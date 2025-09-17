@@ -1,2 +1,0 @@
-# hairgator-privacy
-privacy policy
