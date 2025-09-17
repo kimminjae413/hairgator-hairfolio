@@ -19,13 +19,8 @@ const App: React.FC = () => {
 
     if (designerFromUrl) {
       setClientViewDesigner(designerFromUrl);
-    } else {
-      // Check session storage for a logged-in designer
-      const sessionDesigner = sessionStorage.getItem('hairfolio_designer');
-      if (sessionDesigner) {
-        setLoggedInDesigner(sessionDesigner);
-      }
     }
+    // sessionStorage 관련 코드 제거됨
     setIsLoading(false);
   }, []);
 
@@ -33,13 +28,13 @@ const App: React.FC = () => {
     if (name.trim()) {
       const formattedName = name.trim();
       setLoggedInDesigner(formattedName);
-      sessionStorage.setItem('hairfolio_designer', formattedName);
+      // sessionStorage 제거됨
     }
   };
 
   const handleLogout = () => {
     setLoggedInDesigner(null);
-    sessionStorage.removeItem('hairfolio_designer');
+    // sessionStorage 제거됨
   };
 
   if (isLoading) {
