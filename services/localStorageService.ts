@@ -1,30 +1,23 @@
 import { Hairstyle, DesignerData, DesignerStats } from '../types';
 import { portfolioImages as defaultPortfolio } from '../portfolioImages';
 
-const DB_KEY = 'hairfolio_designers';
 const SAMPLE_DESIGNER_NAME = 'Sample Designer';
 
-// Type for the entire database stored in local storage
+// Type for the entire database stored in memory
 type DesignerDB = {
   [key: string]: DesignerData;
 };
 
+// 메모리 기반 저장소 (localStorage 대신)
+let memoryDB: DesignerDB = {};
+let sessionData: { [key: string]: any } = {};
+
 const getDesigners = (): DesignerDB => {
-  try {
-    const db = localStorage.getItem(DB_KEY);
-    return db ? JSON.parse(db) : {};
-  } catch (error) {
-    console.error("Failed to parse designers from local storage:", error);
-    return {};
-  }
+  return memoryDB;
 };
 
 const saveDesigners = (db: DesignerDB): void => {
-  try {
-    localStorage.setItem(DB_KEY, JSON.stringify(db));
-  } catch (error) {
-    console.error("Failed to save designers to local storage:", error);
-  }
+  memoryDB = { ...db };
 };
 
 const defaultStats: DesignerStats = {
@@ -81,7 +74,8 @@ export const designerExists = (designerName: string): boolean => {
 
 export const trackVisit = (designerName: string): void => {
   const sessionKey = `hairfolio_visit_tracked_${designerName}`;
-  if (sessionStorage.getItem(sessionKey)) {
+  // sessionStorage 대신 메모리 기반
+  if (sessionData[sessionKey]) {
     return; // Already tracked this session
   }
 
@@ -92,7 +86,7 @@ export const trackVisit = (designerName: string): void => {
   db[designerName] = data;
   saveDesigners(db);
 
-  sessionStorage.setItem(sessionKey, 'true');
+  sessionData[sessionKey] = true;
 };
 
 export const trackStyleView = (designerName: string, styleUrl: string): void => {
@@ -105,7 +99,6 @@ export const trackStyleView = (designerName: string, styleUrl: string): void => 
   db[designerName] = data;
   saveDesigners(db);
 };
-
 
 export const trackBooking = (designerName: string, styleUrl: string): void => {
     const db = getDesigners();
