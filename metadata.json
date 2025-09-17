@@ -1,0 +1,5 @@
+{
+  "name": "AI Hairstyle Try-On",
+  "description": "Upload a photo of your face and a photo of a hairstyle you like. The application will use AI to apply the desired hairstyle to your photo, giving you a preview of your new look.",
+  "requestFramePermissions": []
+}
