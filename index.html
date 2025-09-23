@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/hairfolio-icon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="AI 기반 헤어스타일 가상 체험 플랫폼. 디자이너 포트폴리오를 만들고 고객이 원하는 헤어스타일을 미리 체험해보세요." />
+  <meta name="keywords" content="헤어스타일, AI, 가상체험, 미용실, 포트폴리오, VModel" />
+  <meta name="author" content="Hairfolio" />
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://hairfolio.netlify.app/" />
+  <meta property="og:title" content="Hairfolio - AI 헤어스타일 가상 체험" />
+  <meta property="og:description" content="AI 기술로 새로운 헤어스타일을 미리 체험해보세요" />
+  <meta property="og:image" content="/og-image.jpg" />
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image" />
+  <meta property="twitter:url" content="https://hairfolio.netlify.app/" />
+  <meta property="twitter:title" content="Hairfolio - AI 헤어스타일 가상 체험" />
+  <meta property="twitter:description" content="AI 기술로 새로운 헤어스타일을 미리 체험해보세요" />
+  <meta property="twitter:image" content="/og-image.jpg" />
+
+  <title>Hairfolio - AI 헤어스타일 가상 체험</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Custom CSS -->
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+    
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    
+    .animate-fade-in {
+      animation: fadeIn 0.3s ease-in-out;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .animate-pulse-slow {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    
+    /* Loading spinner */
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #6366f1;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 2s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body class="bg-gray-50">
+  <div id="root"></div>
+  <script type="module" src="/src/index.tsx"></script>
+</body>
+</html>
