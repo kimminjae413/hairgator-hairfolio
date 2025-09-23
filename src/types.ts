@@ -35,16 +35,19 @@ export type MinorCategory =
 
 // Hairstyle data structure
 export interface Hairstyle {
-  name: string;                                          // Display name
-  url: string;                                          // Image URL
-  isLocal?: boolean;                                    // Whether it's a locally uploaded image
-  gender?: Gender;                                      // Target gender
+  id?: string;                                          // Unique identifier
+  name: string;                                         // Display name
+  url: string;                                         // Image URL
+  isLocal?: boolean;                                   // Whether it's a locally uploaded image
+  gender?: Gender;                                     // Target gender
   majorCategory?: FemaleMajorCategory | MaleMajorCategory; // Primary categorization
-  minorCategory?: MinorCategory;                        // Secondary categorization
-  description?: string;                                 // Optional description
+  minorCategory?: MinorCategory;                       // Secondary categorization
+  description?: string;                                // Optional description
   tags?: string[];                                     // Optional tags for searching
   uploadedAt?: Date;                                   // When it was uploaded
   uploadedBy?: string;                                 // Who uploaded it
+  createdAt?: string;                                  // ISO date string
+  updatedAt?: string;                                  // ISO date string
 }
 
 // Analytics data for tracking designer portfolio performance
@@ -52,7 +55,31 @@ export interface DesignerStats {
   visits: number;                                      // Total portfolio visits
   styleViews: { [styleUrl: string]: number };         // Views per hairstyle
   bookings: { [styleUrl: string]: number };           // Bookings per hairstyle
-  lastUpdated?: Date;                                  // When stats were last updated
+  totalTryOns?: number;                               // Total style try-ons
+  conversionRate?: number;                            // Booking conversion rate
+  popularStyles?: string[];                           // Top performing style URLs
+  lastUpdated?: string;                               // ISO date string
+}
+
+// Designer profile data
+export interface DesignerProfile {
+  name?: string;
+  bio?: string;
+  phone?: string;
+  location?: string;
+  address?: string;
+  socialLinks?: {
+    instagram?: string;
+    facebook?: string;
+    website?: string;
+  };
+}
+
+// Designer settings
+export interface DesignerSettings {
+  allowDirectBooking?: boolean;
+  showStats?: boolean;
+  theme?: 'light' | 'dark';
 }
 
 // Complete designer data structure
@@ -60,21 +87,10 @@ export interface DesignerData {
   portfolio: Hairstyle[];                              // Designer's hairstyle collection
   reservationUrl?: string;                             // Naver reservation link
   stats?: DesignerStats;                              // Analytics data
-  profile?: {                                         // Optional designer profile
-    bio?: string;
-    phone?: string;
-    address?: string;
-    socialLinks?: {
-      instagram?: string;
-      facebook?: string;
-      website?: string;
-    };
-  };
-  settings?: {                                        // Optional settings
-    allowDirectBooking?: boolean;
-    showStats?: boolean;
-    theme?: 'light' | 'dark';
-  };
+  profile?: DesignerProfile;                          // Designer profile
+  settings?: DesignerSettings;                        // Designer settings
+  createdAt?: string;                                 // ISO date string
+  updatedAt?: string;                                 // ISO date string
 }
 
 // Form data types
@@ -118,12 +134,48 @@ export interface AppError {
   stack?: string;
 }
 
+// VModel API types
+export interface VModelRequest {
+  faceImage: string;
+  styleImage: string;
+  styleDescription: string;
+  options?: {
+    quality?: 'high' | 'medium' | 'low';
+    preserveFaceFeatures?: boolean;
+    blendStrength?: number;
+  };
+}
+
+export interface VModelResponse {
+  success: boolean;
+  imageUrl?: string;
+  error?: string;
+  processingTime?: number;
+}
+
+// Default values for new designers
+export const DEFAULT_STATS: DesignerStats = {
+  visits: 0,
+  styleViews: {},
+  bookings: {},
+  totalTryOns: 0,
+  conversionRate: 0,
+  popularStyles: [],
+  lastUpdated: new Date().toISOString()
+};
+
+export const DEFAULT_SETTINGS: DesignerSettings = {
+  allowDirectBooking: true,
+  showStats: true,
+  theme: 'light'
+};
+
 // Local storage keys (for type safety)
 export const STORAGE_KEYS = {
   DESIGNERS: 'hairfolio_designers',
   SESSION_DESIGNER: 'hairfolio_designer',
-  VISIT_TRACKED: 'hairfolio_visit_tracked_',
-  USER_PREFERENCES: 'hairfolio_preferences'
+  VISIT_TRACKING: 'hairfolio_visit_tracked',
+  SETTINGS: 'hairfolio_settings'
 } as const;
 
 // API endpoints and configuration
