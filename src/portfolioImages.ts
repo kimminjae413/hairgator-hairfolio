@@ -1,4 +1,16 @@
-import { Hairstyle } from './types';
+import { Hairstyle, Gender } from './types';
+
+// Sample designer profile data
+export const sampleDesigner = {
+  name: 'Sample Designer',
+  bio: '10년 경력의 전문 헤어 디자이너입니다. 다양한 스타일의 헤어 디자인을 제공합니다.',
+  location: '서울시 강남구',
+  phone: '010-1234-5678',
+  socialLinks: {
+    instagram: 'https://instagram.com/sampledesigner',
+    website: 'https://sampledesigner.com'
+  }
+};
 
 // Default portfolio images for sample designer
 // These are publicly available hairstyle images from various sources
@@ -157,4 +169,27 @@ export const searchImagesByTags = (searchTerm: string): Hairstyle[] => {
     image.description?.toLowerCase().includes(lowercaseSearch) ||
     image.tags?.some(tag => tag.toLowerCase().includes(lowercaseSearch))
   );
+};
+
+// Function to get featured styles (most popular or recommended)
+export const getFeaturedStyles = (count: number = 4): Hairstyle[] => {
+  // Return a mix of popular styles from different categories
+  const featured = [
+    portfolioImages.find(img => img.name === '웨이브 보브'),
+    portfolioImages.find(img => img.name === '클래식 사이드파트'),
+    portfolioImages.find(img => img.name === '픽시 컷'),
+    portfolioImages.find(img => img.name === '모던 크롭')
+  ].filter(Boolean) as Hairstyle[];
+  
+  return featured.slice(0, count);
+};
+
+// Function to get complementary styles (based on current selection)
+export const getComplementaryStyles = (currentStyle: Hairstyle, count: number = 3): Hairstyle[] => {
+  return portfolioImages
+    .filter(style => 
+      style.gender === currentStyle.gender && 
+      style.name !== currentStyle.name
+    )
+    .slice(0, count);
 };
