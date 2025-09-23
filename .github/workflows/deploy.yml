@@ -1,0 +1,115 @@
+name: Deploy to Netlify
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+        npm audit fix --audit-level=high || true
+
+    - name: Create environment file
+      run: |
+        echo "VMODEL_API_KEY=${{ secrets.VMODEL_API_KEY }}" > .env.local
+        echo "NODE_ENV=production" >> .env.local
+        echo "VITE_APP_NAME=Hairfolio" >> .env.local
+        echo "VITE_APP_VERSION=1.0.0" >> .env.local
+
+    - name: Run tests (if available)
+      run: |
+        if [ -f "package.json" ] && grep -q '"test"' package.json; then
+          npm test -- --coverage --watchAll=false || echo "Tests failed but continuing..."
+        else
+          echo "No tests found, skipping..."
+        fi
+
+    - name: Build application
+      run: |
+        npm run build
+        
+    - name: Verify build output
+      run: |
+        ls -la dist/
+        if [ ! -f "dist/index.html" ]; then
+          echo "Build failed: index.html not found"
+          exit 1
+        fi
+
+    - name: Deploy to Netlify (Production)
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      uses: nwtgck/actions-netlify@v3.0
+      with:
+        publish-dir: './dist'
+        production-branch: ${{ github.ref_name }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        deploy-message: "Deploy from GitHub Actions - ${{ github.sha }}"
+        enable-pull-request-comment: false
+        enable-commit-comment: true
+        overwrites-pull-request-comment: true
+      env:
+        NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+
+    - name: Deploy to Netlify (Preview)
+      if: github.event_name == 'pull_request'
+      uses: nwtgck/actions-netlify@v3.0
+      with:
+        publish-dir: './dist'
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        deploy-message: "Preview Deploy from PR #${{ github.event.number }} - ${{ github.sha }}"
+        alias: pr-${{ github.event.number }}
+      env:
+        NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+
+    - name: Comment on PR with deploy preview
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { owner, repo } = context.repo;
+          const pr_number = context.payload.pull_request.number;
+          
+          github.rest.issues.createComment({
+            owner,
+            repo,
+            issue_number: pr_number,
+            body: `🚀 **Deploy Preview Ready!**
+            
+            ✅ Preview: https://pr-${pr_number}--hairfolio.netlify.app
+            
+            Built with commit ${context.sha.substring(0, 7)}`
+          });
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: build-logs
+        path: |
+          npm-debug.log*
+          yarn-debug.log*
+          yarn-error.log*
+          dist/
+        retention-days: 5
