@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Hairstyle, Gender, FemaleMajorCategory, MaleMajorCategory, MinorCategory, DesignerStats, DesignerProfile } from '../types';
-import * as localStorageService from '../services/firebaseService';
+import * as firebaseService from '../services/firebaseService';
 import HairstyleGallery from './HairstyleGallery';
 import ShareModal from './ShareModal';
 import SettingsModal from './SettingsModal';
@@ -31,13 +31,25 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [activeView, setActiveView] = useState<ActiveView>('gallery');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const data = localStorageService.getDesignerData(designerName);
-    setPortfolio(data.portfolio);
-    setReservationUrl(data.reservationUrl || '');
-    setStats(data.stats || { visits: 0, styleViews: {}, bookings: {} });
-    setDesignerProfile(data.profile);
+    const loadDesignerData = async () => {
+      try {
+        setIsLoading(true);
+        const data = await firebaseService.getDesignerData(designerName);
+        setPortfolio(data.portfolio);
+        setReservationUrl(data.reservationUrl || '');
+        setStats(data.stats || { visits: 0, styleViews: {}, bookings: {} });
+        setDesignerProfile(data.profile);
+      } catch (error) {
+        console.error('Error loading designer data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadDesignerData();
   }, [designerName]);
 
   const handlePortfolioImageAdd = async (styleData: {
@@ -48,45 +60,81 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
     minorCategory: MinorCategory;
     cloudinaryUrl: string;
   }) => {
-    const { file, cloudinaryUrl, ...details } = styleData;
-    const newImage: Hairstyle = {
-      ...details,
-      url: cloudinaryUrl, // Cloudinary URL 사용
-      isLocal: false, // 클라우드에 저장됨
-      id: Date.now().toString(),
-    };
-    const updatedPortfolio = [newImage, ...portfolio];
-    setPortfolio(updatedPortfolio);
-    localStorageService.savePortfolio(designerName, updatedPortfolio);
-    setShowUploadModal(false);
-  };
-
-  const handlePortfolioImageDelete = (hairstyle: Hairstyle) => {
-    if (!hairstyle.id && !hairstyle.url) {
-      console.error('Hairstyle identifier is missing');
-      return;
+    try {
+      const { file, cloudinaryUrl, ...details } = styleData;
+      const newImage: Hairstyle = {
+        ...details,
+        url: cloudinaryUrl,
+        isLocal: false,
+        id: Date.now().toString(),
+      };
+      
+      const success = await firebaseService.addStyleToPortfolio(designerName, newImage);
+      if (success) {
+        const updatedPortfolio = [newImage, ...portfolio];
+        setPortfolio(updatedPortfolio);
+        setShowUploadModal(false);
+      } else {
+        alert('포트폴리오 저장에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('Error adding portfolio image:', error);
+      alert('포트폴리오 저장 중 오류가 발생했습니다.');
     }
-
-    // Use URL as fallback if ID is not available (for existing images)
-    const identifier = hairstyle.id || hairstyle.url;
-    const updatedPortfolio = portfolio.filter(item => 
-      (item.id && item.id !== identifier) && (item.url !== identifier)
-    );
-    
-    setPortfolio(updatedPortfolio);
-    localStorageService.savePortfolio(designerName, updatedPortfolio);
   };
 
-  const handleSaveSettings = (newUrl: string) => {
-    localStorageService.saveReservationUrl(designerName, newUrl);
-    setReservationUrl(newUrl);
-    setShowSettingsModal(false);
+  const handlePortfolioImageDelete = async (hairstyle: Hairstyle) => {
+    try {
+      if (!hairstyle.id && !hairstyle.url) {
+        console.error('Hairstyle identifier is missing');
+        return;
+      }
+
+      const identifier = hairstyle.id || hairstyle.url;
+      const success = await firebaseService.removeStyleFromPortfolio(designerName, identifier);
+      
+      if (success) {
+        const updatedPortfolio = portfolio.filter(item => 
+          (item.id && item.id !== identifier) && (item.url !== identifier)
+        );
+        setPortfolio(updatedPortfolio);
+      } else {
+        alert('포트폴리오 삭제에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('Error deleting portfolio image:', error);
+      alert('포트폴리오 삭제 중 오류가 발생했습니다.');
+    }
   };
 
-  const handleSaveProfile = (profile: DesignerProfile) => {
-    localStorageService.saveDesignerProfile(designerName, profile);
-    setDesignerProfile(profile);
-    setShowProfileModal(false);
+  const handleSaveSettings = async (newUrl: string) => {
+    try {
+      const success = await firebaseService.saveReservationUrl(designerName, newUrl);
+      if (success) {
+        setReservationUrl(newUrl);
+        setShowSettingsModal(false);
+      } else {
+        alert('설정 저장에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      alert('설정 저장 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleSaveProfile = async (profile: DesignerProfile) => {
+    try {
+      const success = await firebaseService.saveDesignerProfile(designerName, profile);
+      if (success) {
+        setDesignerProfile(profile);
+        setShowProfileModal(false);
+      } else {
+        alert('프로필 저장에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      alert('프로필 저장 중 오류가 발생했습니다.');
+    }
   };
 
   // Generate designer initials for fallback
@@ -101,6 +149,17 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
 
   // 통일된 헤더 버튼 스타일
   const headerButtonStyle = "inline-flex items-center justify-center px-3 py-2 font-semibold rounded-lg shadow-md transition-colors duration-300 min-w-[44px] h-[44px]";
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">디자이너 데이터 로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center p-4 font-sans">
