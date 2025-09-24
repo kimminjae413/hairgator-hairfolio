@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import { analyzeHairstyle, applyHairstyle } from '../services/vmodelService'
-import * as localStorageService from '../services/firebaseService'
+import * as firebaseService from '../services/firebaseService'
 import { LoadingState, Hairstyle, DesignerProfile } from '../types'
 import ImageUploader from './ImageUploader'
 import ResultDisplay from './ResultDisplay'
@@ -35,6 +35,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
   const [portfolio, setPortfolio] = useState<Hairstyle[]>([])
   const [reservationUrl, setReservationUrl] = useState<string>('')
   const [designerProfile, setDesignerProfile] = useState<DesignerProfile | null>(null)
+  const [isDataLoading, setIsDataLoading] = useState(true)
   
   // State for AI processing
   const [selectedHairstyle, setSelectedHairstyle] = useState<Hairstyle | null>(null)
@@ -45,18 +46,30 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
   
   // Load designer data on mount
   useEffect(() => {
-    try {
-      const data = localStorageService.getDesignerData(designerName)
-      setPortfolio(data.portfolio || [])
-      setReservationUrl(data.reservationUrl || '')
-      setDesignerProfile(data.profile || null)
-      
-      // Track visit
-      localStorageService.trackVisit(designerName)
-    } catch (error) {
-      console.error('Error loading designer data:', error)
-      setError('디자이너 정보를 불러올 수 없습니다.')
+    const loadDesignerData = async () => {
+      try {
+        setIsDataLoading(true)
+        console.log('디자이너 데이터 로딩 시작:', designerName)
+        
+        // Firebase에서 디자이너 데이터 로드 (localStorage 폴백 포함)
+        const data = await firebaseService.getDesignerData(designerName)
+        console.log('로드한 데이터:', data)
+        
+        setPortfolio(data.portfolio || [])
+        setReservationUrl(data.reservationUrl || '')
+        setDesignerProfile(data.profile || null)
+        
+        // Track visit
+        await firebaseService.trackVisit(designerName)
+      } catch (error) {
+        console.error('Error loading designer data:', error)
+        setError('디자이너 정보를 불러올 수 없습니다.')
+      } finally {
+        setIsDataLoading(false)
+      }
     }
+    
+    loadDesignerData()
   }, [designerName])
 
   // Handle face image upload
@@ -91,7 +104,11 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
     setIsResultModalOpen(true)
 
     // Track style view
-    localStorageService.trackStyleView(designerName, hairstyle.url)
+    try {
+      await firebaseService.trackStyleView(designerName, hairstyle.url)
+    } catch (trackError) {
+      console.error('Error tracking style view:', trackError)
+    }
 
     try {
       // Convert hairstyle URL to File
@@ -130,9 +147,13 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
   }, [])
   
   // Handle booking
-  const handleBookNow = useCallback((hairstyle: Hairstyle) => {
+  const handleBookNow = useCallback(async (hairstyle: Hairstyle) => {
     // Track booking
-    localStorageService.trackBooking(designerName, hairstyle.url)
+    try {
+      await firebaseService.trackBooking(designerName, hairstyle.url)
+    } catch (trackError) {
+      console.error('Error tracking booking:', trackError)
+    }
     
     // Open reservation URL
     if (reservationUrl) {
@@ -143,11 +164,23 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
   }, [designerName, reservationUrl])
   
   // Check if processing is in progress
-  const isLoading = loadingState === 'analyzing' || loadingState === 'generating'
+  const isAIProcessing = loadingState === 'analyzing' || loadingState === 'generating'
 
   // Generate designer profile image placeholder
   const getDesignerInitials = (name: string) => {
     return name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2)
+  }
+
+  // Loading state while fetching designer data
+  if (isDataLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">디자이너 포트폴리오 로딩 중...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -302,7 +335,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
                   previewSrc={facePreview}
                   onFileChange={handleFaceFileChange}
                   icon={<UserIcon />}
-                  disabled={isLoading}
+                  disabled={isAIProcessing}
                 />
                 <div className="mt-4 text-xs text-gray-500 text-center">
                   <p>• JPG, PNG, WEBP 형식 지원</p>
@@ -320,7 +353,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
                   images={portfolio}
                   onSelect={handleHairstyleSelect}
                   selectedUrl={selectedHairstyle?.url || null}
-                  disabled={!faceFile || isLoading}
+                  disabled={!faceFile || isAIProcessing}
                 />
                 {!faceFile && (
                   <div className="text-center mt-6 p-4 bg-indigo-50 rounded-lg">
