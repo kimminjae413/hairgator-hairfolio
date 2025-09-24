@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Gender, FemaleMajorCategory, MaleMajorCategory, MinorCategory, UploadStyleFormData } from '../types';
+import { uploadWithProgress, isValidImageFile, isValidFileSize } from '../services/cloudinaryService';
 import UploadIcon from './icons/UploadIcon';
 
 interface UploadStyleModalProps {
-  onUpload: (data: UploadStyleFormData) => void;
+  onUpload: (data: UploadStyleFormData & { cloudinaryUrl: string }) => void;
   onClose: () => void;
 }
 
@@ -31,6 +32,7 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
   const [description, setDescription] = useState('');
   const [tags, setTags] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -47,14 +49,11 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
 
   // Handle file validation
   const validateFile = (selectedFile: File): string | null => {
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-
-    if (!allowedTypes.includes(selectedFile.type)) {
+    if (!isValidImageFile(selectedFile)) {
       return '지원되지 않는 파일 형식입니다. JPEG, PNG, WebP 파일만 업로드 가능합니다.';
     }
 
-    if (selectedFile.size > maxSize) {
+    if (!isValidFileSize(selectedFile, 10)) {
       return '파일 크기가 너무 큽니다. 10MB 이하의 파일만 업로드 가능합니다.';
     }
 
@@ -85,30 +84,41 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
     if (!file || !styleName.trim()) return;
 
     setIsUploading(true);
+    setUploadProgress(0);
     setError(null);
 
     try {
-      // Simulate upload delay for better UX
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Cloudinary에 이미지 업로드
+      const cloudinaryUrl = await uploadWithProgress(
+        file,
+        (progress) => setUploadProgress(progress),
+        {
+          folder: 'hairfolio/styles',
+          tags: ['hairfolio', 'hairstyle', gender.toLowerCase()]
+        }
+      );
 
       const tagsArray = tags
         .split(',')
         .map(tag => tag.trim())
         .filter(tag => tag.length > 0);
 
-      const uploadData: UploadStyleFormData = {
+      const uploadData = {
         file,
         name: styleName.trim(),
         gender,
         majorCategory,
         minorCategory,
         description: description.trim() || undefined,
-        tags: tagsArray.length > 0 ? tagsArray : undefined
+        tags: tagsArray.length > 0 ? tagsArray : undefined,
+        cloudinaryUrl // Cloudinary URL 추가
       };
 
       onUpload(uploadData);
     } catch (err) {
-      setError('업로드 중 오류가 발생했습니다. 다시 시도해주세요.');
+      console.error('Upload error:', err);
+      setError(err instanceof Error ? err.message : '업로드 중 오류가 발생했습니다.');
+      setUploadProgress(0);
     } finally {
       setIsUploading(false);
     }
@@ -176,6 +186,23 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
                     </div>
                     <p className="font-medium">이미지 업로드</p>
                     <p className="text-xs mt-1">JPEG, PNG, WebP (최대 10MB)</p>
+                  </div>
+                )}
+                
+                {/* Upload Progress Overlay */}
+                {isUploading && (
+                  <div className="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center">
+                    <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <div className="text-white text-center">
+                      <p className="text-sm mb-2">Cloudinary에 업로드 중...</p>
+                      <div className="w-48 bg-gray-300 rounded-full h-2">
+                        <div 
+                          className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${uploadProgress}%` }}
+                        ></div>
+                      </div>
+                      <p className="text-xs mt-1">{uploadProgress}%</p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -315,6 +342,21 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
                 </div>
               </div>
             )}
+
+            {/* Cloudinary Info */}
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-start">
+                <svg className="w-5 h-5 text-blue-600 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <h4 className="font-medium text-blue-800 text-sm">클라우드 저장</h4>
+                  <p className="text-blue-700 text-xs mt-1">
+                    이미지는 Cloudinary 클라우드에 안전하게 저장되며, 모든 디바이스에서 접근 가능합니다.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -327,8 +369,8 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
           >
             {isUploading ? (
               <>
-                <div className="spinner w-5 h-5 mr-2"></div>
-                업로드 중...
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                업로드 중... ({uploadProgress}%)
               </>
             ) : (
               <>
