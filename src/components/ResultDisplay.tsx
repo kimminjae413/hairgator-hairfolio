@@ -24,7 +24,6 @@ const ResultDisplay: React.FC<ResultDisplayProps> = ({
   onBookNow
 }) => {
   const [imageLoaded, setImageLoaded] = useState(false)
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
 
   const isLoading = loadingState === 'analyzing' || loadingState === 'generating'
   const isSuccess = loadingState === 'done' && afterSrc
@@ -126,14 +125,25 @@ const ResultDisplay: React.FC<ResultDisplayProps> = ({
       >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <div>
-            <h2 id="result-title" className="text-2xl font-bold text-gray-800">
-              {isLoading ? '처리중...' : isSuccess ? '변환 완료!' : '오류 발생'}
-            </h2>
-            {hairstyle && (
-              <p className="text-sm text-gray-600 mt-1">
-                {hairstyle.name} 스타일 적용
-              </p>
+          <div className="flex items-center gap-3">
+            <div>
+              <h2 id="result-title" className="text-2xl font-bold text-gray-800">
+                {isLoading ? '처리중...' : isSuccess ? '변환 완료!' : '오류 발생'}
+              </h2>
+              {hairstyle && (
+                <p className="text-sm text-gray-600 mt-1">
+                  {hairstyle.name} 스타일 적용
+                </p>
+              )}
+            </div>
+            {/* Success badge - moved to header */}
+            {isSuccess && (
+              <div className="bg-green-600 text-white px-3 py-1 rounded-full text-sm font-semibold flex items-center space-x-2">
+                <div className="w-4 h-4">
+                  <SparklesIcon />
+                </div>
+                <span>완료</span>
+              </div>
             )}
           </div>
           <button
@@ -258,14 +268,12 @@ const ResultDisplay: React.FC<ResultDisplayProps> = ({
                         alt={`${hairstyle?.name} 스타일 적용 결과`}
                         className="w-full h-full object-cover"
                         onLoad={() => setImageLoaded(true)}
+                        onError={(e) => {
+                          console.error('Image failed to load:', afterSrc)
+                          // 이미지 로드 실패 시 fallback 처리
+                        }}
                       />
                     )}
-                    
-                    {/* Success badge */}
-                    <div className="absolute top-3 right-3 bg-green-600 text-white px-2 py-1 rounded-full text-xs font-semibold flex items-center space-x-1">
-                      <SparklesIcon />
-                      <span>완료</span>
-                    </div>
                   </div>
                 </div>
               </div>
