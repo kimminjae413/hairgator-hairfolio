@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import * as localStorageService from '../services/localStorageService';
+import * as firebaseService from '../services/firebaseService';
 import { portfolioImages } from '../portfolioImages';
 
 interface LoginProps {
@@ -44,18 +44,24 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       await new Promise(resolve => setTimeout(resolve, 500));
 
       if (mode === 'login') {
-        if (localStorageService.designerExists(trimmedName)) {
+        const exists = await firebaseService.designerExists(trimmedName);
+        if (exists) {
           onLogin(trimmedName);
         } else {
           throw new Error('등록되지 않은 디자이너입니다. 회원가입을 먼저 진행해주세요.');
         }
       } else { // signup
-        if (localStorageService.designerExists(trimmedName)) {
+        const exists = await firebaseService.designerExists(trimmedName);
+        if (exists) {
           throw new Error('이미 사용중인 이름입니다. 다른 이름을 선택해주세요.');
         } else {
           // Create a new portfolio for the designer with default images and initial stats
-          localStorageService.savePortfolio(trimmedName, portfolioImages);
-          onLogin(trimmedName);
+          const success = await firebaseService.savePortfolio(trimmedName, portfolioImages);
+          if (success) {
+            onLogin(trimmedName);
+          } else {
+            throw new Error('계정 생성에 실패했습니다. 다시 시도해주세요.');
+          }
         }
       }
     } catch (err) {
