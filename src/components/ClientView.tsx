@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import { analyzeHairstyle, applyHairstyle } from '../services/vmodelService'
 import * as localStorageService from '../services/localStorageService'
-import { LoadingState, Hairstyle } from '../types'
+import { LoadingState, Hairstyle, DesignerProfile } from '../types'
 import ImageUploader from './ImageUploader'
 import ResultDisplay from './ResultDisplay'
 import HairstyleGallery from './HairstyleGallery'
@@ -34,7 +34,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
   // State for designer data
   const [portfolio, setPortfolio] = useState<Hairstyle[]>([])
   const [reservationUrl, setReservationUrl] = useState<string>('')
-  const [designerProfile, setDesignerProfile] = useState<any>(null)
+  const [designerProfile, setDesignerProfile] = useState<DesignerProfile | null>(null)
   
   // State for AI processing
   const [selectedHairstyle, setSelectedHairstyle] = useState<Hairstyle | null>(null)
@@ -49,7 +49,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
       const data = localStorageService.getDesignerData(designerName)
       setPortfolio(data.portfolio || [])
       setReservationUrl(data.reservationUrl || '')
-      setDesignerProfile(data.profile)
+      setDesignerProfile(data.profile || null)
       
       // Track visit
       localStorageService.trackVisit(designerName)
@@ -167,24 +167,29 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
                 {designerProfile?.profileImage ? (
                   <img
                     src={designerProfile.profileImage}
-                    alt={designerName}
-                    className="w-20 h-20 rounded-full object-cover border-4 border-indigo-100"
+                    alt={designerProfile.name || designerName}
+                    className="w-20 h-20 rounded-full object-cover border-4 border-indigo-100 shadow-lg"
                     onError={(e) => {
                       // Fallback to initials if profile image fails to load
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';
-                      target.parentElement!.querySelector('.profile-fallback')!.classList.remove('hidden');
+                      const fallback = target.parentElement?.querySelector('.profile-fallback') as HTMLElement;
+                      if (fallback) {
+                        fallback.classList.remove('hidden');
+                      }
                     }}
                   />
                 ) : null}
-                <div className={`w-20 h-20 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xl border-4 border-indigo-100 profile-fallback ${designerProfile?.profileImage ? 'hidden' : ''}`}>
-                  {getDesignerInitials(designerName)}
+                <div className={`w-20 h-20 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold text-xl border-4 border-indigo-100 shadow-lg profile-fallback ${designerProfile?.profileImage ? 'hidden' : ''}`}>
+                  {getDesignerInitials(designerProfile?.name || designerName)}
                 </div>
               </div>
 
               {/* Designer Info */}
               <div className="flex-1 text-center sm:text-left">
-                <h2 className="text-2xl font-bold text-gray-800 mb-1">{designerName}</h2>
+                <h2 className="text-2xl font-bold text-gray-800 mb-1">
+                  {designerProfile?.name || designerName}
+                </h2>
                 {designerProfile?.bio && (
                   <p className="text-gray-600 text-sm mb-3 leading-relaxed">
                     {designerProfile.bio}
@@ -220,8 +225,11 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
                         href={designerProfile.socialLinks.instagram}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-medium rounded-full hover:from-purple-600 hover:to-pink-600 transition-colors"
+                        className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-medium rounded-full hover:from-purple-600 hover:to-pink-600 transition-all duration-200 shadow-md hover:shadow-lg"
                       >
+                        <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                        </svg>
                         Instagram
                       </a>
                     )}
@@ -230,8 +238,11 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
                         href={designerProfile.socialLinks.website}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center px-3 py-1.5 bg-blue-500 text-white text-xs font-medium rounded-full hover:bg-blue-600 transition-colors"
+                        className="inline-flex items-center px-3 py-1.5 bg-blue-500 text-white text-xs font-medium rounded-full hover:bg-blue-600 transition-all duration-200 shadow-md hover:shadow-lg"
                       >
+                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9m0 9c-5 0-9-4-9-9s4-9 9-9" />
+                        </svg>
                         Website
                       </a>
                     )}
@@ -239,6 +250,18 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
                 )}
               </div>
             </div>
+
+            {/* Trust Badge */}
+            {designerProfile && (
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+                  <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                  <span>검증된 헤어 디자이너</span>
+                </div>
+              </div>
+            )}
           </div>
 
           <p className="text-lg text-gray-600">
@@ -256,7 +279,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
               </div>
               <h2 className="text-2xl font-bold text-gray-700 mb-2">포트폴리오를 찾을 수 없습니다</h2>
               <p className="text-gray-500">
-                "{designerName}" 디자이너의 포트폴리오가 존재하지 않거나 아직 스타일이 등록되지 않았습니다.
+                "{designerProfile?.name || designerName}" 디자이너의 포트폴리오가 존재하지 않거나 아직 스타일이 등록되지 않았습니다.
               </p>
               <button
                 onClick={() => window.history.back()}
