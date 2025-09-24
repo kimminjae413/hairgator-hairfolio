@@ -67,7 +67,7 @@ const pollTaskStatus = async (taskId: string): Promise<VModelTask> => {
       const response = await fetch(`${API_BASE_URL}/get/${taskId}`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${API_KEY}`,
+          'Authorization': `Bearer ${API_TOKEN}`,
           'Content-Type': 'application/json'
         }
       });
@@ -110,7 +110,7 @@ const pollTaskStatus = async (taskId: string): Promise<VModelTask> => {
 export const analyzeHairstyle = async (hairstyleFile: File): Promise<string> => {
   try {
     // VModel API에는 별도 분석 기능이 없으므로 기본 설명 생성
-    return new Promise((resolve) => {
+    return new Promise<string>((resolve) => {
       setTimeout(() => {
         const descriptions = [
           'modern layered cut with natural texture',
@@ -136,11 +136,19 @@ export const applyHairstyle = async (
   hairstyleFile: File | string,
   hairstyleDescription: string
 ): Promise<string> => {
-=400&h=400&fit=crop&crop=face',
+  try {
+    if (!API_TOKEN || API_TOKEN === 'your_vmodel_api_token_here') {
+      console.warn('VModel API 토큰이 설정되지 않음. 데모 모드로 실행합니다.');
+      
+      // 데모 모드: 실제 변환된 것처럼 보이는 샘플 이미지 반환
+      return new Promise<string>((resolve) => {
+        setTimeout(() => {
+          const demoImages = [
+            'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop&crop=face',
             'https://images.unsplash.com/photo-1494790108755-2616c5e93769?w=400&h=400&fit=crop&crop=face',
             'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face',
             'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face',
-            'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face',
+            'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face'
           ];
           const randomDemo = demoImages[Math.floor(Math.random() * demoImages.length)];
           resolve(randomDemo);
