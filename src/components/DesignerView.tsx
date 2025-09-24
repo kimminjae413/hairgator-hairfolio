@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Hairstyle, Gender, FemaleMajorCategory, MaleMajorCategory, MinorCategory, DesignerStats } from '../types';
+import { Hairstyle, Gender, FemaleMajorCategory, MaleMajorCategory, MinorCategory, DesignerStats, DesignerProfile } from '../types';
 import * as localStorageService from '../services/localStorageService';
 import HairstyleGallery from './HairstyleGallery';
 import ShareModal from './ShareModal';
 import SettingsModal from './SettingsModal';
 import UploadStyleModal from './UploadStyleModal';
+import DesignerProfileModal from './DesignerProfileModal';
 import AnalyticsDashboard from './AnalyticsDashboard';
 import ShareIcon from './icons/ShareIcon';
 import SettingsIcon from './icons/SettingsIcon';
+import UserIcon from './icons/UserIcon';
 import PlusIcon from './icons/PlusIcon';
 import HairIcon from './icons/HairIcon';
 import AnalyticsIcon from './icons/AnalyticsIcon';
@@ -23,9 +25,11 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
   const [portfolio, setPortfolio] = useState<Hairstyle[]>([]);
   const [reservationUrl, setReservationUrl] = useState('');
   const [stats, setStats] = useState<DesignerStats | null>(null);
+  const [designerProfile, setDesignerProfile] = useState<DesignerProfile | undefined>(undefined);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [activeView, setActiveView] = useState<ActiveView>('gallery');
 
   useEffect(() => {
@@ -33,6 +37,7 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
     setPortfolio(data.portfolio);
     setReservationUrl(data.reservationUrl || '');
     setStats(data.stats || { visits: 0, styleViews: {}, bookings: {} });
+    setDesignerProfile(data.profile);
   }, [designerName]);
 
   const handlePortfolioImageAdd = async (styleData: {
@@ -78,6 +83,12 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
     setShowSettingsModal(false);
   };
 
+  const handleSaveProfile = (profile: DesignerProfile) => {
+    localStorageService.saveDesignerProfile(designerName, profile);
+    setDesignerProfile(profile);
+    setShowProfileModal(false);
+  };
+
   // 통일된 탭 스타일 - 아이콘 크기와 패딩 최적화
   const tabStyle = "px-3 py-2.5 text-center font-medium text-sm rounded-lg transition-colors duration-300 focus:outline-none flex items-center justify-center gap-2 min-w-[100px]";
   const activeTabStyle = "bg-indigo-600 text-white shadow";
@@ -95,6 +106,16 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
             <p className="text-lg text-gray-600 mt-1">Portfolio for <span className="font-semibold text-indigo-600">{designerName}</span></p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowProfileModal(true)}
+              className={`${headerButtonStyle} bg-blue-600 text-white hover:bg-blue-700`}
+              title="Edit Profile"
+            >
+              <div className="w-5 h-5">
+                <UserIcon />
+              </div>
+              <span className="hidden sm:inline ml-2 text-sm">Profile</span>
+            </button>
             <button
               onClick={() => setShowShareModal(true)}
               className={`${headerButtonStyle} bg-indigo-600 text-white hover:bg-indigo-700`}
@@ -124,6 +145,48 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
             </button>
           </div>
         </header>
+
+        {/* Profile Preview Card */}
+        {designerProfile && (
+          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border border-gray-100">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                {designerProfile.name ? designerProfile.name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2) : designerName.slice(0, 2).toUpperCase()}
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-gray-800">{designerProfile.name}</h3>
+                {designerProfile.bio && (
+                  <p className="text-gray-600 text-sm mt-1 leading-relaxed">{designerProfile.bio}</p>
+                )}
+                <div className="flex flex-wrap gap-4 mt-2 text-xs text-gray-500">
+                  {designerProfile.location && (
+                    <span className="flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      {designerProfile.location}
+                    </span>
+                  )}
+                  {designerProfile.phone && (
+                    <span className="flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                      </svg>
+                      {designerProfile.phone}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setShowProfileModal(true)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                편집
+              </button>
+            </div>
+          </div>
+        )}
 
         <main className="bg-white p-6 md:p-8 rounded-2xl shadow-lg">
            <div className="border-b pb-4 mb-6">
@@ -184,6 +247,15 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
             stats ? <AnalyticsDashboard stats={stats} portfolio={portfolio} /> : <div className="text-center py-16 text-gray-500">Loading analytics...</div>
           )}
         </main>
+        
+        {showProfileModal && (
+          <DesignerProfileModal
+            currentProfile={designerProfile}
+            designerName={designerName}
+            onSave={handleSaveProfile}
+            onClose={() => setShowProfileModal(false)}
+          />
+        )}
         
         {showShareModal && (
           <ShareModal 
