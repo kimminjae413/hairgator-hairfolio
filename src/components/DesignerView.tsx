@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Hairstyle, Gender, FemaleMajorCategory, MaleMajorCategory, MinorCategory, DesignerStats, DesignerProfile } from '../types';
-import * as localStorageService from '../services/localStorageService';
+import * as localStorageService from './services/firebaseService';
 import HairstyleGallery from './HairstyleGallery';
 import ShareModal from './ShareModal';
 import SettingsModal from './SettingsModal';
