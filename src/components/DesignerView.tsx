@@ -60,9 +60,13 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
     setShowSettingsModal(false);
   };
 
-  const tabStyle = "px-4 py-2 text-center font-semibold text-sm rounded-lg transition-colors duration-300 focus:outline-none flex items-center justify-center gap-2";
+  // 통일된 탭 스타일 - 아이콘 크기와 패딩 최적화
+  const tabStyle = "px-3 py-2.5 text-center font-medium text-sm rounded-lg transition-colors duration-300 focus:outline-none flex items-center justify-center gap-2 min-w-[100px]";
   const activeTabStyle = "bg-indigo-600 text-white shadow";
   const inactiveTabStyle = "text-gray-600 hover:bg-gray-200";
+
+  // 통일된 헤더 버튼 스타일
+  const headerButtonStyle = "inline-flex items-center justify-center px-3 py-2 font-semibold rounded-lg shadow-md transition-colors duration-300 min-w-[44px] h-[44px]";
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center p-4 font-sans">
@@ -72,40 +76,59 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
             <h1 className="text-4xl md:text-5xl font-bold text-gray-800 tracking-tight">Hairfolio</h1>
             <p className="text-lg text-gray-600 mt-1">Portfolio for <span className="font-semibold text-indigo-600">{designerName}</span></p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setShowShareModal(true)}
-              className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition-colors duration-300"
+              className={`${headerButtonStyle} bg-indigo-600 text-white hover:bg-indigo-700`}
+              title="Share Portfolio"
             >
-              <ShareIcon />
-              <span className="hidden sm:inline ml-2">Share</span>
+              <div className="w-5 h-5">
+                <ShareIcon />
+              </div>
+              <span className="hidden sm:inline ml-2 text-sm">Share</span>
             </button>
             <button
               onClick={() => setShowSettingsModal(true)}
-              className="inline-flex items-center px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg shadow-md hover:bg-gray-300 transition-colors duration-300"
+              className={`${headerButtonStyle} bg-gray-200 text-gray-700 hover:bg-gray-300`}
+              title="Settings"
             >
-              <SettingsIcon />
-               <span className="hidden sm:inline ml-2">Settings</span>
+              <div className="w-5 h-5">
+                <SettingsIcon />
+              </div>
+              <span className="hidden sm:inline ml-2 text-sm">Settings</span>
             </button>
             <button
               onClick={onLogout}
-              className="px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg shadow-md hover:bg-gray-700 transition-colors duration-300"
+              className={`${headerButtonStyle} bg-gray-600 text-white hover:bg-gray-700`}
+              title="Logout"
             >
-              Logout
+              <span className="text-sm px-1">Logout</span>
             </button>
           </div>
         </header>
 
         <main className="bg-white p-6 md:p-8 rounded-2xl shadow-lg">
            <div className="border-b pb-4 mb-6">
-             <div className="flex gap-2 p-1 bg-gray-100 rounded-xl w-full sm:w-max">
-                 <button onClick={() => setActiveView('gallery')} className={`${tabStyle} flex-1 sm:flex-initial ${activeView === 'gallery' ? activeTabStyle : inactiveTabStyle}`} aria-pressed={activeView === 'gallery'}>
-                    <HairIcon />
-                    Your Styles
+             <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-full sm:w-max">
+                 <button 
+                   onClick={() => setActiveView('gallery')} 
+                   className={`${tabStyle} flex-1 sm:flex-initial ${activeView === 'gallery' ? activeTabStyle : inactiveTabStyle}`} 
+                   aria-pressed={activeView === 'gallery'}
+                 >
+                    <div className="w-4 h-4">
+                      <HairIcon />
+                    </div>
+                    <span>Your Styles</span>
                  </button>
-                 <button onClick={() => setActiveView('analytics')} className={`${tabStyle} flex-1 sm:flex-initial ${activeView === 'analytics' ? activeTabStyle : inactiveTabStyle}`} aria-pressed={activeView === 'analytics'}>
-                    <AnalyticsIcon />
-                    Analytics
+                 <button 
+                   onClick={() => setActiveView('analytics')} 
+                   className={`${tabStyle} flex-1 sm:flex-initial ${activeView === 'analytics' ? activeTabStyle : inactiveTabStyle}`} 
+                   aria-pressed={activeView === 'analytics'}
+                 >
+                    <div className="w-4 h-4">
+                      <AnalyticsIcon />
+                    </div>
+                    <span>Analytics</span>
                  </button>
              </div>
           </div>
@@ -130,7 +153,9 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
                         onClick={() => setShowUploadModal(true)}
                         className="mt-6 inline-flex items-center justify-center px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition-colors duration-300"
                     >
-                        <PlusIcon />
+                        <div className="w-5 h-5">
+                          <PlusIcon />
+                        </div>
                         <span className="ml-2">Add Your First Style</span>
                     </button>
                 </div>
