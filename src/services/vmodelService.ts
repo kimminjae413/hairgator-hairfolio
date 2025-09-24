@@ -2,7 +2,7 @@ import { VModelResponse, VModelRequest } from '../types';
 
 // VModel API 설정 - 올바른 엔드포인트
 const API_BASE_URL = 'https://api.vmodel.ai/api/tasks/v1';
-const API_KEY = import.meta.env.VITE_VMODEL_API_KEY;
+const API_TOKEN = import.meta.env.VITE_VMODEL_API_TOKEN;
 const HAIRSTYLE_MODEL_VERSION = '5c0440717a995b0bbd93377bd65dbb4fe360f67967c506aa6bd8f6b660733a7e';
 
 // API 키 확인
