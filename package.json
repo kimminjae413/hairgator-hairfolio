@@ -13,7 +13,8 @@
   },
   "dependencies": {
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "firebase": "^10.7.1"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
@@ -39,7 +40,8 @@
     "ai",
     "hairstyle",
     "vmodel",
-    "tailwindcss"
+    "tailwindcss",
+    "firebase"
   ],
   "author": "Hairfolio Team",
   "license": "MIT",
