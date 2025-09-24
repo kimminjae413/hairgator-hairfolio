@@ -29,9 +29,16 @@ const getCloudinaryConfig = (): CloudinaryConfig => {
   const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
   const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
+  // 디버깅을 위한 로그 (임시)
+  console.log('Cloudinary Config Debug:', { 
+    cloudName: cloudName || 'NOT_SET', 
+    uploadPreset: uploadPreset || 'NOT_SET',
+    allEnvVars: import.meta.env
+  });
+
   if (!cloudName || !uploadPreset) {
     throw new Error(
-      'Cloudinary 설정이 누락되었습니다. .env.local에 VITE_CLOUDINARY_CLOUD_NAME과 VITE_CLOUDINARY_UPLOAD_PRESET를 추가하세요.'
+      'Cloudinary 설정이 누락되었습니다. 네트리파이 환경변수에 VITE_CLOUDINARY_CLOUD_NAME과 VITE_CLOUDINARY_UPLOAD_PRESET를 추가하세요.'
     );
   }
 
@@ -49,6 +56,7 @@ export const uploadToCloudinary = async (
 ): Promise<string> => {
   try {
     const config = getCloudinaryConfig();
+    console.log('업로드 시작:', { fileName: file.name, size: file.size, config });
     
     // FormData 생성
     const formData = new FormData();
@@ -64,26 +72,40 @@ export const uploadToCloudinary = async (
       formData.append('tags', options.tags.join(','));
     }
 
+    const uploadUrl = `https://api.cloudinary.com/v1_1/${config.cloudName}/image/upload`;
+    console.log('업로드 URL:', uploadUrl);
+
     // Cloudinary API 호출
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${config.cloudName}/image/upload`,
-      {
-        method: 'POST',
-        body: formData,
-      }
-    );
+    const response = await fetch(uploadUrl, {
+      method: 'POST',
+      body: formData,
+    });
+
+    console.log('Cloudinary 응답:', { 
+      status: response.status, 
+      statusText: response.statusText,
+      ok: response.ok 
+    });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`업로드 실패: ${errorData.error?.message || response.statusText}`);
+      let errorMessage = response.statusText;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error?.message || errorMessage;
+        console.error('Cloudinary 에러 상세:', errorData);
+      } catch (parseError) {
+        console.error('에러 응답 파싱 실패:', parseError);
+      }
+      throw new Error(`업로드 실패 (${response.status}): ${errorMessage}`);
     }
 
     const result: CloudinaryUploadResponse = await response.json();
+    console.log('업로드 성공:', { public_id: result.public_id, secure_url: result.secure_url });
     
-    // 최적화된 URL 반환 (자동 포맷, 품질 최적화)
+    // 최적화된 URL 반환 (자동 포맷, 품질 최적화, 크기 조정)
     const optimizedUrl = result.secure_url.replace(
       '/upload/',
-      '/upload/f_auto,q_auto,w_800,h_800,c_fill/'
+      '/upload/f_auto,q_auto,w_800,h_800,c_fill,g_face/'
     );
     
     return optimizedUrl;
@@ -110,6 +132,7 @@ export const uploadWithProgress = async (
 ): Promise<string> => {
   try {
     const config = getCloudinaryConfig();
+    console.log('진행률 추적 업로드 시작:', { fileName: file.name, config });
     
     const formData = new FormData();
     formData.append('file', file);
@@ -122,6 +145,8 @@ export const uploadWithProgress = async (
     if (options?.tags && options.tags.length > 0) {
       formData.append('tags', options.tags.join(','));
     }
+
+    const uploadUrl = `https://api.cloudinary.com/v1_1/${config.cloudName}/image/upload`;
 
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -138,29 +163,50 @@ export const uploadWithProgress = async (
         if (xhr.status === 200) {
           try {
             const result: CloudinaryUploadResponse = JSON.parse(xhr.responseText);
+            console.log('XHR 업로드 성공:', { public_id: result.public_id });
+            
+            // 최적화된 URL 반환 (얼굴 중심 크롭)
             const optimizedUrl = result.secure_url.replace(
               '/upload/',
-              '/upload/f_auto,q_auto,w_800,h_800,c_fill/'
+              '/upload/f_auto,q_auto,w_800,h_800,c_fill,g_face/'
             );
             resolve(optimizedUrl);
           } catch (parseError) {
+            console.error('응답 파싱 에러:', parseError);
             reject(new Error('서버 응답을 파싱할 수 없습니다.'));
           }
         } else {
-          reject(new Error(`업로드 실패: ${xhr.statusText}`));
+          console.error('XHR 업로드 실패:', { status: xhr.status, statusText: xhr.statusText });
+          
+          let errorMessage = xhr.statusText;
+          try {
+            const errorData = JSON.parse(xhr.responseText);
+            errorMessage = errorData.error?.message || errorMessage;
+          } catch (parseError) {
+            // 파싱 실패시 기본 메시지 사용
+          }
+          
+          reject(new Error(`업로드 실패 (${xhr.status}): ${errorMessage}`));
         }
       });
       
       xhr.addEventListener('error', () => {
+        console.error('XHR 네트워크 에러');
         reject(new Error('네트워크 오류가 발생했습니다.'));
       });
       
-      xhr.open('POST', `https://api.cloudinary.com/v1_1/${config.cloudName}/image/upload`);
+      xhr.addEventListener('timeout', () => {
+        console.error('XHR 타임아웃');
+        reject(new Error('업로드 시간이 초과되었습니다.'));
+      });
+      
+      xhr.timeout = 60000; // 60초 타임아웃
+      xhr.open('POST', uploadUrl);
       xhr.send(formData);
     });
     
   } catch (error) {
-    console.error('Cloudinary 업로드 에러:', error);
+    console.error('uploadWithProgress 에러:', error);
     throw error;
   }
 };
@@ -168,8 +214,20 @@ export const uploadWithProgress = async (
 // 이미지 URL에서 Cloudinary public_id 추출
 export const getPublicIdFromUrl = (cloudinaryUrl: string): string | null => {
   try {
-    const matches = cloudinaryUrl.match(/\/v\d+\/(.+)\./);
-    return matches ? matches[1] : null;
+    // Cloudinary URL 패턴 매칭
+    const patterns = [
+      /\/v\d+\/(.+?)(?:\.|$)/, // 기본 패턴
+      /\/upload\/[^/]+\/(.+?)(?:\.|$)/, // 변환이 포함된 패턴
+    ];
+    
+    for (const pattern of patterns) {
+      const matches = cloudinaryUrl.match(pattern);
+      if (matches && matches[1]) {
+        return matches[1];
+      }
+    }
+    
+    return null;
   } catch {
     return null;
   }
@@ -179,6 +237,7 @@ export const getPublicIdFromUrl = (cloudinaryUrl: string): string | null => {
 export const deleteFromCloudinary = async (publicId: string): Promise<boolean> => {
   console.warn('클라이언트에서 직접 삭제할 수 없습니다. 서버 API가 필요합니다.');
   // 실제 구현시에는 백엔드 API를 통해 삭제해야 함
+  // DELETE API는 API Secret이 필요하므로 보안상 서버에서 처리해야 함
   return false;
 };
 
@@ -188,9 +247,11 @@ export const getTransformedUrl = (
   transformations: {
     width?: number;
     height?: number;
-    crop?: 'fill' | 'fit' | 'scale' | 'crop';
+    crop?: 'fill' | 'fit' | 'scale' | 'crop' | 'thumb' | 'pad';
+    gravity?: 'face' | 'center' | 'north' | 'south' | 'east' | 'west';
     quality?: 'auto' | number;
-    format?: 'auto' | 'jpg' | 'png' | 'webp';
+    format?: 'auto' | 'jpg' | 'png' | 'webp' | 'avif';
+    effects?: string[]; // 예: ['blur:300', 'brightness:50']
   }
 ): string => {
   try {
@@ -199,11 +260,21 @@ export const getTransformedUrl = (
     if (transformations.width) transformString += `w_${transformations.width},`;
     if (transformations.height) transformString += `h_${transformations.height},`;
     if (transformations.crop) transformString += `c_${transformations.crop},`;
+    if (transformations.gravity) transformString += `g_${transformations.gravity},`;
     if (transformations.quality) transformString += `q_${transformations.quality},`;
     if (transformations.format) transformString += `f_${transformations.format},`;
     
+    // 특수 효과 적용
+    if (transformations.effects && transformations.effects.length > 0) {
+      transformString += `e_${transformations.effects.join(':')},`;
+    }
+    
     // 마지막 쉼표 제거
     transformString = transformString.replace(/,$/, '');
+    
+    if (!transformString) {
+      return originalUrl;
+    }
     
     return originalUrl.replace('/upload/', `/upload/${transformString}/`);
   } catch {
@@ -213,7 +284,14 @@ export const getTransformedUrl = (
 
 // 업로드 가능한 파일 유형 체크
 export const isValidImageFile = (file: File): boolean => {
-  const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  const validTypes = [
+    'image/jpeg', 
+    'image/jpg', 
+    'image/png', 
+    'image/webp',
+    'image/avif', // 차세대 포맷 지원
+    'image/heic', // iOS 기본 포맷 지원
+  ];
   return validTypes.includes(file.type);
 };
 
@@ -221,4 +299,60 @@ export const isValidImageFile = (file: File): boolean => {
 export const isValidFileSize = (file: File, maxSizeMB: number = 10): boolean => {
   const maxSizeBytes = maxSizeMB * 1024 * 1024;
   return file.size <= maxSizeBytes;
+};
+
+// 이미지 미리보기 생성
+export const createImagePreview = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    if (!isValidImageFile(file)) {
+      reject(new Error('지원되지 않는 이미지 형식입니다.'));
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      resolve(e.target?.result as string);
+    };
+    reader.onerror = () => {
+      reject(new Error('이미지 미리보기 생성에 실패했습니다.'));
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
+// Cloudinary 상태 체크
+export const checkCloudinaryStatus = async (): Promise<boolean> => {
+  try {
+    const config = getCloudinaryConfig();
+    // Cloudinary API 상태 확인 (간단한 ping)
+    const response = await fetch(`https://api.cloudinary.com/v1_1/${config.cloudName}/image/list`, {
+      method: 'GET',
+    });
+    return response.status !== 404; // 404가 아니면 정상
+  } catch {
+    return false;
+  }
+};
+
+// 업로드 설정 검증
+export const validateUploadConfig = (): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+  
+  try {
+    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+    
+    if (!cloudName || cloudName === 'your_cloud_name_here') {
+      errors.push('VITE_CLOUDINARY_CLOUD_NAME이 설정되지 않았습니다.');
+    }
+    
+    if (!uploadPreset || uploadPreset === 'your_upload_preset_here') {
+      errors.push('VITE_CLOUDINARY_UPLOAD_PRESET이 설정되지 않았습니다.');
+    }
+    
+    return { isValid: errors.length === 0, errors };
+  } catch {
+    errors.push('환경변수 접근 중 오류가 발생했습니다.');
+    return { isValid: false, errors };
+  }
 };
