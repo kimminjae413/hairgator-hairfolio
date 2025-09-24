@@ -17,10 +17,16 @@ const App: React.FC = () => {
 
       // Check URL for a designer parameter to determine the view mode
       const urlParams = new URLSearchParams(window.location.search);
-      const designerFromUrl = urlParams.get('designer');
+      const designerParam = urlParams.get('designer');
+      
+      // 한글 URL 인코딩 문제 해결: decodeURIComponent로 디코딩
+      const designerFromUrl = designerParam 
+        ? decodeURIComponent(designerParam) 
+        : null;
 
       if (designerFromUrl) {
         // Client view mode
+        console.log('URL에서 디자이너명 추출:', designerFromUrl); // 디버깅용
         setClientViewDesigner(designerFromUrl);
       } else {
         // Check if there's a logged-in designer in memory
