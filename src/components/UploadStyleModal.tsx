@@ -60,6 +60,58 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
     return null;
   };
 
+  // 의미없는 파일명인지 확인하는 함수
+  const isMeaninglessFileName = (fileName: string): boolean => {
+    const meaninglessPatterns = [
+      /^IMG_\d+$/i,           // IMG_1234
+      /^DSC\d+$/i,            // DSC1234  
+      /^Photo_\d+$/i,         // Photo_123
+      /^KakaoTalk_\d+$/i,     // KakaoTalk_20250924
+      /^\d{8}_\d{6}$/,        // 20250924_123456
+      /^Screenshot_/i,        // Screenshot_xxx
+      /^image_?\d*$/i,        // image1, image
+      /^photo_?\d*$/i,        // photo1, photo
+      /^스크린샷/i,           // 스크린샷
+      /^캡처$/i,              // 캡처
+      /^사진\d*$/i,           // 사진1, 사진
+      /^이미지\d*$/i,         // 이미지1, 이미지
+      /^\d+$/,                // 순수 숫자만
+      /^IMG-\d+$/i,           // IMG-20250924
+      /^PXL_\d+$/i,           // PXL_20250924 (Google Pixel)
+    ];
+    
+    return meaninglessPatterns.some(pattern => pattern.test(fileName));
+  };
+
+  // 성별과 카테고리에 따른 추천 스타일명 생성
+  const getSuggestedStyleName = (gender: Gender, majorCategory: string): string => {
+    const femaleSuggestions: { [key: string]: string[] } = {
+      'A length': ['픽시 컷', '짧은 단발', '보이시 컷', '크롭 헤어'],
+      'B length': ['보브 컷', '턱선 보브', '웨이브 보브', '일자 보브'],
+      'C length': ['어깨 레이어드', '미디엄 컷', '쇄골 컷', 'C컬 스타일'],
+      'D length': ['가슴라인 컷', '롱 레이어드', '미디엄 롱', '자연 웨이브'],
+      'E length': ['롱 스트레이트', '긴 웨이브', '롱 레이어', '가슴 아래 컷'],
+      'F length': ['허리 길이 컷', '수퍼 롱', '긴 생머리', '롱 웨이브'],
+      'G length': ['힙 라인 컷', '익스트라 롱', '극장발', '초장발'],
+      'H length': ['엉덩이 아래 컷', '울트라 롱', '라푼젤 헤어', '최장발'],
+    };
+
+    const maleSuggestions: { [key: string]: string[] } = {
+      'SIDE FRINGE': ['사이드 뱅', '옆머리 스타일', '사이드 프린지', '비대칭 뱅'],
+      'SIDE PART': ['사이드 파트', '클래식 파트', '신사 스타일', '정통 파트'],
+      'FRINGE UP': ['업뱅 스타일', '올린 앞머리', '리프트 뱅', '볼륨 업'],
+      'PUSHED BACK': ['올백 스타일', '뒤로 넘긴 머리', '슬릭백', '젤 백'],
+      'BUZZ': ['버즈 컷', '삭발', '군인 컷', '스포츠 컷'],
+      'CROP': ['크롭 컷', '텍스처 크롭', '모던 크롭', '페이드 크롭'],
+      'MOHICAN': ['모히칸', '펑크 스타일', '리젠트 컷', '언더 컷'],
+    };
+
+    const suggestions = gender === 'Female' ? femaleSuggestions : maleSuggestions;
+    const categoryOptions = suggestions[majorCategory] || ['새로운 스타일'];
+    
+    return categoryOptions[Math.floor(Math.random() * categoryOptions.length)];
+  };
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
     const selectedFile = event.target.files?.[0];
@@ -74,9 +126,36 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
       setFile(selectedFile);
       setPreviewUrl(URL.createObjectURL(selectedFile));
       
-      // Prefill style name without extension
+      // 파일명에서 확장자 제거
       const nameWithoutExt = selectedFile.name.split('.').slice(0, -1).join('.') || '';
-      setStyleName(nameWithoutExt);
+      
+      // 의미없는 파일명인지 확인
+      if (isMeaninglessFileName(nameWithoutExt)) {
+        // 의미없는 파일명인 경우 빈 값으로 설정
+        setStyleName('');
+        
+        // placeholder에 추천 스타일명 표시를 위해 input 요소 업데이트
+        setTimeout(() => {
+          const inputElement = document.getElementById('style-name') as HTMLInputElement;
+          if (inputElement) {
+            const suggestion = getSuggestedStyleName(gender, majorCategory);
+            inputElement.placeholder = `예: ${suggestion}`;
+          }
+        }, 100);
+      } else {
+        // 의미있는 파일명인 경우 첫글자 대문자로 정리해서 사용
+        const cleanedName = nameWithoutExt
+          .replace(/[-_]/g, ' ') // 하이픈, 언더스코어를 공백으로
+          .replace(/\s+/g, ' ')  // 여러 공백을 하나로
+          .trim();
+        
+        const capitalizedName = cleanedName
+          .split(' ')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+          .join(' ');
+          
+        setStyleName(capitalizedName);
+      }
     }
   };
 
@@ -211,7 +290,10 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
             {/* Style Name */}
             <div>
               <label htmlFor="style-name" className="block text-sm font-medium text-gray-700 mb-1">
-                스타일 이름 *
+                스타일 이름 * 
+                <span className="text-xs text-gray-500 font-normal ml-1">
+                  (고객에게 표시될 이름)
+                </span>
               </label>
               <input
                 id="style-name"
@@ -223,6 +305,14 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
                 disabled={isUploading}
                 maxLength={50}
               />
+              {!styleName && file && (
+                <p className="text-xs text-amber-600 mt-1 flex items-center">
+                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  의미있는 스타일 이름을 입력해주세요
+                </p>
+              )}
             </div>
 
             {/* Gender Selection */}
@@ -343,6 +433,23 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
               </div>
             )}
 
+            {/* Style Name Tip */}
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-start">
+                <svg className="w-5 h-5 text-green-600 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <h4 className="font-medium text-green-800 text-sm">스타일명 작성 팁</h4>
+                  <ul className="text-green-700 text-xs mt-1 space-y-1">
+                    <li>• 고객이 이해하기 쉬운 이름을 사용하세요</li>
+                    <li>• 예: "웨이브 보브", "레이어드 컷", "픽시 컷"</li>
+                    <li>• 파일명(IMG_1234) 대신 스타일의 특징을 담아주세요</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
             {/* Cloudinary Info */}
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <div className="flex items-start">
@@ -378,7 +485,7 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
                 스타일 추가
-              </>
+              </button>
             )}
           </button>
           <button
