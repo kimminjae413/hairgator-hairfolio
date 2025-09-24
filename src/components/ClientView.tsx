@@ -145,22 +145,105 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
   // Check if processing is in progress
   const isLoading = loadingState === 'analyzing' || loadingState === 'generating'
 
+  // Generate designer profile image placeholder
+  const getDesignerInitials = (name: string) => {
+    return name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 font-sans">
       <div className="w-full max-w-6xl mx-auto">
-        {/* Header */}
+        {/* Header with Designer Profile */}
         <header className="text-center mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-800 tracking-tight mb-2">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-800 tracking-tight mb-6">
             Hairfolio
           </h1>
+          
+          {/* Designer Profile Card */}
+          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 max-w-2xl mx-auto">
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              {/* Designer Profile Picture */}
+              <div className="relative">
+                {designerProfile?.profileImage ? (
+                  <img
+                    src={designerProfile.profileImage}
+                    alt={designerName}
+                    className="w-20 h-20 rounded-full object-cover border-4 border-indigo-100"
+                    onError={(e) => {
+                      // Fallback to initials if profile image fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      target.parentElement!.querySelector('.profile-fallback')!.classList.remove('hidden');
+                    }}
+                  />
+                ) : null}
+                <div className={`w-20 h-20 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xl border-4 border-indigo-100 profile-fallback ${designerProfile?.profileImage ? 'hidden' : ''}`}>
+                  {getDesignerInitials(designerName)}
+                </div>
+              </div>
+
+              {/* Designer Info */}
+              <div className="flex-1 text-center sm:text-left">
+                <h2 className="text-2xl font-bold text-gray-800 mb-1">{designerName}</h2>
+                {designerProfile?.bio && (
+                  <p className="text-gray-600 text-sm mb-3 leading-relaxed">
+                    {designerProfile.bio}
+                  </p>
+                )}
+                
+                {/* Quick Info */}
+                <div className="flex flex-wrap justify-center sm:justify-start gap-4 text-sm text-gray-500">
+                  {designerProfile?.location && (
+                    <div className="flex items-center gap-1">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span>{designerProfile.location}</span>
+                    </div>
+                  )}
+                  {designerProfile?.phone && (
+                    <div className="flex items-center gap-1">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                      </svg>
+                      <span>{designerProfile.phone}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Social Links */}
+                {(designerProfile?.socialLinks?.instagram || designerProfile?.socialLinks?.website) && (
+                  <div className="flex justify-center sm:justify-start gap-3 mt-3">
+                    {designerProfile.socialLinks.instagram && (
+                      <a
+                        href={designerProfile.socialLinks.instagram}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-medium rounded-full hover:from-purple-600 hover:to-pink-600 transition-colors"
+                      >
+                        Instagram
+                      </a>
+                    )}
+                    {designerProfile.socialLinks.website && (
+                      <a
+                        href={designerProfile.socialLinks.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-3 py-1.5 bg-blue-500 text-white text-xs font-medium rounded-full hover:bg-blue-600 transition-colors"
+                      >
+                        Website
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
           <p className="text-lg text-gray-600">
-            <span className="font-semibold text-indigo-600">{designerName}</span>의 포트폴리오에서 헤어스타일을 체험해보세요
+            AI로 새로운 헤어스타일을 미리 체험해보세요
           </p>
-          {designerProfile?.bio && (
-            <p className="text-sm text-gray-500 mt-2 max-w-md mx-auto">
-              {designerProfile.bio}
-            </p>
-          )}
         </header>
 
         {/* Main Content */}
@@ -248,40 +331,8 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
         )}
 
         {/* Footer */}
-        <footer className="text-center mt-8 space-y-2">
-          {designerProfile?.location && (
-            <p className="text-gray-500 text-sm">
-              📍 {designerProfile.location}
-            </p>
-          )}
-          {designerProfile?.phone && (
-            <p className="text-gray-500 text-sm">
-              📞 {designerProfile.phone}
-            </p>
-          )}
-          <div className="flex justify-center space-x-4 mt-2">
-            {designerProfile?.socialLinks?.instagram && (
-              <a
-                href={designerProfile.socialLinks.instagram}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-pink-500 hover:text-pink-600 text-sm"
-              >
-                Instagram
-              </a>
-            )}
-            {designerProfile?.socialLinks?.website && (
-              <a
-                href={designerProfile.socialLinks.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-500 hover:text-blue-600 text-sm"
-              >
-                Website
-              </a>
-            )}
-          </div>
-          <p className="text-gray-400 text-xs mt-4">Powered by VModel AI</p>
+        <footer className="text-center mt-8">
+          <p className="text-gray-400 text-xs">Powered by VModel AI</p>
         </footer>
       </div>
     </div>
