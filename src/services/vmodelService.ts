@@ -1,63 +1,125 @@
 import { VModelResponse, VModelRequest } from '../types';
 
-// VModel API 설정
-const API_BASE_URL = import.meta.env.VITE_VMODEL_API_URL || 'https://api.vmodel.ai';
+// VModel API 설정 - 올바른 엔드포인트
+const API_BASE_URL = 'https://api.vmodel.ai/api/tasks/v1';
 const API_KEY = import.meta.env.VITE_VMODEL_API_KEY;
+const HAIRSTYLE_MODEL_VERSION = '5c0440717a995b0bbd93377bd65dbb4fe360f67967c506aa6bd8f6b660733a7e';
 
 // API 키 확인
 if (!API_KEY) {
   console.warn('VModel API key가 설정되지 않았습니다. .env.local 파일에 VITE_VMODEL_API_KEY를 추가하세요.');
 }
 
-// 파일을 base64로 변환하는 헬퍼 함수
-const fileToBase64 = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      const result = reader.result as string;
-      // "data:image/jpeg;base64," 부분을 제거하고 base64 데이터만 반환
-      resolve(result.split(',')[1]);
-    };
-    reader.onerror = (error) => reject(error);
-  });
-};
+// VModel Task 응답 타입
+interface VModelTask {
+  task_id: string;
+  user_id: number;
+  version: string;
+  error: string | null;
+  total_time: number;
+  predict_time: number;
+  logs: string;
+  output: string[] | null;
+  status: 'starting' | 'processing' | 'succeeded' | 'failed' | 'canceled';
+  create_at: number;
+  completed_at: number | null;
+}
 
-// 이미지 URL을 base64로 변환하는 함수
-const urlToBase64 = async (url: string): Promise<string> => {
+interface VModelCreateResponse {
+  code: number;
+  result: {
+    task_id: string;
+    task_cost: number;
+  };
+  message: {
+    en: string;
+  };
+}
+
+interface VModelGetResponse {
+  code: number;
+  result: VModelTask;
+  message: any;
+}
+
+// 이미지를 Cloudinary URL로 업로드하는 함수 (VModel은 URL만 허용)
+const uploadImageToCloudinary = async (file: File): Promise<string> => {
   try {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(blob);
-      reader.onload = () => {
-        const result = reader.result as string;
-        resolve(result.split(',')[1]);
-      };
-      reader.onerror = reject;
+    // Cloudinary 업로드 로직 재사용
+    const { uploadToCloudinary } = await import('./cloudinaryService');
+    return await uploadToCloudinary(file, {
+      folder: 'hairfolio/temp',
+      tags: ['hairfolio', 'vmodel-temp']
     });
   } catch (error) {
-    throw new Error('이미지 URL을 변환하는데 실패했습니다.');
+    console.error('Cloudinary 업로드 실패:', error);
+    throw new Error('이미지 업로드에 실패했습니다. 네트워크 연결을 확인해주세요.');
   }
 };
 
-// 헤어스타일 분석 함수
+// Task 상태를 폴링하여 완료까지 기다리는 함수
+const pollTaskStatus = async (taskId: string): Promise<VModelTask> => {
+  const maxAttempts = 60; // 최대 5분 대기 (5초 간격)
+  const pollInterval = 5000; // 5초
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/get/${taskId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Task 상태 확인 실패: ${response.status}`);
+      }
+
+      const data: VModelGetResponse = await response.json();
+      const task = data.result;
+
+      // Task 완료 상태 확인
+      if (task.status === 'succeeded') {
+        return task;
+      } else if (task.status === 'failed') {
+        throw new Error(task.error || 'VModel 처리 중 오류가 발생했습니다.');
+      } else if (task.status === 'canceled') {
+        throw new Error('Task가 취소되었습니다.');
+      }
+
+      // 아직 처리 중이면 대기
+      if (task.status === 'starting' || task.status === 'processing') {
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        continue;
+      }
+
+    } catch (error) {
+      if (attempt === maxAttempts - 1) {
+        throw error;
+      }
+      // 임시 오류인 경우 재시도
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+  }
+
+  throw new Error('처리 시간이 초과되었습니다. 다시 시도해주세요.');
+};
+
+// 헤어스타일 분석 함수 (VModel API에는 없으므로 간단한 분석)
 export const analyzeHairstyle = async (hairstyleFile: File): Promise<string> => {
   try {
-    // 실제 VModel API가 헤어스타일 분석을 제공하지 않는 경우,
-    // 간단한 이미지 분석 또는 기본 설명을 반환
-    const base64 = await fileToBase64(hairstyleFile);
-    
-    // 데모용 분석 결과 (실제로는 VModel API 호출)
+    // VModel API에는 별도 분석 기능이 없으므로 기본 설명 생성
     return new Promise((resolve) => {
       setTimeout(() => {
         const descriptions = [
-          'medium-length, wavy, dark brown, center part, textured layers, curtain bangs',
-          'long, straight, blonde, side part, sleek finish, face-framing layers',
-          'short, curly, natural, voluminous, defined curls, full coverage',
-          'pixie cut, straight, platinum blonde, side-swept, edgy, modern',
-          'bob cut, wavy, auburn, blunt cut, chin-length, sophisticated'
+          'modern layered cut with natural texture',
+          'sleek straight hair with subtle highlights',
+          'wavy shoulder-length style with volume',
+          'short pixie cut with edgy finish',
+          'long flowing hair with soft curls',
+          'bob cut with blunt edges',
+          'textured shag with face-framing layers'
         ];
         const randomDescription = descriptions[Math.floor(Math.random() * descriptions.length)];
         resolve(randomDescription);
@@ -68,90 +130,104 @@ export const analyzeHairstyle = async (hairstyleFile: File): Promise<string> => 
   }
 };
 
-// 헤어스타일 적용 함수 (메인 기능)
+// 헤어스타일 적용 함수 (메인 기능) - VModel API 사용
 export const applyHairstyle = async (
   faceFile: File,
   hairstyleFile: File | string,
   hairstyleDescription: string
 ): Promise<string> => {
   try {
-    if (!API_KEY) {
-      throw new Error('API 키가 설정되지 않았습니다. 환경변수를 확인하세요.');
-    }
-
-    // 얼굴 이미지를 base64로 변환
-    const faceBase64 = await fileToBase64(faceFile);
-    
-    // 헤어스타일 이미지를 base64로 변환
-    let styleBase64: string;
-    if (typeof hairstyleFile === 'string') {
-      // URL인 경우
-      styleBase64 = await urlToBase64(hairstyleFile);
-    } else {
-      // File 객체인 경우
-      styleBase64 = await fileToBase64(hairstyleFile);
-    }
-
-    // VModel API 요청 데이터 구성
-    const requestData: VModelRequest = {
-      faceImage: faceBase64,
-      styleImage: styleBase64,
-      styleDescription: hairstyleDescription,
-      options: {
-        quality: 'high',
-        preserveFaceFeatures: true,
-        blendStrength: 0.8
-      }
-    };
-
-    // VModel API 호출
-    const response = await fetch(`${API_BASE_URL}/v1/hair-transfer`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_KEY}`,
-        'X-API-Version': '1.0'
-      },
-      body: JSON.stringify(requestData)
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `API 요청 실패: ${response.status}`);
-    }
-
-    const result: VModelResponse = await response.json();
-    
-    if (!result.success || !result.imageUrl) {
-      throw new Error(result.error || '이미지 생성에 실패했습니다.');
-    }
-
-    // 성공적으로 생성된 이미지 URL 반환
-    return result.imageUrl;
-
-  } catch (error) {
-    console.error('VModel API Error:', error);
-    
-    // 개발 모드에서는 데모 이미지 반환
-    if (import.meta.env.VITE_DEV_MODE === 'true') {
-      console.warn('개발 모드: 데모 이미지를 반환합니다.');
+    if (!API_KEY || API_KEY === 'your_vmodel_api_key_here') {
+      console.warn('VModel API 키가 설정되지 않음. 데모 모드로 실행합니다.');
       
-      // 실제 변환된 것처럼 보이는 데모 이미지 생성
-      return new Promise((resolve, reject) => {
+      // 데모 모드: 실제 변환된 것처럼 보이는 샘플 이미지 반환
+      return new Promise((resolve) => {
         setTimeout(() => {
-          // 데모용 변환된 이미지 (실제로는 샘플 이미지)
           const demoImages = [
             'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop&crop=face',
             'https://images.unsplash.com/photo-1494790108755-2616c5e93769?w=400&h=400&fit=crop&crop=face',
             'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face',
+            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face',
+            'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face',
           ];
           const randomDemo = demoImages[Math.floor(Math.random() * demoImages.length)];
           resolve(randomDemo);
         }, 3000);
       });
     }
+
+    console.log('VModel API 요청 시작...');
+
+    // 1단계: 이미지를 Cloudinary에 업로드하여 URL 획득
+    const targetImageUrl = await uploadImageToCloudinary(faceFile);
+    console.log('얼굴 이미지 업로드 완료:', targetImageUrl);
+
+    let sourceImageUrl: string;
+    if (typeof hairstyleFile === 'string') {
+      sourceImageUrl = hairstyleFile; // 이미 URL인 경우
+    } else {
+      sourceImageUrl = await uploadImageToCloudinary(hairstyleFile);
+      console.log('헤어스타일 이미지 업로드 완료:', sourceImageUrl);
+    }
+
+    // 2단계: VModel Task 생성
+    const createResponse = await fetch(`${API_BASE_URL}/create`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        version: HAIRSTYLE_MODEL_VERSION,
+        input: {
+          source: sourceImageUrl,    // 헤어스타일 참조 이미지
+          target: targetImageUrl,    // 변경할 사람의 사진
+          disable_safety_checker: false
+        }
+      })
+    });
+
+    if (!createResponse.ok) {
+      const errorText = await createResponse.text();
+      console.error('VModel Task 생성 실패:', errorText);
+      
+      if (createResponse.status === 401) {
+        throw new Error('API 키가 유효하지 않습니다. VModel 계정을 확인해주세요.');
+      } else if (createResponse.status === 402) {
+        throw new Error('크레딧이 부족합니다. VModel 계정에서 크레딧을 충전해주세요.');
+      } else if (createResponse.status === 403) {
+        throw new Error('API 접근이 거부되었습니다. API 키 권한을 확인해주세요.');
+      }
+      
+      throw new Error(`VModel API 오류: ${createResponse.status}`);
+    }
+
+    const createData: VModelCreateResponse = await createResponse.json();
     
-    // 프로덕션에서는 에러 발생
+    if (createData.code !== 200) {
+      throw new Error(createData.message?.en || 'Task 생성에 실패했습니다.');
+    }
+
+    const taskId = createData.result.task_id;
+    console.log('VModel Task 생성됨:', taskId, '비용:', createData.result.task_cost);
+
+    // 3단계: Task 완료까지 폴링
+    console.log('VModel 처리 대기 중...');
+    const completedTask = await pollTaskStatus(taskId);
+
+    // 4단계: 결과 이미지 URL 반환
+    if (!completedTask.output || completedTask.output.length === 0) {
+      throw new Error('VModel에서 결과 이미지를 생성하지 못했습니다.');
+    }
+
+    const resultImageUrl = completedTask.output[0];
+    console.log('VModel 처리 완료:', resultImageUrl);
+    
+    return resultImageUrl;
+
+  } catch (error) {
+    console.error('VModel API Error:', error);
+    
     if (error instanceof Error) {
       throw error;
     }
@@ -162,38 +238,32 @@ export const applyHairstyle = async (
 // API 상태 확인 함수
 export const checkAPIStatus = async (): Promise<boolean> => {
   try {
-    if (!API_KEY) return false;
+    if (!API_KEY || API_KEY === 'your_vmodel_api_key_here') {
+      return false;
+    }
     
-    const response = await fetch(`${API_BASE_URL}/v1/status`, {
-      method: 'GET',
+    // VModel API에는 별도 상태 확인 엔드포인트가 없으므로
+    // 간단한 요청을 보내서 401이 아닌지 확인
+    const response = await fetch(`${API_BASE_URL}/create`, {
+      method: 'POST',
       headers: {
-        'Authorization': `Bearer ${API_KEY}`
-      }
+        'Authorization': `Bearer ${API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({}) // 빈 요청으로 인증만 확인
     });
     
-    return response.ok;
+    // 401이 아니면 API 키는 유효함
+    return response.status !== 401;
   } catch {
     return false;
   }
 };
 
-// 사용 가능한 크레딧 확인 (선택사항)
+// 사용 가능한 크레딧 확인 (VModel API에는 직접적인 방법이 없음)
 export const checkCredits = async (): Promise<number | null> => {
   try {
-    if (!API_KEY) return null;
-    
-    const response = await fetch(`${API_BASE_URL}/v1/account/credits`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${API_KEY}`
-      }
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      return data.credits || 0;
-    }
-    
+    console.log('VModel API에는 크레딧 확인 엔드포인트가 없습니다. 웹사이트에서 확인하세요.');
     return null;
   } catch {
     return null;
