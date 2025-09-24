@@ -5,9 +5,9 @@ const API_BASE_URL = 'https://api.vmodel.ai/api/tasks/v1';
 const API_TOKEN = import.meta.env.VITE_VMODEL_API_TOKEN;
 const HAIRSTYLE_MODEL_VERSION = '5c0440717a995b0bbd93377bd65dbb4fe360f67967c506aa6bd8f6b660733a7e';
 
-// API 키 확인
-if (!API_KEY) {
-  console.warn('VModel API key가 설정되지 않았습니다. .env.local 파일에 VITE_VMODEL_API_KEY를 추가하세요.');
+// API 토큰 확인
+if (!API_TOKEN) {
+  console.warn('VModel API token이 설정되지 않았습니다. .env.local 파일에 VITE_VMODEL_API_TOKEN을 추가하세요.');
 }
 
 // VModel Task 응답 타입
@@ -136,15 +136,7 @@ export const applyHairstyle = async (
   hairstyleFile: File | string,
   hairstyleDescription: string
 ): Promise<string> => {
-  try {
-    if (!API_KEY || API_KEY === 'your_vmodel_api_key_here') {
-      console.warn('VModel API 키가 설정되지 않음. 데모 모드로 실행합니다.');
-      
-      // 데모 모드: 실제 변환된 것처럼 보이는 샘플 이미지 반환
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          const demoImages = [
-            'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop&crop=face',
+=400&h=400&fit=crop&crop=face',
             'https://images.unsplash.com/photo-1494790108755-2616c5e93769?w=400&h=400&fit=crop&crop=face',
             'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face',
             'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face',
@@ -174,7 +166,7 @@ export const applyHairstyle = async (
     const createResponse = await fetch(`${API_BASE_URL}/create`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${API_KEY}`,
+        'Authorization': `Bearer ${API_TOKEN}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -238,7 +230,7 @@ export const applyHairstyle = async (
 // API 상태 확인 함수
 export const checkAPIStatus = async (): Promise<boolean> => {
   try {
-    if (!API_KEY || API_KEY === 'your_vmodel_api_key_here') {
+    if (!API_TOKEN || API_TOKEN === 'your_vmodel_api_token_here') {
       return false;
     }
     
@@ -247,7 +239,7 @@ export const checkAPIStatus = async (): Promise<boolean> => {
     const response = await fetch(`${API_BASE_URL}/create`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${API_KEY}`,
+        'Authorization': `Bearer ${API_TOKEN}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({}) // 빈 요청으로 인증만 확인
