@@ -15,7 +15,14 @@ export default defineConfig(({ mode }) => {
       },
     },
     define: {
+      // VModel AI API
       'import.meta.env.VITE_VMODEL_API_KEY': JSON.stringify(env.VITE_VMODEL_API_KEY || ''),
+      
+      // Cloudinary 설정
+      'import.meta.env.VITE_CLOUDINARY_CLOUD_NAME': JSON.stringify(env.VITE_CLOUDINARY_CLOUD_NAME || ''),
+      'import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET': JSON.stringify(env.VITE_CLOUDINARY_UPLOAD_PRESET || ''),
+      
+      // 기타 환경변수
       'import.meta.env.NODE_ENV': JSON.stringify(mode),
     },
     server: {
