@@ -15,8 +15,8 @@ export default defineConfig(({ mode }) => {
       },
     },
     define: {
-      'process.env.VITE_VMODEL_API_KEY': JSON.stringify(env.VITE_VMODEL_API_KEY || ''),
-      'process.env.NODE_ENV': JSON.stringify(mode),
+      'import.meta.env.VITE_VMODEL_API_KEY': JSON.stringify(env.VITE_VMODEL_API_KEY || ''),
+      'import.meta.env.NODE_ENV': JSON.stringify(mode),
     },
     server: {
       port: 3000,
