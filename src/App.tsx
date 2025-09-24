@@ -11,35 +11,39 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      // Initialize the local storage with sample data if it's the first visit
-      localStorageService.initializeDB();
+    const initializeApp = async () => {
+      try {
+        // Initialize Firebase with sample data
+        await firebaseService.initializeDB();
 
-      // Check URL for a designer parameter to determine the view mode
-      const urlParams = new URLSearchParams(window.location.search);
-      const designerParam = urlParams.get('designer');
-      
-      // 한글 URL 인코딩 문제 해결: decodeURIComponent로 디코딩
-      const designerFromUrl = designerParam 
-        ? decodeURIComponent(designerParam) 
-        : null;
+        // Check URL for a designer parameter to determine the view mode
+        const urlParams = new URLSearchParams(window.location.search);
+        const designerParam = urlParams.get('designer');
+        
+        // 한글 URL 인코딩 문제 해결: decodeURIComponent로 디코딩
+        const designerFromUrl = designerParam 
+          ? decodeURIComponent(designerParam) 
+          : null;
 
-      if (designerFromUrl) {
-        // Client view mode
-        console.log('URL에서 디자이너명 추출:', designerFromUrl); // 디버깅용
-        setClientViewDesigner(designerFromUrl);
-      } else {
-        // Check if there's a logged-in designer in memory
-        const storedDesigner = JSON.parse(sessionStorage.getItem('hairfolio_designer') || 'null');
-        if (storedDesigner) {
-          setLoggedInDesigner(storedDesigner);
+        if (designerFromUrl) {
+          // Client view mode
+          console.log('URL에서 디자이너명 추출:', designerFromUrl);
+          setClientViewDesigner(designerFromUrl);
+        } else {
+          // Check if there's a logged-in designer in memory
+          const storedDesigner = JSON.parse(sessionStorage.getItem('hairfolio_designer') || 'null');
+          if (storedDesigner) {
+            setLoggedInDesigner(storedDesigner);
+          }
         }
+      } catch (error) {
+        console.error('Error initializing app:', error);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Error initializing app:', error);
-    } finally {
-      setIsLoading(false);
-    }
+    };
+
+    initializeApp();
   }, []);
 
   const handleLogin = (name: string) => {
@@ -64,7 +68,7 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Hairfolio 로딩 중...</p>
+          <p className="text-gray-600">Firebase 초기화 중...</p>
         </div>
       </div>
     );
