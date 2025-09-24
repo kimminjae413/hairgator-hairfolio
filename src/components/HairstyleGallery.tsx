@@ -10,6 +10,8 @@ interface HairstyleGalleryProps {
   onAddImage?: () => void;
   showCategories?: boolean;
   allowMultipleSelection?: boolean;
+  onDeleteImage?: (hairstyle: Hairstyle) => void;
+  isDesignerView?: boolean;
 }
 
 type GroupedHairstyles = {
@@ -25,7 +27,9 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
   disabled, 
   onAddImage, 
   showCategories = true,
-  allowMultipleSelection = false 
+  allowMultipleSelection = false,
+  onDeleteImage,
+  isDesignerView = false
 }) => {
   const [activeTab, setActiveTab] = useState<Gender>('Female');
   const [searchTerm, setSearchTerm] = useState('');
@@ -181,62 +185,84 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                 
                 {/* Hairstyle Images */}
                 {hairstyles.map((image) => (
-                  <button
+                  <div
                     key={image.url}
-                    onClick={() => onSelect(image)}
-                    disabled={disabled}
-                    className={`group relative aspect-square rounded-lg overflow-hidden transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-indigo-400 ${
-                      selectedUrl === image.url
-                        ? 'ring-4 ring-indigo-500 shadow-lg transform scale-105'
-                        : 'ring-2 ring-transparent hover:ring-indigo-300'
-                    } ${
-                      disabled 
-                        ? 'cursor-not-allowed' 
-                        : 'hover:scale-105 hover:shadow-lg cursor-pointer'
-                    }`}
+                    className="relative group"
                   >
-                    {/* Image */}
-                    <img 
-                      src={imageErrors.has(image.url) ? fallbackImageSvg : image.url}
-                      alt={image.name}
-                      className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-110"
-                      loading="lazy"
-                      onError={(e) => handleImageError(image.url, e)}
-                    />
-                    
-                    {/* Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-                    
-                    {/* Title */}
-                    <div className="absolute bottom-0 left-0 right-0 p-3">
-                      <p className="text-white text-sm font-bold drop-shadow-lg">{image.name}</p>
-                      {image.description && (
-                        <p className="text-white/80 text-xs mt-1 line-clamp-2 drop-shadow">{image.description}</p>
-                      )}
-                    </div>
-                    
-                    {/* Selection Indicator */}
-                    {selectedUrl === image.url && (
-                      <div className="absolute top-2 right-2 w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center">
-                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
+                    <button
+                      onClick={() => onSelect(image)}
+                      disabled={disabled}
+                      className={`w-full aspect-square rounded-lg overflow-hidden transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-indigo-400 ${
+                        selectedUrl === image.url
+                          ? 'ring-4 ring-indigo-500 shadow-lg transform scale-105'
+                          : 'ring-2 ring-transparent hover:ring-indigo-300'
+                      } ${
+                        disabled 
+                          ? 'cursor-not-allowed' 
+                          : 'hover:scale-105 hover:shadow-lg cursor-pointer'
+                      }`}
+                    >
+                      {/* Image */}
+                      <img 
+                        src={imageErrors.has(image.url) ? fallbackImageSvg : image.url}
+                        alt={image.name}
+                        className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-110"
+                        loading="lazy"
+                        onError={(e) => handleImageError(image.url, e)}
+                      />
+                      
+                      {/* Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                      
+                      {/* Title */}
+                      <div className="absolute bottom-0 left-0 right-0 p-3">
+                        <p className="text-white text-sm font-bold drop-shadow-lg">{image.name}</p>
+                        {image.description && (
+                          <p className="text-white/80 text-xs mt-1 line-clamp-2 drop-shadow">{image.description}</p>
+                        )}
                       </div>
-                    )}
-                    
-                    {/* Tags */}
-                    {image.tags && image.tags.length > 0 && (
-                      <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <div className="flex flex-wrap gap-1">
-                          {image.tags.slice(0, 2).map((tag, idx) => (
-                            <span key={idx} className="px-2 py-1 bg-black/60 text-white text-xs rounded-full">
-                              #{tag}
-                            </span>
-                          ))}
+                      
+                      {/* Selection Indicator */}
+                      {selectedUrl === image.url && (
+                        <div className="absolute top-2 right-2 w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center">
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
                         </div>
-                      </div>
+                      )}
+                      
+                      {/* Tags */}
+                      {image.tags && image.tags.length > 0 && (
+                        <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          <div className="flex flex-wrap gap-1">
+                            {image.tags.slice(0, 2).map((tag, idx) => (
+                              <span key={idx} className="px-2 py-1 bg-black/60 text-white text-xs rounded-full">
+                                #{tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </button>
+
+                    {/* Delete Button - Only show in designer view */}
+                    {isDesignerView && onDeleteImage && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`"${image.name}" 스타일을 삭제하시겠습니까?`)) {
+                            onDeleteImage(image);
+                          }
+                        }}
+                        className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center z-10"
+                        title="스타일 삭제"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     )}
-                  </button>
+                  </div>
                 ))}
               </div>
             </div>
