@@ -29,6 +29,27 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<Gender>('Female');
   const [searchTerm, setSearchTerm] = useState('');
+  const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
+
+  // Create fallback image using SVG data URL
+  const fallbackImageSvg = `data:image/svg+xml,${encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+      <rect width="400" height="400" fill="#e5e7eb"/>
+      <text x="200" y="200" text-anchor="middle" dominant-baseline="middle" 
+            font-family="Arial, sans-serif" font-size="24" fill="#9ca3af" font-weight="bold">
+        이미지 없음
+      </text>
+    </svg>
+  `)}`;
+
+  // Handle image error
+  const handleImageError = (imageUrl: string, e: React.SyntheticEvent<HTMLImageElement>) => {
+    const target = e.target as HTMLImageElement;
+    if (!imageErrors.has(imageUrl)) {
+      setImageErrors(prev => new Set([...prev, imageUrl]));
+      target.src = fallbackImageSvg;
+    }
+  };
 
   // Filter images based on search term
   const filteredImages = useMemo(() => {
@@ -176,15 +197,11 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                   >
                     {/* Image */}
                     <img 
-                      src={image.url} 
+                      src={imageErrors.has(image.url) ? fallbackImageSvg : image.url}
                       alt={image.name}
                       className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-110"
                       loading="lazy"
-                      onError={(e) => {
-                        // Fallback for broken images
-                        const target = e.target as HTMLImageElement;
-                        target.src = 'https://via.placeholder.com/400x400/e5e7eb/9ca3af?text=이미지+없음';
-                      }}
+                      onError={(e) => handleImageError(image.url, e)}
                     />
                     
                     {/* Overlay */}
