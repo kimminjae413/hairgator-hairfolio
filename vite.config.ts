@@ -15,9 +15,8 @@ export default defineConfig(({ mode }) => {
       },
     },
     define: {
-  'import.meta.env.VITE_VMODEL_API_TOKEN': JSON.stringify(env.VITE_VMODEL_API_TOKEN || ''),
-  // 기존 VITE_VMODEL_API_KEY 제거
-}
+      // VModel AI API Token (올바른 환경변수명)
+      'import.meta.env.VITE_VMODEL_API_TOKEN': JSON.stringify(env.VITE_VMODEL_API_TOKEN || ''),
       
       // Cloudinary 설정
       'import.meta.env.VITE_CLOUDINARY_CLOUD_NAME': JSON.stringify(env.VITE_CLOUDINARY_CLOUD_NAME || ''),
