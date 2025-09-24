@@ -42,57 +42,83 @@ const ShareModal: React.FC<ShareModalProps> = ({ designerName, onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 animate-fade-in"
+      className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 md:p-8 text-center"
+        className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-3xl font-bold text-gray-800 mb-4">Share Your Portfolio</h2>
-        <p className="text-gray-600 mb-6">Clients can scan the QR code or use the link to try on your styles.</p>
-
-        <div className="flex flex-col items-center mb-6">
-          <img src={qrCodeUrl} alt="Portfolio QR Code" className="rounded-lg shadow-md mb-4" />
-          <button
-            onClick={handleQrCopy}
-            className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 font-semibold rounded-lg shadow-sm hover:bg-gray-200 transition-colors duration-300"
-          >
-            <CopyIcon />
-            <span className="ml-2">Copy QR Code</span>
-          </button>
-           {qrCopied && <p className="text-green-600 text-sm mt-2">QR Code copied!</p>}
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 text-center border-b border-gray-100">
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Share Your Portfolio</h2>
+          <p className="text-gray-600 text-sm">Clients can scan the QR code or use the link to try on your styles.</p>
         </div>
-        
-        <div className="text-left">
-           <label htmlFor="share-url" className="block text-sm font-medium text-gray-700 mb-1">
+
+        {/* Content */}
+        <div className="px-6 py-6 space-y-6">
+          {/* QR Code Section */}
+          <div className="text-center">
+            <div className="inline-block p-3 bg-white rounded-lg shadow-md border border-gray-200 mb-4">
+              <img 
+                src={qrCodeUrl} 
+                alt="Portfolio QR Code" 
+                className="w-[180px] h-[180px]"
+                loading="lazy"
+              />
+            </div>
+            <button
+              onClick={handleQrCopy}
+              className="inline-flex items-center justify-center px-4 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-lg shadow-sm hover:bg-gray-200 transition-colors duration-200 text-sm min-h-[40px]"
+            >
+              <div className="w-4 h-4 mr-2">
+                <CopyIcon />
+              </div>
+              <span>Copy QR Code</span>
+            </button>
+            {qrCopied && (
+              <p className="text-green-600 text-sm mt-2 font-medium">QR Code copied!</p>
+            )}
+          </div>
+
+          {/* URL Section */}
+          <div>
+            <label htmlFor="share-url" className="block text-sm font-medium text-gray-700 mb-2">
               Shareable Link
             </label>
             <div className="relative">
-                <input
-                    id="share-url"
-                    type="text"
-                    readOnly
-                    value={shareUrl}
-                    className="w-full bg-gray-100 border border-gray-300 rounded-lg p-3 pr-12 text-gray-700"
-                />
-                <button
-                    onClick={handleLinkCopy}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-500 hover:text-indigo-600 transition-colors"
-                    aria-label="Copy link"
-                >
-                    <CopyIcon />
-                </button>
+              <input
+                id="share-url"
+                type="text"
+                readOnly
+                value={shareUrl}
+                className="w-full bg-gray-50 border border-gray-300 rounded-lg py-3 pl-3 pr-12 text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              />
+              <button
+                onClick={handleLinkCopy}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-500 hover:text-indigo-600 transition-colors duration-200 hover:bg-gray-100 rounded-md"
+                aria-label="Copy link"
+              >
+                <div className="w-4 h-4">
+                  <CopyIcon />
+                </div>
+              </button>
             </div>
-            {linkCopied && <p className="text-green-600 text-sm mt-2">Link copied to clipboard!</p>}
+            {linkCopied && (
+              <p className="text-green-600 text-sm mt-2 font-medium">Link copied to clipboard!</p>
+            )}
+          </div>
         </div>
 
-        <button
-          onClick={onClose}
-          className="mt-8 px-6 py-3 w-full bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition-colors duration-300"
-        >
-          Done
-        </button>
+        {/* Footer */}
+        <div className="px-6 pb-6">
+          <button
+            onClick={onClose}
+            className="w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors duration-200 min-h-[48px]"
+          >
+            Done
+          </button>
+        </div>
       </div>
     </div>
   );
