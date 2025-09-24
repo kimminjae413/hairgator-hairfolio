@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { DesignerProfile } from '../types';
+import { uploadToCloudinary } from '../services/cloudinaryService';
 
 interface DesignerProfileModalProps {
   currentProfile: DesignerProfile | undefined;
@@ -19,6 +20,7 @@ const DesignerProfileModal: React.FC<DesignerProfileModalProps> = ({
     bio: currentProfile?.bio || '',
     location: currentProfile?.location || '',
     phone: currentProfile?.phone || '',
+    profileImage: currentProfile?.profileImage || '', // 프로필 이미지 추가
     socialLinks: {
       instagram: currentProfile?.socialLinks?.instagram || '',
       website: currentProfile?.socialLinks?.website || ''
@@ -26,8 +28,62 @@ const DesignerProfileModal: React.FC<DesignerProfileModalProps> = ({
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(currentProfile?.profileImage || null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Handle form input changes
+  // Handle profile image upload
+  const handleImageUpload = async (file: File) => {
+    if (!file) return;
+
+    // Validate file
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      alert('JPG, PNG, WEBP 파일만 업로드 가능합니다.');
+      return;
+    }
+
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      alert('파일 크기는 5MB 이하만 가능합니다.');
+      return;
+    }
+
+    setImageUploading(true);
+    
+    try {
+      // Upload to Cloudinary
+      const imageUrl = await uploadToCloudinary(file, {
+        folder: 'hairfolio/profiles',
+        tags: ['hairfolio', 'profile', designerName.toLowerCase()]
+      });
+
+      setProfile(prev => ({ ...prev, profileImage: imageUrl }));
+      setImagePreview(imageUrl);
+    } catch (error) {
+      console.error('Profile image upload failed:', error);
+      alert('이미지 업로드에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  // Handle file input change
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleImageUpload(file);
+    }
+  };
+
+  // Remove profile image
+  const handleRemoveImage = () => {
+    setProfile(prev => ({ ...prev, profileImage: '' }));
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
   const handleChange = (field: keyof DesignerProfile, value: string) => {
     if (field === 'socialLinks') return; // Handle separately
     setProfile(prev => ({ ...prev, [field]: value }));
@@ -150,6 +206,71 @@ const DesignerProfileModal: React.FC<DesignerProfileModalProps> = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 max-h-[70vh] overflow-y-auto space-y-4">
+          
+          {/* Profile Image Upload */}
+          <div className="text-center mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              프로필 사진
+            </label>
+            
+            <div className="relative inline-block">
+              <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-100 border-4 border-white shadow-lg">
+                {imagePreview ? (
+                  <img 
+                    src={imagePreview} 
+                    alt="Profile preview" 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xl">
+                    {profile.name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2)}
+                  </div>
+                )}
+                
+                {imageUploading && (
+                  <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-2 border-white border-t-transparent"></div>
+                  </div>
+                )}
+              </div>
+
+              {/* Upload/Remove buttons */}
+              <div className="mt-3 flex justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={imageUploading || isSubmitting}
+                  className="px-3 py-2 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                >
+                  {imageUploading ? '업로드 중...' : '사진 변경'}
+                </button>
+                
+                {imagePreview && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    disabled={imageUploading || isSubmitting}
+                    className="px-3 py-2 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                  >
+                    제거
+                  </button>
+                )}
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                onChange={handleFileChange}
+                className="hidden"
+                disabled={imageUploading || isSubmitting}
+              />
+            </div>
+
+            <p className="text-xs text-gray-500 mt-2">
+              JPG, PNG, WEBP 형식, 최대 5MB
+            </p>
+          </div>
           
           {/* Designer Name */}
           <div>
