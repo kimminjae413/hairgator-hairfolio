@@ -10,9 +10,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ designerName, onClose }) => {
   const [linkCopied, setLinkCopied] = useState(false);
   const [qrCopied, setQrCopied] = useState(false);
 
-  // 캐시 우회를 위해 타임스탬프 추가
-  const timestamp = Date.now();
-  const shareUrl = `${window.location.origin}${window.location.pathname}?designer=${encodeURIComponent(designerName)}&v=${timestamp}`;
+  const shareUrl = `${window.location.origin}${window.location.pathname}?designer=${encodeURIComponent(designerName)}`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(shareUrl)}`;
 
   const handleLinkCopy = () => {
