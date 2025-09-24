@@ -35,19 +35,20 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
     setStats(data.stats || { visits: 0, styleViews: {}, bookings: {} });
   }, [designerName]);
 
-  const handlePortfolioImageAdd = (styleData: {
+  const handlePortfolioImageAdd = async (styleData: {
     file: File;
     name: string;
     gender: Gender;
     majorCategory: FemaleMajorCategory | MaleMajorCategory;
     minorCategory: MinorCategory;
+    cloudinaryUrl: string;
   }) => {
-    const { file, ...details } = styleData;
+    const { file, cloudinaryUrl, ...details } = styleData;
     const newImage: Hairstyle = {
       ...details,
-      url: URL.createObjectURL(file),
-      isLocal: true,
-      id: Date.now().toString(), // Generate simple ID
+      url: cloudinaryUrl, // Cloudinary URL 사용
+      isLocal: false, // 클라우드에 저장됨
+      id: Date.now().toString(),
     };
     const updatedPortfolio = [newImage, ...portfolio];
     setPortfolio(updatedPortfolio);
