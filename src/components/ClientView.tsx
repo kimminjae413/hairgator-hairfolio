@@ -5,7 +5,7 @@ import { LoadingState, Hairstyle, DesignerProfile } from '../types'
 import ImageUploader from './ImageUploader'
 import ResultDisplay from './ResultDisplay'
 import HairstyleGallery from './HairstyleGallery'
-import UserIcon from './icons/UserIcon
+import UserIcon from './icons/UserIcon'
 
 interface ClientViewProps {
   designerName: string
