@@ -9,6 +9,9 @@ export default defineConfig(({ mode }) => {
   
   return {
     plugins: [react()],
+    css: {
+      postcss: './postcss.config.js'
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
