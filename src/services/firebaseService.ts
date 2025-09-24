@@ -22,13 +22,13 @@ import {
 import { portfolioImages, sampleDesigner } from '../portfolioImages';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAPUhZggVQqB1m7og2IxPPEcZjzZk0VflU",
-  authDomain: "hairfolio-9b7db.firebaseapp.com",
-  projectId: "hairfolio-9b7db",
-  storageBucket: "hairfolio-9b7db.firebasestorage.app",
-  messagingSenderId: "243350842007",
-  appId: "1:243350842007:web:57c08df1256bf63ae157d2",
-  measurementId: "G-3GMLY9JKEP"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase
