@@ -164,12 +164,14 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center p-4 font-sans">
       <div className="w-full max-w-6xl mx-auto">
-        <header className="flex justify-between items-center mb-8">
-          <div className="text-left">
-            <h1 className="text-4xl md:text-5xl font-bold text-gray-800 tracking-tight">Hairfolio</h1>
-            <p className="text-lg text-gray-600 mt-1">Portfolio for <span className="font-semibold text-indigo-600">{designerProfile?.name || designerName}</span></p>
+        <header className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+          <div className="text-center sm:text-left">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-800 tracking-tight">Hairfolio</h1>
+            <p className="text-base sm:text-lg text-gray-600 mt-1">
+              Portfolio for <span className="font-semibold text-indigo-600 block sm:inline">{designerProfile?.name || designerName}</span>
+            </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-wrap justify-center">
             <button
               onClick={() => setShowProfileModal(true)}
               className={`${headerButtonStyle} bg-blue-600 text-white hover:bg-blue-700`}
@@ -212,17 +214,16 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
 
         {/* Profile Preview Card */}
         {designerProfile && (
-          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border border-gray-100">
-            <div className="flex items-center gap-4">
+          <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 mb-6 border border-gray-100">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
               {/* Profile Image */}
-              <div className="relative">
+              <div className="relative flex-shrink-0">
                 {designerProfile.profileImage ? (
                   <img
                     src={designerProfile.profileImage}
                     alt={designerProfile.name || designerName}
                     className="w-16 h-16 rounded-full object-cover border-4 border-indigo-100 shadow-lg"
                     onError={(e) => {
-                      // Fallback to initials if profile image fails to load
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';
                       const fallback = target.parentElement?.querySelector('.profile-fallback') as HTMLElement;
@@ -238,12 +239,12 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
               </div>
 
               {/* Profile Info */}
-              <div className="flex-1">
+              <div className="flex-1 text-center sm:text-left">
                 <h3 className="text-xl font-bold text-gray-800">{designerProfile.name || designerName}</h3>
                 {designerProfile.bio && (
                   <p className="text-gray-600 text-sm mt-1 leading-relaxed">{designerProfile.bio}</p>
                 )}
-                <div className="flex flex-wrap gap-4 mt-2 text-xs text-gray-500">
+                <div className="flex flex-wrap justify-center sm:justify-start gap-3 sm:gap-4 mt-2 text-xs text-gray-500">
                   {designerProfile.location && (
                     <span className="flex items-center gap-1">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -261,7 +262,6 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
                       {designerProfile.phone}
                     </span>
                   )}
-                  {/* Social Links Preview */}
                   {designerProfile.socialLinks?.instagram && (
                     <span className="flex items-center gap-1">
                       <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
@@ -284,7 +284,7 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
               {/* Edit Button */}
               <button
                 onClick={() => setShowProfileModal(true)}
-                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors font-medium"
               >
                 편집
               </button>
@@ -294,10 +294,10 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
 
         {/* New Profile Setup CTA */}
         {!designerProfile && (
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 mb-6 border border-blue-100">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-4 sm:p-6 mb-6 border border-blue-100">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 text-center sm:text-left">
+                <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
                   <UserIcon />
                 </div>
                 <div>
@@ -307,7 +307,7 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
               </div>
               <button
                 onClick={() => setShowProfileModal(true)}
-                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors font-medium"
               >
                 프로필 설정
               </button>
