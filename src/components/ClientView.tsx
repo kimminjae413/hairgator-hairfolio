@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import { analyzeHairstyle, applyHairstyle } from '../services/vmodelService'
-import * as localStorageService from '../services/localStorageService'
+import * as localStorageService from '../services/firebaseService'
 import { LoadingState, Hairstyle, DesignerProfile } from '../types'
 import ImageUploader from './ImageUploader'
 import ResultDisplay from './ResultDisplay'
 import HairstyleGallery from './HairstyleGallery'
-import UserIcon from './icons/UserIcon'
+import UserIcon from './icons/UserIcon
 
 interface ClientViewProps {
   designerName: string
