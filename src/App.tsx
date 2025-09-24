@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import * as localStorageService from './services/localStorageService';
+import * as firebaseService from './services/firebaseService';
 import ClientView from './components/ClientView';
 import DesignerView from './components/DesignerView';
 import Login from './components/Login';
