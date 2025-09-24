@@ -89,6 +89,11 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
     setShowProfileModal(false);
   };
 
+  // Generate designer initials for fallback
+  const getDesignerInitials = (name: string) => {
+    return name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2);
+  };
+
   // 통일된 탭 스타일 - 아이콘 크기와 패딩 최적화
   const tabStyle = "px-3 py-2.5 text-center font-medium text-sm rounded-lg transition-colors duration-300 focus:outline-none flex items-center justify-center gap-2 min-w-[100px]";
   const activeTabStyle = "bg-indigo-600 text-white shadow";
@@ -103,7 +108,7 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
         <header className="flex justify-between items-center mb-8">
           <div className="text-left">
             <h1 className="text-4xl md:text-5xl font-bold text-gray-800 tracking-tight">Hairfolio</h1>
-            <p className="text-lg text-gray-600 mt-1">Portfolio for <span className="font-semibold text-indigo-600">{designerName}</span></p>
+            <p className="text-lg text-gray-600 mt-1">Portfolio for <span className="font-semibold text-indigo-600">{designerProfile?.name || designerName}</span></p>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -150,11 +155,32 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
         {designerProfile && (
           <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border border-gray-100">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
-                {designerProfile.name ? designerProfile.name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2) : designerName.slice(0, 2).toUpperCase()}
+              {/* Profile Image */}
+              <div className="relative">
+                {designerProfile.profileImage ? (
+                  <img
+                    src={designerProfile.profileImage}
+                    alt={designerProfile.name || designerName}
+                    className="w-16 h-16 rounded-full object-cover border-4 border-indigo-100 shadow-lg"
+                    onError={(e) => {
+                      // Fallback to initials if profile image fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      const fallback = target.parentElement?.querySelector('.profile-fallback') as HTMLElement;
+                      if (fallback) {
+                        fallback.classList.remove('hidden');
+                      }
+                    }}
+                  />
+                ) : null}
+                <div className={`w-16 h-16 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xl border-4 border-indigo-100 shadow-lg profile-fallback ${designerProfile.profileImage ? 'hidden' : ''}`}>
+                  {getDesignerInitials(designerProfile.name || designerName)}
+                </div>
               </div>
+
+              {/* Profile Info */}
               <div className="flex-1">
-                <h3 className="text-xl font-bold text-gray-800">{designerProfile.name}</h3>
+                <h3 className="text-xl font-bold text-gray-800">{designerProfile.name || designerName}</h3>
                 {designerProfile.bio && (
                   <p className="text-gray-600 text-sm mt-1 leading-relaxed">{designerProfile.bio}</p>
                 )}
@@ -176,13 +202,55 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
                       {designerProfile.phone}
                     </span>
                   )}
+                  {/* Social Links Preview */}
+                  {designerProfile.socialLinks?.instagram && (
+                    <span className="flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                      </svg>
+                      Instagram
+                    </span>
+                  )}
+                  {designerProfile.socialLinks?.website && (
+                    <span className="flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9m0 9c-5 0-9-4-9-9s4-9 9-9" />
+                      </svg>
+                      Website
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Edit Button */}
+              <button
+                onClick={() => setShowProfileModal(true)}
+                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                편집
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* New Profile Setup CTA */}
+        {!designerProfile && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 mb-6 border border-blue-100">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
+                  <UserIcon />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">프로필을 설정해보세요!</h3>
+                  <p className="text-sm text-gray-600">고객에게 보여질 프로필 정보를 추가하면 더 전문적으로 보입니다.</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowProfileModal(true)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors font-medium"
               >
-                편집
+                프로필 설정
               </button>
             </div>
           </div>
