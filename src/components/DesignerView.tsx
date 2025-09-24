@@ -47,11 +47,28 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
       ...details,
       url: URL.createObjectURL(file),
       isLocal: true,
+      id: Date.now().toString(), // Generate simple ID
     };
     const updatedPortfolio = [newImage, ...portfolio];
     setPortfolio(updatedPortfolio);
     localStorageService.savePortfolio(designerName, updatedPortfolio);
     setShowUploadModal(false);
+  };
+
+  const handlePortfolioImageDelete = (hairstyle: Hairstyle) => {
+    if (!hairstyle.id && !hairstyle.url) {
+      console.error('Hairstyle identifier is missing');
+      return;
+    }
+
+    // Use URL as fallback if ID is not available (for existing images)
+    const identifier = hairstyle.id || hairstyle.url;
+    const updatedPortfolio = portfolio.filter(item => 
+      (item.id && item.id !== identifier) && (item.url !== identifier)
+    );
+    
+    setPortfolio(updatedPortfolio);
+    localStorageService.savePortfolio(designerName, updatedPortfolio);
   };
 
   const handleSaveSettings = (newUrl: string) => {
@@ -141,6 +158,8 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
                   selectedUrl={null}
                   disabled={false}
                   onAddImage={() => setShowUploadModal(true)}
+                  onDeleteImage={handlePortfolioImageDelete}
+                  isDesignerView={true}
                 />
               ) : (
                  <div className="text-center py-16 px-6 bg-gray-50 rounded-lg">
