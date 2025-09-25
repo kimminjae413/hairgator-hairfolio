@@ -45,6 +45,28 @@ const generateId = (): string => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
 
+// undefined 값 제거 함수
+const removeUndefinedFields = (obj: any): any => {
+  if (obj === null || obj === undefined) return obj;
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => removeUndefinedFields(item));
+  }
+  
+  if (typeof obj === 'object') {
+    const cleaned: any = {};
+    Object.keys(obj).forEach(key => {
+      const value = obj[key];
+      if (value !== undefined) {
+        cleaned[key] = removeUndefinedFields(value);
+      }
+    });
+    return cleaned;
+  }
+  
+  return obj;
+};
+
 // Initialize database with sample data
 export const initializeDB = async (): Promise<void> => {
   try {
@@ -68,7 +90,8 @@ export const initializeDB = async (): Promise<void> => {
         updatedAt: new Date().toISOString()
       };
       
-      await setDoc(sampleDesignerRef, sampleDesignerData);
+      const cleanedData = removeUndefinedFields(sampleDesignerData);
+      await setDoc(sampleDesignerRef, cleanedData);
       console.log('Sample designer initialized in Firebase');
     }
   } catch (error) {
@@ -155,11 +178,12 @@ export const savePortfolio = async (designerName: string, portfolio: Hairstyle[]
       updatedAt: new Date().toISOString()
     };
     
-    await setDoc(designerRef, updatedData);
+    const cleanedData = removeUndefinedFields(updatedData);
+    await setDoc(designerRef, cleanedData);
     
     // Also update localStorage as backup
     const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
-    localData[designerName] = updatedData;
+    localData[designerName] = cleanedData;
     localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
     
     return true;
@@ -182,7 +206,22 @@ export const addStyleToPortfolio = async (designerName: string, style: Hairstyle
     };
     
     const updatedPortfolio = [newStyle, ...currentData.portfolio];
-    return await savePortfolio(designerName, updatedPortfolio);
+    const updatedData: DesignerData = {
+      ...currentData,
+      portfolio: updatedPortfolio,
+      updatedAt: new Date().toISOString()
+    };
+
+    const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
+    const cleanedData = removeUndefinedFields(updatedData);
+    await setDoc(designerRef, cleanedData);
+    
+    // Also update localStorage as backup
+    const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
+    localData[designerName] = cleanedData;
+    localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
+    
+    return true;
   } catch (error) {
     console.error('Error adding style to portfolio:', error);
     return false;
@@ -233,11 +272,12 @@ export const saveDesignerProfile = async (designerName: string, profile: Designe
       updatedAt: new Date().toISOString()
     };
     
-    await setDoc(designerRef, updatedData);
+    const cleanedData = removeUndefinedFields(updatedData);
+    await setDoc(designerRef, cleanedData);
     
     // Also update localStorage
     const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
-    localData[designerName] = updatedData;
+    localData[designerName] = cleanedData;
     localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
     
     return true;
@@ -259,11 +299,12 @@ export const saveDesignerSettings = async (designerName: string, settings: Desig
       updatedAt: new Date().toISOString()
     };
     
-    await setDoc(designerRef, updatedData);
+    const cleanedData = removeUndefinedFields(updatedData);
+    await setDoc(designerRef, cleanedData);
     
     // Also update localStorage
     const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
-    localData[designerName] = updatedData;
+    localData[designerName] = cleanedData;
     localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
     
     return true;
@@ -285,11 +326,12 @@ export const saveReservationUrl = async (designerName: string, url: string): Pro
       updatedAt: new Date().toISOString()
     };
     
-    await setDoc(designerRef, updatedData);
+    const cleanedData = removeUndefinedFields(updatedData);
+    await setDoc(designerRef, cleanedData);
     
     // Also update localStorage
     const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
-    localData[designerName] = updatedData;
+    localData[designerName] = cleanedData;
     localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
     
     return true;
@@ -437,11 +479,12 @@ export const resetAnalytics = async (designerName: string): Promise<boolean> => 
       updatedAt: new Date().toISOString()
     };
     
-    await setDoc(designerRef, updatedData);
+    const cleanedData = removeUndefinedFields(updatedData);
+    await setDoc(designerRef, cleanedData);
     
     // Also update localStorage
     const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
-    localData[designerName] = updatedData;
+    localData[designerName] = cleanedData;
     localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
     
     return true;
@@ -485,11 +528,12 @@ export const importDesignerData = async (jsonData: string): Promise<boolean> => 
       updatedAt: new Date().toISOString()
     };
     
-    await setDoc(designerRef, updatedData);
+    const cleanedData = removeUndefinedFields(updatedData);
+    await setDoc(designerRef, cleanedData);
     
     // Also update localStorage
     const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
-    localData[imported.designerName] = updatedData;
+    localData[imported.designerName] = cleanedData;
     localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
     
     return true;
