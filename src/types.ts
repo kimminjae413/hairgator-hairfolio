@@ -82,9 +82,13 @@ export interface DesignerProfile {
     instagram?: string;
     facebook?: string;
     website?: string;
+    brandSettings?: {
+    salonName?: string;        // 매장명 (기본값: "Hairfolio")  
+    fontFamily?: string;       // 글씨체
+    textColor?: string;        // 텍스트 색상
+    showSubtitle?: boolean;    // "Portfolio for" 표시 여부
   };
 }
-
 // Designer settings
 export interface DesignerSettings {
   allowDirectBooking?: boolean;
