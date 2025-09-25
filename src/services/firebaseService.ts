@@ -16,6 +16,7 @@ import {
   DesignerStats, 
   DesignerProfile,
   DesignerSettings,
+  TrialResult,
   DEFAULT_STATS,
   DEFAULT_SETTINGS
 } from '../types';
@@ -464,6 +465,47 @@ export const trackBooking = async (designerName: string, styleUrl: string): Prom
   }
 };
 
+// Track trial result (NEW FUNCTION)
+export const trackTrialResult = async (
+  designerName: string, 
+  trialData: {
+    styleUrl: string;
+    resultUrl: string;
+    styleName?: string;
+  }
+): Promise<void> => {
+  try {
+    const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
+    const currentData = await getDesignerData(designerName);
+    
+    const trialResult: TrialResult = {
+      styleUrl: trialData.styleUrl,
+      resultUrl: trialData.resultUrl,
+      timestamp: new Date().toISOString(),
+      styleName: trialData.styleName
+    };
+    
+    const trialResults = currentData.stats?.trialResults || [];
+    trialResults.unshift(trialResult); // Add to beginning
+    
+    // Keep only the most recent 20 trial results (용량 관리)
+    if (trialResults.length > 20) {
+      trialResults.splice(20);
+    }
+    
+    await updateDoc(designerRef, {
+      'stats.trialResults': trialResults,
+      'stats.lastUpdated': new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+    
+    console.log('Trial result tracked successfully');
+  } catch (error) {
+    console.error('Error tracking trial result:', error);
+    // Silently fail - don't interrupt user experience
+  }
+};
+
 // Reset analytics data
 export const resetAnalytics = async (designerName: string): Promise<boolean> => {
   try {
@@ -611,6 +653,7 @@ export const getAnalyticsSummary = async (designerName: string) => {
         count: topBookedStyle[1]
       } : null,
       popularStyles: stats.popularStyles,
+      trialResults: stats.trialResults || [],
       lastUpdated: stats.lastUpdated
     };
   } catch (error) {
@@ -623,6 +666,7 @@ export const getAnalyticsSummary = async (designerName: string) => {
       topViewedStyle: null,
       topBookedStyle: null,
       popularStyles: [],
+      trialResults: [],
       lastUpdated: new Date().toISOString()
     };
   }
