@@ -403,7 +403,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
 
         {/* Footer */}
         <footer className="text-center mt-8">
-          <p className="text-gray-400 text-xs">Powered by VModel AI</p>
+          <p className="text-gray-400 text-xs">Powered by HAIRFOLIO</p>
         </footer>
       </div>
     </div>
