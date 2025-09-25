@@ -128,6 +128,21 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
       
       setGeneratedImage(finalImage)
       setLoadingState('done')
+
+      // Track trial result - 성공한 경우에만 저장
+      if (finalImage) {
+        try {
+          await firebaseService.trackTrialResult(designerName, {
+            styleUrl: hairstyle.url,
+            resultUrl: finalImage,
+            styleName: hairstyle.name
+          })
+          console.log('Trial result tracked successfully')
+        } catch (trackError) {
+          console.error('Error tracking trial result:', trackError)
+          // 추적 실패는 사용자 경험에 영향을 주지 않음
+        }
+      }
     } catch (err) {
       console.error('Error processing hairstyle:', err)
       
