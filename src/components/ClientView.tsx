@@ -5,6 +5,7 @@ import { LoadingState, Hairstyle, DesignerProfile } from '../types'
 import ImageUploader from './ImageUploader'
 import ResultDisplay from './ResultDisplay'
 import HairstyleGallery from './HairstyleGallery'
+import IntroScreen from './IntroScreen'
 import UserIcon from './icons/UserIcon'
 
 interface ClientViewProps {
@@ -27,6 +28,9 @@ const urlToFile = async (url: string, filename: string, mimeType: string): Promi
 }
 
 const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
+  // State for intro screen
+  const [showIntro, setShowIntro] = useState(true)
+  
   // State for uploaded face image
   const [faceFile, setFaceFile] = useState<File | null>(null)
   const [facePreview, setFacePreview] = useState<string | null>(null)
@@ -61,9 +65,15 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
         
         // Track visit
         await firebaseService.trackVisit(designerName)
+        
+        // 프로필 이미지가 없으면 인트로 건너뛰기
+        if (!data.profile?.profileImage) {
+          setShowIntro(false)
+        }
       } catch (error) {
         console.error('Error loading designer data:', error)
         setError('디자이너 정보를 불러올 수 없습니다.')
+        setShowIntro(false) // 에러 시 인트로 건너뛰기
       } finally {
         setIsDataLoading(false)
       }
@@ -71,6 +81,11 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
     
     loadDesignerData()
   }, [designerName])
+
+  // Handle intro completion
+  const handleIntroComplete = useCallback(() => {
+    setShowIntro(false)
+  }, [])
 
   // Handle face image upload
   const handleFaceFileChange = useCallback((file: File | null) => {
@@ -192,6 +207,16 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
   const fontFamily = brandSettings.fontFamily || 'Inter'
   const textColor = brandSettings.textColor || '#1f2937'
   const showSubtitle = brandSettings.showSubtitle !== false
+
+  // Show intro screen if profile image exists and intro not completed
+  if (showIntro && designerProfile?.profileImage && !isDataLoading) {
+    return (
+      <IntroScreen 
+        designerProfile={designerProfile}
+        onComplete={handleIntroComplete}
+      />
+    )
+  }
 
   // Loading state while fetching designer data
   if (isDataLoading) {
@@ -418,9 +443,10 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
           />
         )}
 
+        {/* Footer */}
         <footer className="text-center mt-8">
-  <p className="text-gray-400 text-xs">Powered by HAIRFOLIO</p>
-</footer>
+          <p className="text-gray-400 text-xs">Powered by HAIRFOLIO</p>
+        </footer>
       </div>
     </div>
   )
