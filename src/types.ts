@@ -50,6 +50,14 @@ export interface Hairstyle {
   updatedAt?: string;                                  // ISO date string
 }
 
+// Trial result data structure
+export interface TrialResult {
+  styleUrl: string;                                    // 적용한 헤어스타일 URL
+  resultUrl: string;                                   // VModel 생성 결과 이미지 URL
+  timestamp: string;                                   // 체험 시간 (ISO string)
+  styleName?: string;                                  // 헤어스타일 이름 (선택사항)
+}
+
 // Analytics data for tracking designer portfolio performance
 export interface DesignerStats {
   visits: number;                                      // Total portfolio visits
@@ -58,6 +66,7 @@ export interface DesignerStats {
   totalTryOns?: number;                               // Total style try-ons
   conversionRate?: number;                            // Booking conversion rate
   popularStyles?: string[];                           // Top performing style URLs
+  trialResults?: TrialResult[];                       // Recent client try-on results
   lastUpdated?: string;                               // ISO date string
 }
 
@@ -68,6 +77,7 @@ export interface DesignerProfile {
   phone?: string;
   location?: string;
   address?: string;
+  profileImage?: string;                              // Profile image URL
   socialLinks?: {
     instagram?: string;
     facebook?: string;
@@ -161,6 +171,7 @@ export const DEFAULT_STATS: DesignerStats = {
   totalTryOns: 0,
   conversionRate: 0,
   popularStyles: [],
+  trialResults: [],
   lastUpdated: new Date().toISOString()
 };
 
