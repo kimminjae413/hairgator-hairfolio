@@ -449,7 +449,7 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
         )}
 
         <footer className="text-center mt-8">
-          <p className="text-gray-500">Powered by VModel AI</p>
+          <p className="text-gray-500">Powered by HAIRFOLIO</p>
         </footer>
       </div>
     </div>
