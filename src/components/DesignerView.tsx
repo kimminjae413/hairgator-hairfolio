@@ -196,10 +196,15 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
       <div className="w-full max-w-6xl mx-auto">
         <header className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
           <div className="text-center sm:text-left">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-800 tracking-tight">Hairfolio</h1>
-            <p className="text-base sm:text-lg text-gray-600 mt-1">
-              Portfolio for <span className="font-semibold text-indigo-600 block sm:inline">{designerProfile?.name || designerName}</span>
-            </p>
+            <h1 
+  className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight"
+  style={{
+    fontFamily: designerProfile?.brandSettings?.fontFamily || 'Inter',
+    color: designerProfile?.brandSettings?.textColor || '#1f2937'
+  }}
+>
+  {designerProfile?.brandSettings?.salonName || 'Hairfolio'}
+</h1>
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-center">
             <button
