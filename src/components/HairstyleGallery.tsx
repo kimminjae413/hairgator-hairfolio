@@ -11,6 +11,7 @@ interface HairstyleGalleryProps {
   showCategories?: boolean;
   allowMultipleSelection?: boolean;
   onDeleteImage?: (hairstyle: Hairstyle) => void;
+  onEditImage?: (hairstyle: Hairstyle) => void;
   isDesignerView?: boolean;
 }
 
@@ -29,6 +30,7 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
   showCategories = true,
   allowMultipleSelection = false,
   onDeleteImage,
+  onEditImage,
   isDesignerView = false
 }) => {
   const [activeTab, setActiveTab] = useState<Gender>('Female');
@@ -245,22 +247,43 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                       )}
                     </button>
 
-                    {/* Delete Button - Only show in designer view */}
-                    {isDesignerView && onDeleteImage && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (window.confirm(`"${image.name}" 스타일을 삭제하시겠습니까?`)) {
-                            onDeleteImage(image);
-                          }
-                        }}
-                        className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center z-10"
-                        title="스타일 삭제"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                    {/* Action Buttons - Only show in designer view */}
+                    {isDesignerView && (
+                      <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                        {/* Edit Button */}
+                        {onEditImage && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditImage(image);
+                            }}
+                            className="w-8 h-8 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg transition-all duration-200 flex items-center justify-center z-10"
+                            title="스타일 편집"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                        )}
+                        
+                        {/* Delete Button */}
+                        {onDeleteImage && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`"${image.name}" 스타일을 삭제하시겠습니까?`)) {
+                                onDeleteImage(image);
+                              }
+                            }}
+                            className="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-all duration-200 flex items-center justify-center z-10"
+                            title="스타일 삭제"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 ))}
