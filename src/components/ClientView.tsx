@@ -186,6 +186,13 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
     return name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2)
   }
 
+  // Get brand settings with defaults
+  const brandSettings = designerProfile?.brandSettings || {}
+  const salonName = brandSettings.salonName || 'Hairfolio'
+  const fontFamily = brandSettings.fontFamily || 'Inter'
+  const textColor = brandSettings.textColor || '#1f2937'
+  const showSubtitle = brandSettings.showSubtitle !== false
+
   // Loading state while fetching designer data
   if (isDataLoading) {
     return (
@@ -203,8 +210,15 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
       <div className="w-full max-w-6xl mx-auto">
         {/* Header with Designer Profile */}
         <header className="text-center mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-800 tracking-tight mb-6">
-            Hairfolio
+          {/* Custom Branded Title */}
+          <h1 
+            className="text-4xl md:text-5xl font-bold tracking-tight mb-6"
+            style={{
+              fontFamily: fontFamily,
+              color: textColor
+            }}
+          >
+            {salonName}
           </h1>
           
           {/* Designer Profile Card */}
@@ -312,9 +326,12 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
             )}
           </div>
 
-          <p className="text-lg text-gray-600">
-            AI로 새로운 헤어스타일을 미리 체험해보세요
-          </p>
+          {/* Subtitle (optional) */}
+          {showSubtitle && (
+            <p className="text-lg text-gray-600">
+              AI로 새로운 헤어스타일을 미리 체험해보세요
+            </p>
+          )}
         </header>
 
         {/* Main Content */}
@@ -403,7 +420,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
 
         {/* Footer */}
         <footer className="text-center mt-8">
-          <p className="text-gray-400 text-xs">Powered by HAIRFOLIO</p>
+          <p className="text-gray-400 text-xs">© 2024 {salonName}</p>
         </footer>
       </div>
     </div>
