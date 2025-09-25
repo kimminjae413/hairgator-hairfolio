@@ -9,6 +9,27 @@ interface DesignerProfileModalProps {
   onClose: () => void;
 }
 
+// Font options
+const FONT_OPTIONS = [
+  { value: 'Inter', label: '모던 (기본)', preview: 'font-sans' },
+  { value: 'serif', label: '클래식', preview: 'font-serif' },
+  { value: 'Noto Sans KR', label: '한글 최적화', preview: 'font-sans' },
+  { value: 'cursive', label: '손글씨체', preview: 'font-mono' },
+  { value: 'Georgia', label: '우아한', preview: 'font-serif' },
+];
+
+// Color options
+const COLOR_OPTIONS = [
+  { value: '#1f2937', label: '클래식 블랙', color: 'bg-gray-800' },
+  { value: '#dc2626', label: '빨간색', color: 'bg-red-600' },
+  { value: '#2563eb', label: '파란색', color: 'bg-blue-600' },
+  { value: '#7c3aed', label: '보라색', color: 'bg-violet-600' },
+  { value: '#059669', label: '초록색', color: 'bg-emerald-600' },
+  { value: '#d97706', label: '주황색', color: 'bg-amber-600' },
+  { value: '#be185d', label: '핑크색', color: 'bg-pink-600' },
+  { value: '#374151', label: '다크 그레이', color: 'bg-gray-700' },
+];
+
 const DesignerProfileModal: React.FC<DesignerProfileModalProps> = ({
   currentProfile,
   designerName,
@@ -20,7 +41,13 @@ const DesignerProfileModal: React.FC<DesignerProfileModalProps> = ({
     bio: currentProfile?.bio || '',
     location: currentProfile?.location || '',
     phone: currentProfile?.phone || '',
-    profileImage: currentProfile?.profileImage || '', // 프로필 이미지 추가
+    profileImage: currentProfile?.profileImage || '',
+    brandSettings: {
+      salonName: currentProfile?.brandSettings?.salonName || '',
+      fontFamily: currentProfile?.brandSettings?.fontFamily || 'Inter',
+      textColor: currentProfile?.brandSettings?.textColor || '#1f2937',
+      showSubtitle: currentProfile?.brandSettings?.showSubtitle !== false,
+    },
     socialLinks: {
       instagram: currentProfile?.socialLinks?.instagram || '',
       website: currentProfile?.socialLinks?.website || ''
@@ -84,8 +111,9 @@ const DesignerProfileModal: React.FC<DesignerProfileModalProps> = ({
       fileInputRef.current.value = '';
     }
   };
+
   const handleChange = (field: keyof DesignerProfile, value: string) => {
-    if (field === 'socialLinks') return; // Handle separately
+    if (field === 'socialLinks' || field === 'brandSettings') return; // Handle separately
     setProfile(prev => ({ ...prev, [field]: value }));
   };
 
@@ -95,6 +123,16 @@ const DesignerProfileModal: React.FC<DesignerProfileModalProps> = ({
       socialLinks: {
         ...prev.socialLinks,
         [platform]: value
+      }
+    }));
+  };
+
+  const handleBrandSettingChange = (field: keyof NonNullable<DesignerProfile['brandSettings']>, value: string | boolean) => {
+    setProfile(prev => ({
+      ...prev,
+      brandSettings: {
+        ...prev.brandSettings,
+        [field]: value
       }
     }));
   };
@@ -146,6 +184,12 @@ const DesignerProfileModal: React.FC<DesignerProfileModalProps> = ({
         bio: profile.bio?.trim() || undefined,
         location: profile.location?.trim() || undefined,
         phone: profile.phone?.trim() || undefined,
+        brandSettings: {
+          salonName: profile.brandSettings?.salonName?.trim() || undefined,
+          fontFamily: profile.brandSettings?.fontFamily || 'Inter',
+          textColor: profile.brandSettings?.textColor || '#1f2937',
+          showSubtitle: profile.brandSettings?.showSubtitle !== false,
+        },
         socialLinks: {
           instagram: profile.socialLinks?.instagram?.trim() || undefined,
           website: profile.socialLinks?.website?.trim() || undefined
@@ -178,13 +222,16 @@ const DesignerProfileModal: React.FC<DesignerProfileModalProps> = ({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [onClose, isSubmitting]);
 
+  // Get current brand display name
+  const displaySalonName = profile.brandSettings?.salonName || 'Hairfolio';
+
   return (
     <div
       className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in"
       onClick={!isSubmitting ? onClose : undefined}
     >
       <div
-        className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden"
+        className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -205,7 +252,7 @@ const DesignerProfileModal: React.FC<DesignerProfileModalProps> = ({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 max-h-[70vh] overflow-y-auto space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 max-h-[75vh] overflow-y-auto space-y-6">
           
           {/* Profile Image Upload */}
           <div className="text-center mb-6">
@@ -270,6 +317,113 @@ const DesignerProfileModal: React.FC<DesignerProfileModalProps> = ({
             <p className="text-xs text-gray-500 mt-2">
               JPG, PNG, WEBP 형식, 최대 5MB
             </p>
+          </div>
+
+          {/* Brand Settings Section */}
+          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-5 border border-purple-200">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+              <svg className="w-5 h-5 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v14a4 4 0 01-4 4zM7 21h10a2 2 0 002-2v-9a2 2 0 00-2-2H9a2 2 0 00-2 2v9a2 2 0 002 2z" />
+              </svg>
+              브랜드 설정
+            </h3>
+            
+            {/* Salon Name */}
+            <div className="mb-4">
+              <label htmlFor="salon-name" className="block text-sm font-medium text-gray-700 mb-2">
+                매장명/브랜드명
+              </label>
+              <input
+                id="salon-name"
+                type="text"
+                value={profile.brandSettings?.salonName || ''}
+                onChange={(e) => handleBrandSettingChange('salonName', e.target.value)}
+                placeholder="예: 스타일 헤어살롱, 뷰티 스튜디오"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                disabled={isSubmitting}
+                maxLength={30}
+              />
+              <p className="text-xs text-gray-500 mt-1">비어있으면 'Hairfolio'로 표시됩니다</p>
+            </div>
+
+            {/* Font Family */}
+            <div className="mb-4">
+              <label htmlFor="font-family" className="block text-sm font-medium text-gray-700 mb-2">
+                글씨체
+              </label>
+              <select
+                id="font-family"
+                value={profile.brandSettings?.fontFamily || 'Inter'}
+                onChange={(e) => handleBrandSettingChange('fontFamily', e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                disabled={isSubmitting}
+              >
+                {FONT_OPTIONS.map(font => (
+                  <option key={font.value} value={font.value}>
+                    {font.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Text Color */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-3">텍스트 색상</label>
+              <div className="grid grid-cols-4 gap-2">
+                {COLOR_OPTIONS.map(color => (
+                  <button
+                    key={color.value}
+                    type="button"
+                    onClick={() => handleBrandSettingChange('textColor', color.value)}
+                    className={`w-full h-12 rounded-lg border-2 ${color.color} ${
+                      profile.brandSettings?.textColor === color.value
+                        ? 'border-purple-500 ring-2 ring-purple-200'
+                        : 'border-gray-300 hover:border-purple-300'
+                    } transition-all duration-200 relative flex items-center justify-center`}
+                    disabled={isSubmitting}
+                    title={color.label}
+                  >
+                    {profile.brandSettings?.textColor === color.value && (
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Show Subtitle Toggle */}
+            <div className="mb-4">
+              <label className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">부제목 표시</span>
+                <input
+                  type="checkbox"
+                  checked={profile.brandSettings?.showSubtitle !== false}
+                  onChange={(e) => handleBrandSettingChange('showSubtitle', e.target.checked)}
+                  className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                  disabled={isSubmitting}
+                />
+              </label>
+              <p className="text-xs text-gray-500 mt-1">"AI로 새로운 헤어스타일을..." 문구 표시</p>
+            </div>
+
+            {/* Brand Preview */}
+            <div className="bg-white rounded-lg p-4 border border-gray-200">
+              <p className="text-xs text-gray-600 mb-2">미리보기:</p>
+              <h4 
+                className="text-xl font-bold mb-1"
+                style={{
+                  fontFamily: profile.brandSettings?.fontFamily || 'Inter',
+                  color: profile.brandSettings?.textColor || '#1f2937'
+                }}
+              >
+                {displaySalonName}
+              </h4>
+              {profile.brandSettings?.showSubtitle !== false && (
+                <p className="text-sm text-gray-600">AI로 새로운 헤어스타일을 미리 체험해보세요</p>
+              )}
+            </div>
           </div>
           
           {/* Designer Name */}
@@ -385,9 +539,9 @@ const DesignerProfileModal: React.FC<DesignerProfileModalProps> = ({
               <div>
                 <h4 className="font-medium text-blue-800 text-sm">프로필 정보</h4>
                 <ul className="text-blue-700 text-xs mt-1 space-y-1">
+                  <li>• 브랜드 설정으로 고유한 매장 이미지를 만들어보세요</li>
                   <li>• 이 정보는 고객이 포트폴리오를 볼 때 표시됩니다</li>
                   <li>• 신뢰도 향상을 위해 정확한 정보를 입력해주세요</li>
-                  <li>• 소셜 링크는 선택사항입니다</li>
                 </ul>
               </div>
             </div>
