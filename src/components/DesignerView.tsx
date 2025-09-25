@@ -5,6 +5,7 @@ import HairstyleGallery from './HairstyleGallery';
 import ShareModal from './ShareModal';
 import SettingsModal from './SettingsModal';
 import UploadStyleModal from './UploadStyleModal';
+import EditStyleModal from './EditStyleModal';
 import DesignerProfileModal from './DesignerProfileModal';
 import AnalyticsDashboard from './AnalyticsDashboard';
 import ShareIcon from './icons/ShareIcon';
@@ -29,7 +30,9 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
   const [showShareModal, setShowShareModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [editingStyle, setEditingStyle] = useState<Hairstyle | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>('gallery');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -104,6 +107,33 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
     } catch (error) {
       console.error('Error deleting portfolio image:', error);
       alert('포트폴리오 삭제 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handlePortfolioImageEdit = (hairstyle: Hairstyle) => {
+    setEditingStyle(hairstyle);
+    setShowEditModal(true);
+  };
+
+  const handleSaveEditedStyle = async (styleId: string, updates: Partial<Hairstyle>) => {
+    try {
+      const success = await firebaseService.updateStyleInPortfolio(designerName, styleId, updates);
+      if (success) {
+        // Update local state
+        const updatedPortfolio = portfolio.map(style => 
+          (style.id === styleId || style.url === styleId) 
+            ? { ...style, ...updates }
+            : style
+        );
+        setPortfolio(updatedPortfolio);
+        setShowEditModal(false);
+        setEditingStyle(null);
+      } else {
+        alert('스타일 수정에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('Error updating style:', error);
+      alert('스타일 수정 중 오류가 발생했습니다.');
     }
   };
 
@@ -350,6 +380,7 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
                   disabled={false}
                   onAddImage={() => setShowUploadModal(true)}
                   onDeleteImage={handlePortfolioImageDelete}
+                  onEditImage={handlePortfolioImageEdit}
                   isDesignerView={true}
                 />
               ) : (
@@ -403,6 +434,17 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
             <UploadStyleModal
                 onUpload={handlePortfolioImageAdd}
                 onClose={() => setShowUploadModal(false)}
+            />
+        )}
+
+        {showEditModal && editingStyle && (
+            <EditStyleModal
+                style={editingStyle}
+                onSave={handleSaveEditedStyle}
+                onClose={() => {
+                  setShowEditModal(false);
+                  setEditingStyle(null);
+                }}
             />
         )}
 
