@@ -22,6 +22,17 @@ import {
 } from '../types';
 import { portfolioImages, sampleDesigner } from '../portfolioImages';
 
+// Firebase 설정 디버깅
+console.log('🔧 Firebase Config Debug:', {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY ? 'SET ✅' : 'NOT SET ❌',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'NOT SET ❌',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'NOT SET ❌',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'NOT SET ❌',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ? 'SET ✅' : 'NOT SET ❌',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID ? 'SET ✅' : 'NOT SET ❌',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID ? 'SET ✅' : 'NOT SET ❌'
+});
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -32,9 +43,26 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// Firebase 초기화
+let app: any;
+let db: any;
+
+try {
+  console.log('🚀 Initializing Firebase...');
+  app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+  console.log('✅ Firebase initialized successfully');
+} catch (error) {
+  console.error('❌ Firebase initialization failed:', error);
+  console.error('Error details:', {
+    message: error instanceof Error ? error.message : 'Unknown error',
+    code: (error as any)?.code || 'No code',
+    stack: error instanceof Error ? error.stack : 'No stack'
+  });
+  // Firebase 초기화 실패시에도 앱이 동작하도록 null로 설정
+  app = null;
+  db = null;
+}
 
 // 컬렉션 레퍼런스
 const COLLECTIONS = {
@@ -68,14 +96,42 @@ const removeUndefinedFields = (obj: any): any => {
   return obj;
 };
 
+// Firebase 사용 가능 체크
+const isFirebaseAvailable = (): boolean => {
+  return db !== null;
+};
+
 // Initialize database with sample data
 export const initializeDB = async (): Promise<void> => {
   try {
+    if (!isFirebaseAvailable()) {
+      console.warn('⚠️ Firebase not available, using localStorage fallback');
+      // Fallback to localStorage if Firebase fails
+      const localData = localStorage.getItem('hairfolio_designers');
+      if (!localData) {
+        localStorage.setItem('hairfolio_designers', JSON.stringify({
+          'Sample Designer': {
+            portfolio: portfolioImages,
+            profile: sampleDesigner,
+            reservationUrl: 'https://booking.naver.com/booking/12/bizes/123456',
+            stats: DEFAULT_STATS,
+            settings: DEFAULT_SETTINGS,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+        }));
+        console.log('📝 Sample designer initialized in localStorage');
+      }
+      return;
+    }
+
+    console.log('🔄 Checking Sample Designer in Firebase...');
     const sampleDesignerRef = doc(db, COLLECTIONS.DESIGNERS, 'Sample Designer');
     const sampleDesignerSnap = await getDoc(sampleDesignerRef);
     
     // Only initialize if Sample Designer doesn't exist
     if (!sampleDesignerSnap.exists()) {
+      console.log('📝 Creating Sample Designer in Firebase...');
       const sampleDesignerData: DesignerData = {
         portfolio: portfolioImages.map(style => ({
           ...style,
@@ -93,10 +149,18 @@ export const initializeDB = async (): Promise<void> => {
       
       const cleanedData = removeUndefinedFields(sampleDesignerData);
       await setDoc(sampleDesignerRef, cleanedData);
-      console.log('Sample designer initialized in Firebase');
+      console.log('✅ Sample designer initialized in Firebase');
+    } else {
+      console.log('✅ Sample designer already exists in Firebase');
     }
   } catch (error) {
-    console.error('Error initializing Firebase DB:', error);
+    console.error('❌ Error initializing Firebase DB:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      code: (error as any)?.code || 'No code',
+      name: (error as any)?.name || 'No name'
+    });
+    
     // Fallback to localStorage if Firebase fails
     const localData = localStorage.getItem('hairfolio_designers');
     if (!localData) {
@@ -111,6 +175,7 @@ export const initializeDB = async (): Promise<void> => {
           updatedAt: new Date().toISOString()
         }
       }));
+      console.log('📝 Fallback: Sample designer initialized in localStorage');
     }
   }
 };
@@ -118,6 +183,22 @@ export const initializeDB = async (): Promise<void> => {
 // Get designer data
 export const getDesignerData = async (designerName: string): Promise<DesignerData> => {
   try {
+    if (!isFirebaseAvailable()) {
+      console.log('⚠️ Firebase not available, using localStorage for getDesignerData');
+      const localData = localStorage.getItem('hairfolio_designers');
+      if (localData) {
+        const designers = JSON.parse(localData);
+        return designers[designerName] || {
+          portfolio: [],
+          stats: { ...DEFAULT_STATS },
+          settings: { ...DEFAULT_SETTINGS },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+      }
+      throw new Error('No data available');
+    }
+
     const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
     const designerSnap = await getDoc(designerRef);
     
@@ -140,7 +221,7 @@ export const getDesignerData = async (designerName: string): Promise<DesignerDat
       };
     }
   } catch (error) {
-    console.error('Error getting designer data from Firebase:', error);
+    console.error('❌ Error getting designer data from Firebase:', error);
     // Fallback to localStorage
     const localData = localStorage.getItem('hairfolio_designers');
     if (localData) {
@@ -160,6 +241,32 @@ export const getDesignerData = async (designerName: string): Promise<DesignerDat
 // Save designer portfolio
 export const savePortfolio = async (designerName: string, portfolio: Hairstyle[]): Promise<boolean> => {
   try {
+    if (!isFirebaseAvailable()) {
+      console.log('⚠️ Firebase not available, using localStorage for savePortfolio');
+      const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
+      const existingData = localData[designerName] || {
+        stats: { ...DEFAULT_STATS },
+        settings: { ...DEFAULT_SETTINGS },
+        createdAt: new Date().toISOString()
+      };
+      
+      const updatedPortfolio = portfolio.map(style => ({
+        ...style,
+        id: style.id || generateId(),
+        createdAt: style.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }));
+
+      localData[designerName] = {
+        ...existingData,
+        portfolio: updatedPortfolio,
+        updatedAt: new Date().toISOString()
+      };
+      
+      localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
+      return true;
+    }
+
     const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
     
     // Ensure each style has required fields
@@ -189,7 +296,7 @@ export const savePortfolio = async (designerName: string, portfolio: Hairstyle[]
     
     return true;
   } catch (error) {
-    console.error('Error saving portfolio to Firebase:', error);
+    console.error('❌ Error saving portfolio to Firebase:', error);
     return false;
   }
 };
@@ -213,6 +320,14 @@ export const addStyleToPortfolio = async (designerName: string, style: Hairstyle
       updatedAt: new Date().toISOString()
     };
 
+    if (!isFirebaseAvailable()) {
+      console.log('⚠️ Firebase not available, using localStorage for addStyleToPortfolio');
+      const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
+      localData[designerName] = updatedData;
+      localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
+      return true;
+    }
+
     const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
     const cleanedData = removeUndefinedFields(updatedData);
     await setDoc(designerRef, cleanedData);
@@ -224,7 +339,7 @@ export const addStyleToPortfolio = async (designerName: string, style: Hairstyle
     
     return true;
   } catch (error) {
-    console.error('Error adding style to portfolio:', error);
+    console.error('❌ Error adding style to portfolio:', error);
     return false;
   }
 };
@@ -236,7 +351,7 @@ export const removeStyleFromPortfolio = async (designerName: string, styleId: st
     const updatedPortfolio = currentData.portfolio.filter(style => style.id !== styleId);
     return await savePortfolio(designerName, updatedPortfolio);
   } catch (error) {
-    console.error('Error removing style from portfolio:', error);
+    console.error('❌ Error removing style from portfolio:', error);
     return false;
   }
 };
@@ -256,7 +371,7 @@ export const updateStyleInPortfolio = async (designerName: string, styleId: stri
     
     return await savePortfolio(designerName, currentData.portfolio);
   } catch (error) {
-    console.error('Error updating style in portfolio:', error);
+    console.error('❌ Error updating style in portfolio:', error);
     return false;
   }
 };
@@ -264,7 +379,6 @@ export const updateStyleInPortfolio = async (designerName: string, styleId: stri
 // Save designer profile
 export const saveDesignerProfile = async (designerName: string, profile: DesignerProfile): Promise<boolean> => {
   try {
-    const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
     const currentData = await getDesignerData(designerName);
     
     const updatedData: DesignerData = {
@@ -272,7 +386,16 @@ export const saveDesignerProfile = async (designerName: string, profile: Designe
       profile,
       updatedAt: new Date().toISOString()
     };
-    
+
+    if (!isFirebaseAvailable()) {
+      console.log('⚠️ Firebase not available, using localStorage for saveDesignerProfile');
+      const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
+      localData[designerName] = updatedData;
+      localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
+      return true;
+    }
+
+    const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
     const cleanedData = removeUndefinedFields(updatedData);
     await setDoc(designerRef, cleanedData);
     
@@ -283,7 +406,7 @@ export const saveDesignerProfile = async (designerName: string, profile: Designe
     
     return true;
   } catch (error) {
-    console.error('Error saving designer profile:', error);
+    console.error('❌ Error saving designer profile:', error);
     return false;
   }
 };
@@ -291,7 +414,6 @@ export const saveDesignerProfile = async (designerName: string, profile: Designe
 // Save designer settings
 export const saveDesignerSettings = async (designerName: string, settings: DesignerSettings): Promise<boolean> => {
   try {
-    const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
     const currentData = await getDesignerData(designerName);
     
     const updatedData: DesignerData = {
@@ -299,7 +421,16 @@ export const saveDesignerSettings = async (designerName: string, settings: Desig
       settings,
       updatedAt: new Date().toISOString()
     };
-    
+
+    if (!isFirebaseAvailable()) {
+      console.log('⚠️ Firebase not available, using localStorage for saveDesignerSettings');
+      const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
+      localData[designerName] = updatedData;
+      localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
+      return true;
+    }
+
+    const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
     const cleanedData = removeUndefinedFields(updatedData);
     await setDoc(designerRef, cleanedData);
     
@@ -310,7 +441,7 @@ export const saveDesignerSettings = async (designerName: string, settings: Desig
     
     return true;
   } catch (error) {
-    console.error('Error saving designer settings:', error);
+    console.error('❌ Error saving designer settings:', error);
     return false;
   }
 };
@@ -318,7 +449,6 @@ export const saveDesignerSettings = async (designerName: string, settings: Desig
 // Save reservation URL
 export const saveReservationUrl = async (designerName: string, url: string): Promise<boolean> => {
   try {
-    const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
     const currentData = await getDesignerData(designerName);
     
     const updatedData: DesignerData = {
@@ -326,7 +456,16 @@ export const saveReservationUrl = async (designerName: string, url: string): Pro
       reservationUrl: url,
       updatedAt: new Date().toISOString()
     };
-    
+
+    if (!isFirebaseAvailable()) {
+      console.log('⚠️ Firebase not available, using localStorage for saveReservationUrl');
+      const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
+      localData[designerName] = updatedData;
+      localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
+      return true;
+    }
+
+    const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
     const cleanedData = removeUndefinedFields(updatedData);
     await setDoc(designerRef, cleanedData);
     
@@ -337,7 +476,7 @@ export const saveReservationUrl = async (designerName: string, url: string): Pro
     
     return true;
   } catch (error) {
-    console.error('Error saving reservation URL:', error);
+    console.error('❌ Error saving reservation URL:', error);
     return false;
   }
 };
@@ -345,11 +484,21 @@ export const saveReservationUrl = async (designerName: string, url: string): Pro
 // Check if designer exists
 export const designerExists = async (designerName: string): Promise<boolean> => {
   try {
+    if (!isFirebaseAvailable()) {
+      console.log('⚠️ Firebase not available, using localStorage for designerExists');
+      const localData = localStorage.getItem('hairfolio_designers');
+      if (localData) {
+        const designers = JSON.parse(localData);
+        return designerName in designers;
+      }
+      return false;
+    }
+
     const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
     const designerSnap = await getDoc(designerRef);
     return designerSnap.exists();
   } catch (error) {
-    console.error('Error checking if designer exists:', error);
+    console.error('❌ Error checking if designer exists:', error);
     // Fallback to localStorage
     const localData = localStorage.getItem('hairfolio_designers');
     if (localData) {
@@ -363,11 +512,20 @@ export const designerExists = async (designerName: string): Promise<boolean> => 
 // Get all designer names
 export const getAllDesignerNames = async (): Promise<string[]> => {
   try {
+    if (!isFirebaseAvailable()) {
+      console.log('⚠️ Firebase not available, using localStorage for getAllDesignerNames');
+      const localData = localStorage.getItem('hairfolio_designers');
+      if (localData) {
+        return Object.keys(JSON.parse(localData));
+      }
+      return [];
+    }
+
     const designersRef = collection(db, COLLECTIONS.DESIGNERS);
     const snapshot = await getDocs(designersRef);
     return snapshot.docs.map(doc => doc.id);
   } catch (error) {
-    console.error('Error getting all designer names:', error);
+    console.error('❌ Error getting all designer names:', error);
     // Fallback to localStorage
     const localData = localStorage.getItem('hairfolio_designers');
     if (localData) {
@@ -380,6 +538,14 @@ export const getAllDesignerNames = async (): Promise<string[]> => {
 // Delete designer
 export const deleteDesigner = async (designerName: string): Promise<boolean> => {
   try {
+    if (!isFirebaseAvailable()) {
+      console.log('⚠️ Firebase not available, using localStorage for deleteDesigner');
+      const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
+      delete localData[designerName];
+      localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
+      return true;
+    }
+
     const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
     await deleteDoc(designerRef);
     
@@ -390,7 +556,7 @@ export const deleteDesigner = async (designerName: string): Promise<boolean> => 
     
     return true;
   } catch (error) {
-    console.error('Error deleting designer:', error);
+    console.error('❌ Error deleting designer:', error);
     return false;
   }
 };
@@ -405,6 +571,12 @@ export const trackVisit = async (designerName: string): Promise<void> => {
   }
   
   try {
+    if (!isFirebaseAvailable()) {
+      console.log('⚠️ Firebase not available, skipping trackVisit');
+      sessionStorage.setItem(sessionKey, 'true');
+      return;
+    }
+
     const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
     
     await updateDoc(designerRef, {
@@ -416,13 +588,18 @@ export const trackVisit = async (designerName: string): Promise<void> => {
     // Mark as tracked for this session
     sessionStorage.setItem(sessionKey, 'true');
   } catch (error) {
-    console.error('Error tracking visit:', error);
+    console.error('❌ Error tracking visit:', error);
   }
 };
 
 // Track style view/try-on
 export const trackStyleView = async (designerName: string, styleUrl: string): Promise<void> => {
   try {
+    if (!isFirebaseAvailable()) {
+      console.log('⚠️ Firebase not available, skipping trackStyleView');
+      return;
+    }
+
     const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
     const currentData = await getDesignerData(designerName);
     
@@ -436,13 +613,18 @@ export const trackStyleView = async (designerName: string, styleUrl: string): Pr
       updatedAt: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Error tracking style view:', error);
+    console.error('❌ Error tracking style view:', error);
   }
 };
 
 // Track booking
 export const trackBooking = async (designerName: string, styleUrl: string): Promise<void> => {
   try {
+    if (!isFirebaseAvailable()) {
+      console.log('⚠️ Firebase not available, skipping trackBooking');
+      return;
+    }
+
     const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
     const currentData = await getDesignerData(designerName);
     
@@ -461,7 +643,7 @@ export const trackBooking = async (designerName: string, styleUrl: string): Prom
       updatedAt: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Error tracking booking:', error);
+    console.error('❌ Error tracking booking:', error);
   }
 };
 
@@ -475,6 +657,11 @@ export const trackTrialResult = async (
   }
 ): Promise<void> => {
   try {
+    if (!isFirebaseAvailable()) {
+      console.log('⚠️ Firebase not available, skipping trackTrialResult');
+      return;
+    }
+
     const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
     const currentData = await getDesignerData(designerName);
     
@@ -499,9 +686,9 @@ export const trackTrialResult = async (
       updatedAt: new Date().toISOString()
     });
     
-    console.log('Trial result tracked successfully');
+    console.log('✅ Trial result tracked successfully');
   } catch (error) {
-    console.error('Error tracking trial result:', error);
+    console.error('❌ Error tracking trial result:', error);
     // Silently fail - don't interrupt user experience
   }
 };
@@ -509,7 +696,6 @@ export const trackTrialResult = async (
 // Reset analytics data
 export const resetAnalytics = async (designerName: string): Promise<boolean> => {
   try {
-    const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
     const currentData = await getDesignerData(designerName);
     
     const updatedData: DesignerData = {
@@ -520,7 +706,16 @@ export const resetAnalytics = async (designerName: string): Promise<boolean> => 
       },
       updatedAt: new Date().toISOString()
     };
-    
+
+    if (!isFirebaseAvailable()) {
+      console.log('⚠️ Firebase not available, using localStorage for resetAnalytics');
+      const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
+      localData[designerName] = updatedData;
+      localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
+      return true;
+    }
+
+    const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
     const cleanedData = removeUndefinedFields(updatedData);
     await setDoc(designerRef, cleanedData);
     
@@ -531,7 +726,7 @@ export const resetAnalytics = async (designerName: string): Promise<boolean> => 
     
     return true;
   } catch (error) {
-    console.error('Error resetting analytics:', error);
+    console.error('❌ Error resetting analytics:', error);
     return false;
   }
 };
@@ -549,7 +744,7 @@ export const exportDesignerData = async (designerName: string): Promise<string |
       version: '1.0'
     }, null, 2);
   } catch (error) {
-    console.error('Error exporting designer data:', error);
+    console.error('❌ Error exporting designer data:', error);
     return null;
   }
 };
@@ -564,12 +759,20 @@ export const importDesignerData = async (jsonData: string): Promise<boolean> => 
       return false;
     }
     
-    const designerRef = doc(db, COLLECTIONS.DESIGNERS, imported.designerName);
     const updatedData = {
       ...imported.data,
       updatedAt: new Date().toISOString()
     };
-    
+
+    if (!isFirebaseAvailable()) {
+      console.log('⚠️ Firebase not available, using localStorage for importDesignerData');
+      const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
+      localData[imported.designerName] = updatedData;
+      localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
+      return true;
+    }
+
+    const designerRef = doc(db, COLLECTIONS.DESIGNERS, imported.designerName);
     const cleanedData = removeUndefinedFields(updatedData);
     await setDoc(designerRef, cleanedData);
     
@@ -580,7 +783,7 @@ export const importDesignerData = async (jsonData: string): Promise<boolean> => 
     
     return true;
   } catch (error) {
-    console.error('Error importing designer data:', error);
+    console.error('❌ Error importing designer data:', error);
     return false;
   }
 };
@@ -592,10 +795,10 @@ export const clearAllData = async (): Promise<boolean> => {
     localStorage.removeItem('hairfolio_designers');
     sessionStorage.clear();
     
-    console.warn('Cleared localStorage only. Firebase data preserved for safety.');
+    console.warn('⚠️ Cleared localStorage only. Firebase data preserved for safety.');
     return true;
   } catch (error) {
-    console.error('Error clearing data:', error);
+    console.error('❌ Error clearing data:', error);
     return false;
   }
 };
@@ -657,7 +860,7 @@ export const getAnalyticsSummary = async (designerName: string) => {
       lastUpdated: stats.lastUpdated
     };
   } catch (error) {
-    console.error('Error getting analytics summary:', error);
+    console.error('❌ Error getting analytics summary:', error);
     return {
       visits: 0,
       totalViews: 0,
