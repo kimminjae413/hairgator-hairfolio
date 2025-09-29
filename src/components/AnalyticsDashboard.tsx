@@ -6,7 +6,6 @@ interface AnalyticsDashboardProps {
   portfolio: Hairstyle[];
 }
 
-// 날짜 범위 프리셋 타입
 type DatePreset = '7days' | '30days' | '90days' | 'all' | 'custom';
 
 const findTopStyle = (
@@ -32,13 +31,11 @@ const StatCard: React.FC<{ title: string; children: React.ReactNode; className?:
 );
 
 const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfolio }) => {
-  // 날짜 필터 상태
   const [datePreset, setDatePreset] = useState<DatePreset>('30days');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
 
-  // 날짜 범위 계산
   const dateRange = useMemo(() => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -64,14 +61,12 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
           startDate = new Date(customStartDate);
           endDate = new Date(customEndDate);
         } else {
-          // 커스텀 날짜가 설정되지 않았으면 30일 기본값
           startDate = new Date(today);
           startDate.setDate(startDate.getDate() - 30);
         }
         break;
       case 'all':
       default:
-        // 전체 기간은 매우 과거 날짜부터
         startDate = new Date(2020, 0, 1);
         break;
     }
@@ -79,7 +74,6 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
     return { startDate, endDate };
   }, [datePreset, customStartDate, customEndDate]);
 
-  // 날짜 범위로 필터링된 체험 결과
   const filteredTrialResults = useMemo(() => {
     if (!stats.trialResults) return [];
     
@@ -89,14 +83,11 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
     });
   }, [stats.trialResults, dateRange]);
 
-  // 필터링된 통계 계산
   const filteredStats = useMemo(() => {
-    // 전체 기간을 선택했거나 통계가 없으면 기존 통계 사용
     if (datePreset === 'all' || !stats.trialResults || stats.trialResults.length === 0) {
       return stats;
     }
 
-    // 날짜 범위 내의 체험 결과로부터 통계 재계산
     const styleViews: { [url: string]: number } = {};
     
     filteredTrialResults.forEach(trial => {
@@ -106,8 +97,6 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
     return {
       ...stats,
       styleViews,
-      // 방문수와 예약은 날짜별 데이터가 없으므로 전체 통계 유지
-      // (실제 프로덕션에서는 타임스탬프가 있어야 함)
     };
   }, [stats, filteredTrialResults, datePreset]);
 
@@ -120,14 +109,12 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
 
   const hasData = stats.visits > 0 || totalStyleViews > 0;
 
-  // 날짜 프리셋 변경 핸들러
   const handlePresetChange = (preset: DatePreset) => {
     setDatePreset(preset);
     if (preset !== 'custom') {
       setShowCustomDatePicker(false);
     } else {
       setShowCustomDatePicker(true);
-      // 커스텀 선택 시 기본값 설정
       if (!customStartDate || !customEndDate) {
         const today = new Date().toISOString().split('T')[0];
         const monthAgo = new Date();
@@ -140,7 +127,6 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
     }
   };
 
-  // 날짜 범위 텍스트 생성
   const getDateRangeText = () => {
     const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' };
     const start = dateRange.startDate.toLocaleDateString('ko-KR', options);
@@ -150,18 +136,8 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
     return `${start} ~ ${end}`;
   };
 
-  if (!hasData) {
-    return (
-      <div className="text-center py-16 text-gray-500">
-        <h2 className="text-2xl font-bold text-gray-700">No Analytics Data Yet</h2>
-        <p className="mt-2">Share your portfolio with clients to start seeing statistics here.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-      {/* Date Filter Section */}
       <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
@@ -174,65 +150,34 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
             <p className="text-sm text-gray-600">{getDateRangeText()}</p>
           </div>
 
-          {/* Date Preset Buttons */}
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => handlePresetChange('7days')}
-              className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
-                datePreset === '7days'
-                  ? 'bg-indigo-600 text-white shadow-lg'
-                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-              }`}
-            >
-              최근 7일
-            </button>
-            <button
-              onClick={() => handlePresetChange('30days')}
-              className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
-                datePreset === '30days'
-                  ? 'bg-indigo-600 text-white shadow-lg'
-                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-              }`}
-            >
-              최근 30일
-            </button>
-            <button
-              onClick={() => handlePresetChange('90days')}
-              className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
-                datePreset === '90days'
-                  ? 'bg-indigo-600 text-white shadow-lg'
-                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-              }`}
-            >
-              최근 90일
-            </button>
-            <button
-              onClick={() => handlePresetChange('all')}
-              className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
-                datePreset === 'all'
-                  ? 'bg-indigo-600 text-white shadow-lg'
-                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-              }`}
-            >
-              전체
-            </button>
-            <button
-              onClick={() => handlePresetChange('custom')}
-              className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
-                datePreset === 'custom'
-                  ? 'bg-indigo-600 text-white shadow-lg'
-                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-              }`}
-            >
-              <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              직접 선택
-            </button>
+            {['7days', '30days', '90days', 'all', 'custom'].map((preset) => (
+              <button
+                key={preset}
+                onClick={() => handlePresetChange(preset as DatePreset)}
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
+                  datePreset === preset
+                    ? 'bg-indigo-600 text-white shadow-lg'
+                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                }`}
+              >
+                {preset === '7days' && '최근 7일'}
+                {preset === '30days' && '최근 30일'}
+                {preset === '90days' && '최근 90일'}
+                {preset === 'all' && '전체'}
+                {preset === 'custom' && (
+                  <>
+                    <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    직접 선택
+                  </>
+                )}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Custom Date Picker */}
         {showCustomDatePicker && (
           <div className="mt-4 pt-4 border-t border-indigo-200">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -268,7 +213,6 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
         )}
       </div>
 
-      {/* No Data State - 데이터가 없을 때만 표시 */}
       {!hasData && (
         <div className="bg-white rounded-xl shadow-md p-12 text-center">
           <div className="max-w-md mx-auto">
@@ -289,7 +233,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
                 데이터 수집 시작하기
               </h3>
               <ul className="text-sm text-indigo-800 space-y-1">
-                <li>• Your Styles 탭에서 "Share" 버튼 클릭</li>
+                <li>• Your Styles 탭에서 Share 버튼 클릭</li>
                 <li>• QR 코드 또는 링크를 고객에게 공유</li>
                 <li>• 고객이 스타일을 체험하면 데이터 수집 시작!</li>
               </ul>
@@ -298,59 +242,54 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
         </div>
       )}
 
-      {/* Portfolio Overview */}
       {hasData && (
-        <div className="flex flex-col sm:flex-row justify-around text-center gap-6">
+        <StatCard title="Portfolio Overview">
+          <div className="flex flex-col sm:flex-row justify-around text-center gap-6">
             <div>
-                <p className="text-5xl font-bold text-indigo-600">{stats.visits}</p>
-                <p className="text-sm text-gray-500 mt-1">Total Visits</p>
-                <p className="text-xs text-gray-400">전체 기간</p>
+              <p className="text-5xl font-bold text-indigo-600">{stats.visits}</p>
+              <p className="text-sm text-gray-500 mt-1">Total Visits</p>
+              <p className="text-xs text-gray-400">전체 기간</p>
             </div>
             <div className="border-l border-gray-200 hidden sm:block"></div>
             <div>
-                <p className="text-5xl font-bold text-indigo-600">{totalStyleViews}</p>
-                <p className="text-sm text-gray-500 mt-1">Style Try-ons</p>
-                <p className="text-xs text-gray-400">{datePreset === 'all' ? '전체 기간' : '선택 기간'}</p>
+              <p className="text-5xl font-bold text-indigo-600">{totalStyleViews}</p>
+              <p className="text-sm text-gray-500 mt-1">Style Try-ons</p>
+              <p className="text-xs text-gray-400">{datePreset === 'all' ? '전체 기간' : '선택 기간'}</p>
             </div>
             <div className="border-l border-gray-200 hidden sm:block"></div>
             <div>
-                <p className="text-5xl font-bold text-purple-600">{totalTrialResults}</p>
-                <p className="text-sm text-gray-500 mt-1">Client Results</p>
-                <p className="text-xs text-gray-400">{datePreset === 'all' ? '전체 기간' : '선택 기간'}</p>
+              <p className="text-5xl font-bold text-purple-600">{totalTrialResults}</p>
+              <p className="text-sm text-gray-500 mt-1">Client Results</p>
+              <p className="text-xs text-gray-400">{datePreset === 'all' ? '전체 기간' : '선택 기간'}</p>
             </div>
             <div className="border-l border-gray-200 hidden sm:block"></div>
             <div>
-                <p className="text-5xl font-bold text-green-600">{totalBookings}</p>
-                <p className="text-sm text-gray-500 mt-1">Bookings</p>
-                <p className="text-xs text-gray-400">전체 기간</p>
+              <p className="text-5xl font-bold text-green-600">{totalBookings}</p>
+              <p className="text-sm text-gray-500 mt-1">Bookings</p>
+              <p className="text-xs text-gray-400">전체 기간</p>
             </div>
-        </div>
-      </StatCard>
+          </div>
+        </StatCard>
       )}
 
-      {/* Recent Client Try-ons */}
       {hasData && totalStyleViews > 0 && (
-        <StatCard title={`Recent Client Try-ons (${datePreset === 'all' ? '전체' : '선택 기간'})`} className="">
+        <StatCard title={`Recent Client Try-ons (${datePreset === 'all' ? '전체' : '선택 기간'})`}>
           {filteredTrialResults && filteredTrialResults.length > 0 ? (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
                 {filteredTrialResults.slice(0, 12).map((trial, index) => (
                   <div key={index} className="relative group">
-                    <div className="aspect-square rounded-lg overflow-hidden bg-gray-100 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer"
-                         onClick={() => window.open(trial.resultUrl, '_blank')}
+                    <div 
+                      className="aspect-square rounded-lg overflow-hidden bg-gray-100 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer"
+                      onClick={() => window.open(trial.resultUrl, '_blank')}
                     >
                       <img 
                         src={trial.resultUrl} 
                         alt={`Client try-on: ${trial.styleName || 'Unknown style'}`}
                         className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
                         loading="lazy"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xMDAgNzBMMTMwIDEzMEg3MEwxMDAgNzBaIiBmaWxsPSIjOUM5Q0EzIi8+Cjx0ZXh0IHg9IjEwMCIgeT0iMTYwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOUM5Q0EzIj5JbWFnZSBub3QgZm91bmQ8L3RleHQ+Cjwvc3ZnPg==';
-                        }}
                       />
                       
-                      {/* Overlay */}
                       <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity duration-200 rounded-lg flex items-center justify-center">
                         <svg className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -358,7 +297,6 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
                         </svg>
                       </div>
                       
-                      {/* Style name badge */}
                       {trial.styleName && (
                         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                           <p className="text-white text-xs font-medium text-center truncate">
@@ -367,7 +305,6 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
                         </div>
                       )}
                       
-                      {/* Timestamp badge */}
                       <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                         {new Date(trial.timestamp).toLocaleDateString('ko-KR', {
                           month: 'short',
@@ -399,37 +336,36 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
         </StatCard>
       )}
 
-      {/* Performance Stats Grid */}
       {hasData && (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <StatCard title={`Most Popular Style (${datePreset === 'all' ? '전체' : '선택 기간'})`}>
-          {topViewed.style ? (
-            <div className="flex items-center gap-4">
-              <img src={topViewed.style.url} alt={topViewed.style.name} className="w-24 h-24 rounded-md object-cover" />
-              <div>
-                <p className="font-bold text-gray-800 text-lg">{topViewed.style.name}</p>
-                <p className="text-4xl font-bold text-indigo-600">{topViewed.count} <span className="text-xl text-gray-500 font-medium">views</span></p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <StatCard title={`Most Popular Style (${datePreset === 'all' ? '전체' : '선택 기간'})`}>
+            {topViewed.style ? (
+              <div className="flex items-center gap-4">
+                <img src={topViewed.style.url} alt={topViewed.style.name} className="w-24 h-24 rounded-md object-cover" />
+                <div>
+                  <p className="font-bold text-gray-800 text-lg">{topViewed.style.name}</p>
+                  <p className="text-4xl font-bold text-indigo-600">{topViewed.count} <span className="text-xl text-gray-500 font-medium">views</span></p>
+                </div>
               </div>
-            </div>
-          ) : (
-            <p className="text-gray-500 h-full flex items-center justify-center">선택한 기간에 데이터가 없습니다.</p>
-          )}
-        </StatCard>
-        
-        <StatCard title="Top Booking Driver (전체 기간)">
-          {topBooked.style ? (
-            <div className="flex flex-col items-center justify-center text-center h-full">
-              <img src={topBooked.style.url} alt={topBooked.style.name} className="w-24 h-24 rounded-md object-cover mb-3" />
-              <div>
-                <p className="font-bold text-gray-800">{topBooked.style.name}</p>
-                <p className="text-3xl font-bold text-green-600">{topBooked.count} <span className="text-lg text-gray-500 font-medium">bookings</span></p>
+            ) : (
+              <p className="text-gray-500 h-full flex items-center justify-center">선택한 기간에 데이터가 없습니다.</p>
+            )}
+          </StatCard>
+          
+          <StatCard title="Top Booking Driver (전체 기간)">
+            {topBooked.style ? (
+              <div className="flex flex-col items-center justify-center text-center h-full">
+                <img src={topBooked.style.url} alt={topBooked.style.name} className="w-24 h-24 rounded-md object-cover mb-3" />
+                <div>
+                  <p className="font-bold text-gray-800">{topBooked.style.name}</p>
+                  <p className="text-3xl font-bold text-green-600">{topBooked.count} <span className="text-lg text-gray-500 font-medium">bookings</span></p>
+                </div>
               </div>
-            </div>
-          ) : (
-            <p className="text-gray-500 h-full flex items-center justify-center">No bookings tracked yet.</p>
-          )}
-        </StatCard>
-      </div>
+            ) : (
+              <p className="text-gray-500 h-full flex items-center justify-center">No bookings tracked yet.</p>
+            )}
+          </StatCard>
+        </div>
       )}
     </div>
   );
