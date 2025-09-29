@@ -268,8 +268,38 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
         )}
       </div>
 
+      {/* No Data State - 데이터가 없을 때만 표시 */}
+      {!hasData && (
+        <div className="bg-white rounded-xl shadow-md p-12 text-center">
+          <div className="max-w-md mx-auto">
+            <div className="w-20 h-20 mx-auto mb-6 bg-indigo-100 rounded-full flex items-center justify-center">
+              <svg className="w-10 h-10 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-3">아직 분석 데이터가 없습니다</h2>
+            <p className="text-gray-600 mb-6">
+              포트폴리오를 공유하면 방문자와 체험 데이터가 여기에 표시됩니다.
+            </p>
+            <div className="bg-indigo-50 rounded-lg p-4 text-left">
+              <h3 className="font-semibold text-indigo-900 mb-2 flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                데이터 수집 시작하기
+              </h3>
+              <ul className="text-sm text-indigo-800 space-y-1">
+                <li>• Your Styles 탭에서 "Share" 버튼 클릭</li>
+                <li>• QR 코드 또는 링크를 고객에게 공유</li>
+                <li>• 고객이 스타일을 체험하면 데이터 수집 시작!</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Portfolio Overview */}
-      <StatCard title="Portfolio Overview" className="">
+      {hasData && (
         <div className="flex flex-col sm:flex-row justify-around text-center gap-6">
             <div>
                 <p className="text-5xl font-bold text-indigo-600">{stats.visits}</p>
@@ -296,9 +326,10 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
             </div>
         </div>
       </StatCard>
+      )}
 
       {/* Recent Client Try-ons */}
-      {totalStyleViews > 0 && (
+      {hasData && totalStyleViews > 0 && (
         <StatCard title={`Recent Client Try-ons (${datePreset === 'all' ? '전체' : '선택 기간'})`} className="">
           {filteredTrialResults && filteredTrialResults.length > 0 ? (
             <>
@@ -369,6 +400,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
       )}
 
       {/* Performance Stats Grid */}
+      {hasData && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <StatCard title={`Most Popular Style (${datePreset === 'all' ? '전체' : '선택 기간'})`}>
           {topViewed.style ? (
@@ -398,6 +430,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
           )}
         </StatCard>
       </div>
+      )}
     </div>
   );
 };
