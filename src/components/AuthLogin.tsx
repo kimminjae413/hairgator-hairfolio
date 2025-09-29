@@ -37,7 +37,7 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
     setEmailVerified(false);
   };
 
-  // Step 1: 이메일 중복 확인
+  // Step 1: 이메일 유효성 확인 (중복 체크는 회원가입 시 Firebase가 자동 처리)
   const handleCheckEmail = async () => {
     setError(null);
     setIsCheckingEmail(true);
@@ -54,27 +54,11 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
         throw new Error(nameValidation.message);
       }
 
-      // Try to sign in with a dummy password to check if email exists
-      // Firebase will return 'auth/user-not-found' if email doesn't exist
-      const testResult = await authService.signInWithEmail(email, 'dummy-password-test-123');
+      // 이메일 형식이 올바르면 바로 다음 단계로
+      // 실제 중복 체크는 회원가입 시 Firebase가 자동으로 처리
+      setEmailVerified(true);
+      setMode('signup-step2');
       
-      if (testResult.success) {
-        // Email exists and password matched (very unlikely with dummy password)
-        throw new Error('이미 사용 중인 이메일입니다.');
-      } else {
-        // Check the error code
-        if (testResult.error?.includes('등록되지 않은')) {
-          // Email doesn't exist - this is what we want!
-          setEmailVerified(true);
-          setMode('signup-step2');
-        } else if (testResult.error?.includes('잘못된 비밀번호')) {
-          // Email exists but wrong password
-          throw new Error('이미 사용 중인 이메일입니다.');
-        } else {
-          // Other errors
-          throw new Error(testResult.error || '이메일 확인 중 오류가 발생했습니다.');
-        }
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '이메일 확인 중 오류가 발생했습니다.');
     } finally {
@@ -150,6 +134,10 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
       const result = await authService.signUpWithEmail(email, password, trimmedName);
       
       if (!result.success || !result.user) {
+        // 이메일 중복 에러를 사용자 친화적으로 표시
+        if (result.error?.includes('이미 사용 중인 이메일')) {
+          throw new Error('이미 가입된 이메일입니다. 로그인을 시도하거나 다른 이메일을 사용해주세요.');
+        }
         throw new Error(result.error || '회원가입에 실패했습니다.');
       }
 
@@ -349,8 +337,9 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <div className="flex-1">
-                  <p className="text-green-800 font-semibold">사용 가능한 이메일입니다</p>
+                  <p className="text-green-800 font-semibold">이메일 확인 완료</p>
                   <p className="text-green-700 text-sm">{email}</p>
+                  <p className="text-green-600 text-xs mt-1">* 중복 확인은 회원가입 시 자동으로 진행됩니다</p>
                 </div>
               </div>
             </div>
