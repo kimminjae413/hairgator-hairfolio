@@ -1,18 +1,24 @@
+// src/App.tsx - Firebase Authentication 적용
 import React, { useState, useEffect } from 'react';
 import * as firebaseService from './services/firebaseService';
+import * as authService from './services/firebaseAuthService';
 import ClientView from './components/ClientView';
 import DesignerView from './components/DesignerView';
-import Login from './components/Login';
+import AuthLogin from './components/AuthLogin'; // 기존 Login 대신 AuthLogin 사용
 import ErrorBoundary from './components/ErrorBoundary';
 
 const App: React.FC = () => {
   const [loggedInDesigner, setLoggedInDesigner] = useState<string | null>(null);
+  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(null); // Firebase UID 추가
   const [clientViewDesigner, setClientViewDesigner] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        // Initialize Firebase Auth
+        authService.initializeAuth();
+        
         // Initialize Firebase with sample data
         await firebaseService.initializeDB();
 
@@ -29,16 +35,45 @@ const App: React.FC = () => {
           // Client view mode
           console.log('URL에서 디자이너명 추출:', designerFromUrl);
           setClientViewDesigner(designerFromUrl);
+          setIsLoading(false);
         } else {
-          // Check if there's a logged-in designer in memory
-          const storedDesigner = JSON.parse(sessionStorage.getItem('hairfolio_designer') || 'null');
-          if (storedDesigner) {
-            setLoggedInDesigner(storedDesigner);
-          }
+          // Check if there's a logged-in user via Firebase Auth
+          const unsubscribe = authService.onAuthStateChange(async (user) => {
+            if (user && user.emailVerified) {
+              // User is logged in and email is verified
+              console.log('✅ 인증된 사용자 로그인:', user.uid);
+              
+              // Get designer data to get display name
+              const designerData = await firebaseService.getDesignerData(user.uid);
+              const displayName = user.displayName || designerData.profile?.name || '디자이너';
+              
+              setLoggedInDesigner(displayName);
+              setLoggedInUserId(user.uid);
+              
+              // Store in sessionStorage for quick access
+              sessionStorage.setItem('hairfolio_designer', JSON.stringify(displayName));
+              sessionStorage.setItem('hairfolio_userId', JSON.stringify(user.uid));
+            } else if (user && !user.emailVerified) {
+              // User exists but email not verified - will be handled by AuthLogin
+              console.log('⚠️ 이메일 미인증 사용자:', user.email);
+              setLoggedInDesigner(null);
+              setLoggedInUserId(null);
+            } else {
+              // No user logged in
+              console.log('ℹ️ 로그인된 사용자 없음');
+              setLoggedInDesigner(null);
+              setLoggedInUserId(null);
+              sessionStorage.removeItem('hairfolio_designer');
+              sessionStorage.removeItem('hairfolio_userId');
+            }
+            setIsLoading(false);
+          });
+
+          // Cleanup subscription on unmount
+          return () => unsubscribe();
         }
       } catch (error) {
-        console.error('Error initializing app:', error);
-      } finally {
+        console.error('❌ Error initializing app:', error);
         setIsLoading(false);
       }
     };
@@ -46,20 +81,39 @@ const App: React.FC = () => {
     initializeApp();
   }, []);
 
-  const handleLogin = (name: string) => {
-    if (name.trim()) {
-      const formattedName = name.trim();
-      setLoggedInDesigner(formattedName);
-      sessionStorage.setItem('hairfolio_designer', JSON.stringify(formattedName));
+  const handleLogin = (name: string, userId: string) => {
+    if (name.trim() && userId) {
+      setLoggedInDesigner(name.trim());
+      setLoggedInUserId(userId);
+      sessionStorage.setItem('hairfolio_designer', JSON.stringify(name.trim()));
+      sessionStorage.setItem('hairfolio_userId', JSON.stringify(userId));
     }
   };
 
-  const handleLogout = () => {
-    setLoggedInDesigner(null);
-    sessionStorage.removeItem('hairfolio_designer');
-    // Clear URL parameters if any
-    if (window.location.search) {
-      window.history.replaceState({}, document.title, window.location.pathname);
+  const handleLogout = async () => {
+    try {
+      // Sign out from Firebase Auth
+      const result = await authService.signOutUser();
+      
+      if (result.success) {
+        setLoggedInDesigner(null);
+        setLoggedInUserId(null);
+        sessionStorage.removeItem('hairfolio_designer');
+        sessionStorage.removeItem('hairfolio_userId');
+        
+        // Clear URL parameters if any
+        if (window.location.search) {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+        
+        console.log('✅ 로그아웃 완료');
+      } else {
+        console.error('❌ 로그아웃 실패:', result.error);
+        alert('로그아웃 중 오류가 발생했습니다.');
+      }
+    } catch (error) {
+      console.error('❌ Logout error:', error);
+      alert('로그아웃 중 오류가 발생했습니다.');
     }
   };
 
@@ -79,10 +133,10 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-gray-50">
         {clientViewDesigner ? (
           <ClientView designerName={clientViewDesigner} />
-        ) : loggedInDesigner ? (
-          <DesignerView designerName={loggedInDesigner} onLogout={handleLogout} />
+        ) : loggedInDesigner && loggedInUserId ? (
+          <DesignerView designerName={loggedInUserId} onLogout={handleLogout} />
         ) : (
-          <Login onLogin={handleLogin} />
+          <AuthLogin onLogin={handleLogin} />
         )}
       </div>
     </ErrorBoundary>
