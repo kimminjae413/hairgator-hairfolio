@@ -1,10 +1,13 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { DesignerStats, Hairstyle } from '../types';
 
 interface AnalyticsDashboardProps {
   stats: DesignerStats;
   portfolio: Hairstyle[];
 }
+
+// 날짜 범위 프리셋 타입
+type DatePreset = '7days' | '30days' | '90days' | 'all' | 'custom';
 
 const findTopStyle = (
   statsMap: { [url: string]: number },
@@ -29,14 +32,123 @@ const StatCard: React.FC<{ title: string; children: React.ReactNode; className?:
 );
 
 const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfolio }) => {
-  const topViewed = useMemo(() => findTopStyle(stats.styleViews, portfolio), [stats.styleViews, portfolio]);
-  const topBooked = useMemo(() => findTopStyle(stats.bookings, portfolio), [stats.bookings, portfolio]);
+  // 날짜 필터 상태
+  const [datePreset, setDatePreset] = useState<DatePreset>('30days');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
+
+  // 날짜 범위 계산
+  const dateRange = useMemo(() => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    let startDate: Date;
+    let endDate = today;
+
+    switch (datePreset) {
+      case '7days':
+        startDate = new Date(today);
+        startDate.setDate(startDate.getDate() - 7);
+        break;
+      case '30days':
+        startDate = new Date(today);
+        startDate.setDate(startDate.getDate() - 30);
+        break;
+      case '90days':
+        startDate = new Date(today);
+        startDate.setDate(startDate.getDate() - 90);
+        break;
+      case 'custom':
+        if (customStartDate && customEndDate) {
+          startDate = new Date(customStartDate);
+          endDate = new Date(customEndDate);
+        } else {
+          // 커스텀 날짜가 설정되지 않았으면 30일 기본값
+          startDate = new Date(today);
+          startDate.setDate(startDate.getDate() - 30);
+        }
+        break;
+      case 'all':
+      default:
+        // 전체 기간은 매우 과거 날짜부터
+        startDate = new Date(2020, 0, 1);
+        break;
+    }
+
+    return { startDate, endDate };
+  }, [datePreset, customStartDate, customEndDate]);
+
+  // 날짜 범위로 필터링된 체험 결과
+  const filteredTrialResults = useMemo(() => {
+    if (!stats.trialResults) return [];
+    
+    return stats.trialResults.filter(trial => {
+      const trialDate = new Date(trial.timestamp);
+      return trialDate >= dateRange.startDate && trialDate <= dateRange.endDate;
+    });
+  }, [stats.trialResults, dateRange]);
+
+  // 필터링된 통계 계산
+  const filteredStats = useMemo(() => {
+    // 전체 기간을 선택했거나 통계가 없으면 기존 통계 사용
+    if (datePreset === 'all' || !stats.trialResults || stats.trialResults.length === 0) {
+      return stats;
+    }
+
+    // 날짜 범위 내의 체험 결과로부터 통계 재계산
+    const styleViews: { [url: string]: number } = {};
+    
+    filteredTrialResults.forEach(trial => {
+      styleViews[trial.styleUrl] = (styleViews[trial.styleUrl] || 0) + 1;
+    });
+
+    return {
+      ...stats,
+      styleViews,
+      // 방문수와 예약은 날짜별 데이터가 없으므로 전체 통계 유지
+      // (실제 프로덕션에서는 타임스탬프가 있어야 함)
+    };
+  }, [stats, filteredTrialResults, datePreset]);
+
+  const topViewed = useMemo(() => findTopStyle(filteredStats.styleViews, portfolio), [filteredStats.styleViews, portfolio]);
+  const topBooked = useMemo(() => findTopStyle(filteredStats.bookings, portfolio), [filteredStats.bookings, portfolio]);
   
-  const totalStyleViews = useMemo(() => Object.values(stats.styleViews || {}).reduce((sum, count) => sum + count, 0), [stats.styleViews]);
-  const totalBookings = useMemo(() => Object.values(stats.bookings || {}).reduce((sum, count) => sum + count, 0), [stats.bookings]);
-  const totalTrialResults = useMemo(() => stats.trialResults?.length || 0, [stats.trialResults]);
+  const totalStyleViews = useMemo(() => Object.values(filteredStats.styleViews || {}).reduce((sum, count) => sum + count, 0), [filteredStats.styleViews]);
+  const totalBookings = useMemo(() => Object.values(filteredStats.bookings || {}).reduce((sum, count) => sum + count, 0), [filteredStats.bookings]);
+  const totalTrialResults = useMemo(() => filteredTrialResults.length, [filteredTrialResults]);
 
   const hasData = stats.visits > 0 || totalStyleViews > 0;
+
+  // 날짜 프리셋 변경 핸들러
+  const handlePresetChange = (preset: DatePreset) => {
+    setDatePreset(preset);
+    if (preset !== 'custom') {
+      setShowCustomDatePicker(false);
+    } else {
+      setShowCustomDatePicker(true);
+      // 커스텀 선택 시 기본값 설정
+      if (!customStartDate || !customEndDate) {
+        const today = new Date().toISOString().split('T')[0];
+        const monthAgo = new Date();
+        monthAgo.setDate(monthAgo.getDate() - 30);
+        const monthAgoStr = monthAgo.toISOString().split('T')[0];
+        
+        setCustomStartDate(monthAgoStr);
+        setCustomEndDate(today);
+      }
+    }
+  };
+
+  // 날짜 범위 텍스트 생성
+  const getDateRangeText = () => {
+    const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' };
+    const start = dateRange.startDate.toLocaleDateString('ko-KR', options);
+    const end = dateRange.endDate.toLocaleDateString('ko-KR', options);
+    
+    if (datePreset === 'all') return '전체 기간';
+    return `${start} ~ ${end}`;
+  };
 
   if (!hasData) {
     return (
@@ -49,38 +161,149 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
 
   return (
     <div className="space-y-6">
+      {/* Date Filter Section */}
+      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center gap-2">
+              <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              기간 선택
+            </h3>
+            <p className="text-sm text-gray-600">{getDateRangeText()}</p>
+          </div>
+
+          {/* Date Preset Buttons */}
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => handlePresetChange('7days')}
+              className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
+                datePreset === '7days'
+                  ? 'bg-indigo-600 text-white shadow-lg'
+                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+              }`}
+            >
+              최근 7일
+            </button>
+            <button
+              onClick={() => handlePresetChange('30days')}
+              className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
+                datePreset === '30days'
+                  ? 'bg-indigo-600 text-white shadow-lg'
+                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+              }`}
+            >
+              최근 30일
+            </button>
+            <button
+              onClick={() => handlePresetChange('90days')}
+              className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
+                datePreset === '90days'
+                  ? 'bg-indigo-600 text-white shadow-lg'
+                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+              }`}
+            >
+              최근 90일
+            </button>
+            <button
+              onClick={() => handlePresetChange('all')}
+              className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
+                datePreset === 'all'
+                  ? 'bg-indigo-600 text-white shadow-lg'
+                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+              }`}
+            >
+              전체
+            </button>
+            <button
+              onClick={() => handlePresetChange('custom')}
+              className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
+                datePreset === 'custom'
+                  ? 'bg-indigo-600 text-white shadow-lg'
+                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+              }`}
+            >
+              <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              직접 선택
+            </button>
+          </div>
+        </div>
+
+        {/* Custom Date Picker */}
+        {showCustomDatePicker && (
+          <div className="mt-4 pt-4 border-t border-indigo-200">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="start-date" className="block text-sm font-medium text-gray-700 mb-2">
+                  시작 날짜
+                </label>
+                <input
+                  id="start-date"
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  max={customEndDate || new Date().toISOString().split('T')[0]}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label htmlFor="end-date" className="block text-sm font-medium text-gray-700 mb-2">
+                  종료 날짜
+                </label>
+                <input
+                  id="end-date"
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  min={customStartDate}
+                  max={new Date().toISOString().split('T')[0]}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Portfolio Overview */}
       <StatCard title="Portfolio Overview" className="">
         <div className="flex flex-col sm:flex-row justify-around text-center gap-6">
             <div>
                 <p className="text-5xl font-bold text-indigo-600">{stats.visits}</p>
                 <p className="text-sm text-gray-500 mt-1">Total Visits</p>
+                <p className="text-xs text-gray-400">전체 기간</p>
             </div>
             <div className="border-l border-gray-200 hidden sm:block"></div>
             <div>
                 <p className="text-5xl font-bold text-indigo-600">{totalStyleViews}</p>
                 <p className="text-sm text-gray-500 mt-1">Style Try-ons</p>
+                <p className="text-xs text-gray-400">{datePreset === 'all' ? '전체 기간' : '선택 기간'}</p>
             </div>
             <div className="border-l border-gray-200 hidden sm:block"></div>
             <div>
                 <p className="text-5xl font-bold text-purple-600">{totalTrialResults}</p>
                 <p className="text-sm text-gray-500 mt-1">Client Results</p>
+                <p className="text-xs text-gray-400">{datePreset === 'all' ? '전체 기간' : '선택 기간'}</p>
             </div>
             <div className="border-l border-gray-200 hidden sm:block"></div>
             <div>
                 <p className="text-5xl font-bold text-green-600">{totalBookings}</p>
                 <p className="text-sm text-gray-500 mt-1">Bookings</p>
+                <p className="text-xs text-gray-400">전체 기간</p>
             </div>
         </div>
       </StatCard>
 
       {/* Recent Client Try-ons */}
       {totalStyleViews > 0 && (
-        <StatCard title="Recent Client Try-ons" className="">
-          {stats.trialResults && stats.trialResults.length > 0 ? (
+        <StatCard title={`Recent Client Try-ons (${datePreset === 'all' ? '전체' : '선택 기간'})`} className="">
+          {filteredTrialResults && filteredTrialResults.length > 0 ? (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-                {stats.trialResults.slice(0, 12).map((trial, index) => (
+                {filteredTrialResults.slice(0, 12).map((trial, index) => (
                   <div key={index} className="relative group">
                     <div className="aspect-square rounded-lg overflow-hidden bg-gray-100 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer"
                          onClick={() => window.open(trial.resultUrl, '_blank')}
@@ -125,10 +348,10 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
                 ))}
               </div>
               
-              {stats.trialResults.length > 12 && (
+              {filteredTrialResults.length > 12 && (
                 <div className="mt-4 text-center">
                   <p className="text-sm text-gray-500">
-                    {stats.trialResults.length - 12}개의 추가 결과가 있습니다. 최근 12개만 표시됩니다.
+                    {filteredTrialResults.length - 12}개의 추가 결과가 있습니다. 최근 12개만 표시됩니다.
                   </p>
                 </div>
               )}
@@ -138,8 +361,8 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
               <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              <p>Style Try-on이 {totalStyleViews}회 있었지만 아직 체험 결과가 저장되지 않았습니다</p>
-              <p className="text-xs mt-1">AI 처리가 완료되면 여기에 고객 체험 결과가 표시됩니다</p>
+              <p>선택한 기간에 체험 결과가 없습니다</p>
+              <p className="text-xs mt-1">다른 기간을 선택해보세요</p>
             </div>
           )}
         </StatCard>
@@ -147,7 +370,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
 
       {/* Performance Stats Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <StatCard title="Most Popular Style">
+        <StatCard title={`Most Popular Style (${datePreset === 'all' ? '전체' : '선택 기간'})`}>
           {topViewed.style ? (
             <div className="flex items-center gap-4">
               <img src={topViewed.style.url} alt={topViewed.style.name} className="w-24 h-24 rounded-md object-cover" />
@@ -157,11 +380,11 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
               </div>
             </div>
           ) : (
-            <p className="text-gray-500 h-full flex items-center justify-center">No style views yet.</p>
+            <p className="text-gray-500 h-full flex items-center justify-center">선택한 기간에 데이터가 없습니다.</p>
           )}
         </StatCard>
         
-        <StatCard title="Top Booking Driver">
+        <StatCard title="Top Booking Driver (전체 기간)">
           {topBooked.style ? (
             <div className="flex flex-col items-center justify-center text-center h-full">
               <img src={topBooked.style.url} alt={topBooked.style.name} className="w-24 h-24 rounded-md object-cover mb-3" />
