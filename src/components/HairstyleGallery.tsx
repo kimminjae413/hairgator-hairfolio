@@ -1,6 +1,15 @@
 import React, { useState, useMemo } from 'react';
-import { Hairstyle, Gender, FemaleMajorCategory, MaleMajorCategory } from '../types';
-import PlusIcon from './icons/PlusIcon';
+
+// 타입 정의
+interface Hairstyle {
+  name: string;
+  url: string;
+  gender: 'Female' | 'Male';
+  majorCategory?: string;
+  minorCategory?: string;
+  description?: string;
+  tags?: string[];
+}
 
 interface HairstyleGalleryProps {
   images: Hairstyle[];
@@ -9,17 +18,10 @@ interface HairstyleGalleryProps {
   disabled: boolean;
   onAddImage?: () => void;
   showCategories?: boolean;
-  allowMultipleSelection?: boolean;
   onDeleteImage?: (hairstyle: Hairstyle) => void;
   onEditImage?: (hairstyle: Hairstyle) => void;
   isDesignerView?: boolean;
 }
-
-type GroupedHairstyles = {
-  [key in Gender]?: {
-    [key in FemaleMajorCategory | MaleMajorCategory | 'Uncategorized']?: Hairstyle[];
-  };
-};
 
 const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({ 
   images, 
@@ -28,16 +30,16 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
   disabled, 
   onAddImage, 
   showCategories = true,
-  allowMultipleSelection = false,
   onDeleteImage,
   onEditImage,
   isDesignerView = false
 }) => {
-  const [activeTab, setActiveTab] = useState<Gender>('Female');
+  const [activeTab, setActiveTab] = useState<'Female' | 'Male'>('Female');
   const [searchTerm, setSearchTerm] = useState('');
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
+  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 
-  // Create fallback image using SVG data URL
+  // Fallback image
   const fallbackImageSvg = `data:image/svg+xml,${encodeURIComponent(`
     <svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
       <rect width="400" height="400" fill="#e5e7eb"/>
@@ -57,68 +59,50 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
     }
   };
 
-  // Filter images based on search term
+  // Handle image load
+  const handleImageLoad = (imageUrl: string) => {
+    setLoadedImages(prev => new Set([...prev, imageUrl]));
+  };
+
+  // Filter images
   const filteredImages = useMemo(() => {
-    if (!searchTerm) return images;
+    let filtered = images.filter(img => img.gender === activeTab);
     
-    const lowercaseSearch = searchTerm.toLowerCase();
-    return images.filter(image => 
-      image.name.toLowerCase().includes(lowercaseSearch) ||
-      image.description?.toLowerCase().includes(lowercaseSearch) ||
-      image.tags?.some(tag => tag.toLowerCase().includes(lowercaseSearch))
-    );
-  }, [images, searchTerm]);
+    if (searchTerm) {
+      const lowercaseSearch = searchTerm.toLowerCase();
+      filtered = filtered.filter(image => 
+        image.name.toLowerCase().includes(lowercaseSearch) ||
+        image.description?.toLowerCase().includes(lowercaseSearch) ||
+        image.tags?.some(tag => tag.toLowerCase().includes(lowercaseSearch))
+      );
+    }
+    
+    return filtered;
+  }, [images, activeTab, searchTerm]);
 
-  // Group images by gender and major category
+  // Group by category
   const groupedImages = useMemo(() => {
+    if (!showCategories) return { 'All Styles': filteredImages };
+    
     return filteredImages.reduce((acc, image) => {
-      const genderKey = image.gender;
-      if (!genderKey || (genderKey !== 'Female' && genderKey !== 'Male')) return acc;
-
-      const majorKey = image.majorCategory || 'Uncategorized';
-
-      if (!acc[genderKey]) {
-        acc[genderKey] = {};
+      const category = image.majorCategory || 'Uncategorized';
+      if (!acc[category]) {
+        acc[category] = [];
       }
-      if (!acc[genderKey]![majorKey]) {
-        acc[genderKey]![majorKey] = [];
-      }
-      acc[genderKey]![majorKey]!.push(image);
+      acc[category].push(image);
       return acc;
-    }, {} as GroupedHairstyles);
-  }, [filteredImages]);
+    }, {} as Record<string, Hairstyle[]>);
+  }, [filteredImages, showCategories]);
 
-  const activeGenderStyles = groupedImages[activeTab];
-  const activeGenderEntries = activeGenderStyles ? Object.entries(activeGenderStyles) : [];
-
-  // Sort categories for better display order
-  const sortedEntries = activeGenderEntries.sort(([a], [b]) => {
+  const sortedCategories = Object.entries(groupedImages).sort(([a], [b]) => {
     if (a === 'Uncategorized') return 1;
     if (b === 'Uncategorized') return -1;
     return a.localeCompare(b);
   });
 
   const tabStyle = "flex-1 py-3 text-center font-semibold rounded-md transition-all duration-200 focus:outline-none";
-  const activeTabStyle = "bg-indigo-600 text-white shadow-lg transform scale-105";
-  const inactiveTabStyle = "bg-gray-200 text-gray-700 hover:bg-gray-300 hover:scale-102";
-
-  const addStyleButton = onAddImage && (
-    <button
-      onClick={onAddImage}
-      disabled={disabled}
-      className={`relative aspect-square rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-500 transition-all duration-200 ${
-        disabled
-          ? 'cursor-not-allowed bg-gray-100 opacity-50'
-          : 'cursor-pointer hover:border-indigo-500 hover:bg-indigo-50 hover:text-indigo-600 hover:scale-105'
-      }`}
-      aria-label="새 스타일 추가"
-    >
-      <div className="w-8 h-8 mb-2">
-        <PlusIcon />
-      </div>
-      <p className="text-xs font-bold text-center px-2">스타일 추가</p>
-    </button>
-  );
+  const activeTabStyle = "bg-indigo-600 text-white shadow-lg";
+  const inactiveTabStyle = "bg-gray-200 text-gray-700 hover:bg-gray-300";
 
   return (
     <div className={`${disabled ? 'opacity-50' : ''} space-y-4`}>
@@ -127,17 +111,15 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
         <div className="relative">
           <input
             type="text"
-            placeholder="스타일 검색... (예: 웨이브, 짧은머리, 모던)"
+            placeholder="스타일 검색..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
             disabled={disabled}
           />
-          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
+          <svg className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
         </div>
       )}
 
@@ -162,73 +144,96 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
       {/* Results Count */}
       {searchTerm && (
         <div className="text-sm text-gray-600">
-          검색 결과: {filteredImages.filter(img => img.gender === activeTab).length}개
+          검색 결과: {filteredImages.length}개
         </div>
       )}
 
-      {/* Gallery Content */}
-      <div className="relative max-h-[calc(70vh-120px)] overflow-y-auto p-2 bg-white rounded-lg border border-gray-200">
-        {sortedEntries.length > 0 ? (
-          sortedEntries.map(([majorCategory, hairstyles], categoryIndex) => (
-            <div key={majorCategory} className="mb-8 last:mb-4">
+      {/* Masonry Gallery */}
+      <div className="relative max-h-[70vh] overflow-y-auto p-2">
+        {sortedCategories.length > 0 ? (
+          sortedCategories.map(([category, hairstyles], categoryIndex) => (
+            <div key={category} className="mb-6 last:mb-0">
               {/* Category Header */}
               {showCategories && (
-                <div className="flex items-center mb-4">
-                  <h4 className="text-lg font-semibold text-gray-700">{majorCategory}</h4>
-                  <div className="flex-1 h-px bg-gray-200 ml-4"></div>
-                  <span className="ml-4 text-sm text-gray-500">{hairstyles.length}개</span>
+                <div className="flex items-center mb-3">
+                  <h4 className="text-sm font-semibold text-gray-700">{category}</h4>
+                  <div className="flex-1 h-px bg-gray-200 ml-3"></div>
+                  <span className="ml-3 text-xs text-gray-500">{hairstyles.length}</span>
                 </div>
               )}
               
-              {/* Image Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {/* Add Style Button - only show in first category */}
-                {categoryIndex === 0 && addStyleButton}
+              {/* True Masonry Grid with CSS Columns */}
+              <div className="columns-2 gap-2">
+                {/* Add Style Button - only in first category */}
+                {categoryIndex === 0 && onAddImage && (
+                  <button
+                    onClick={onAddImage}
+                    disabled={disabled}
+                    className={`w-full aspect-square rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 transition-all duration-200 mb-2 break-inside-avoid ${
+                      disabled
+                        ? 'cursor-not-allowed bg-gray-100 opacity-50'
+                        : 'cursor-pointer hover:border-indigo-500 hover:bg-indigo-50 hover:text-indigo-500'
+                    }`}
+                  >
+                    <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    <p className="text-xs font-bold">스타일 추가</p>
+                  </button>
+                )}
                 
                 {/* Hairstyle Images */}
-                {hairstyles.map((image) => (
+                {hairstyles.map((image, index) => {
+                  // Pinterest style: vary heights for zigzag effect
+                  const heightVariants = ['h-48', 'h-56', 'h-64', 'h-52', 'h-60'];
+                  const randomHeight = heightVariants[index % heightVariants.length];
+                  
+                  return (
                   <div
                     key={image.url}
-                    className="relative group"
+                    className="relative group mb-2 break-inside-avoid"
                   >
                     <button
                       onClick={() => onSelect(image)}
                       disabled={disabled}
-                      className={`w-full aspect-square rounded-lg overflow-hidden transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-indigo-400 ${
+                      className={`w-full ${randomHeight} block rounded-xl overflow-hidden transition-all duration-300 ${
                         selectedUrl === image.url
-                          ? 'ring-4 ring-indigo-500 shadow-lg transform scale-105'
+                          ? 'ring-4 ring-indigo-500 shadow-xl'
                           : 'ring-2 ring-transparent hover:ring-indigo-300'
                       } ${
                         disabled 
                           ? 'cursor-not-allowed' 
-                          : 'hover:scale-105 hover:shadow-lg cursor-pointer'
+                          : 'hover:scale-[1.02] cursor-pointer'
                       }`}
                     >
-                      {/* Image */}
+                      {/* Loading skeleton */}
+                      {!loadedImages.has(image.url) && (
+                        <div className="absolute inset-0 bg-gray-200 animate-pulse" />
+                      )}
+                      
+                      {/* Image covering the fixed height */}
                       <img 
                         src={imageErrors.has(image.url) ? fallbackImageSvg : image.url}
                         alt={image.name}
-                        className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-110"
-                        loading="lazy"
                         onError={(e) => handleImageError(image.url, e)}
+                        onLoad={() => handleImageLoad(image.url)}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
                       />
                       
-                      {/* Overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-                      
-                      {/* Title */}
-                      <div className="absolute bottom-0 left-0 right-0 p-3">
-                        <p className="text-white text-sm font-bold drop-shadow-lg">{image.name}</p>
+                      {/* Overlay on hover */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
+                        <p className="text-white font-bold text-sm mb-1">{image.name}</p>
                         {image.description && (
-                          <p className="text-white/80 text-xs mt-1 line-clamp-2 drop-shadow">{image.description}</p>
+                          <p className="text-gray-200 text-xs line-clamp-2">{image.description}</p>
                         )}
                       </div>
                       
-                      {/* Selection Indicator */}
+                      {/* Selected indicator */}
                       {selectedUrl === image.url && (
-                        <div className="absolute top-2 right-2 w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center">
+                        <div className="absolute top-2 right-2 w-7 h-7 bg-indigo-600 rounded-full flex items-center justify-center shadow-lg">
                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                           </svg>
                         </div>
                       )}
@@ -238,7 +243,7 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                         <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                           <div className="flex flex-wrap gap-1">
                             {image.tags.slice(0, 2).map((tag, idx) => (
-                              <span key={idx} className="px-2 py-1 bg-black/60 text-white text-xs rounded-full">
+                              <span key={idx} className="px-2 py-1 bg-black/60 text-white text-xs rounded-full backdrop-blur-sm">
                                 #{tag}
                               </span>
                             ))}
@@ -247,46 +252,44 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                       )}
                     </button>
 
-                    {/* Action Buttons - Only show in designer view */}
+                    {/* Action Buttons - Designer View */}
                     {isDesignerView && (
-                      <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
-                        {/* Edit Button */}
+                      <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 z-10">
                         {onEditImage && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               onEditImage(image);
                             }}
-                            className="w-8 h-8 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg transition-all duration-200 flex items-center justify-center z-10"
-                            title="스타일 편집"
+                            className="w-7 h-7 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg transition-all duration-200 flex items-center justify-center"
+                            title="편집"
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                           </button>
                         )}
-                        
-                        {/* Delete Button */}
                         {onDeleteImage && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (window.confirm(`"${image.name}" 스타일을 삭제하시겠습니까?`)) {
+                              if (window.confirm('이 스타일을 삭제하시겠습니까?')) {
                                 onDeleteImage(image);
                               }
                             }}
-                            className="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-all duration-200 flex items-center justify-center z-10"
-                            title="스타일 삭제"
+                            className="w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-all duration-200 flex items-center justify-center"
+                            title="삭제"
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
                           </button>
                         )}
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))
@@ -314,7 +317,22 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                     <div className="text-4xl">💇‍♀️</div>
                     <h3 className="text-lg font-semibold text-gray-700">아직 등록된 스타일이 없습니다</h3>
                     <p className="text-gray-500 mb-6">첫 번째 '{activeTab}' 스타일을 추가해보세요!</p>
-                    {addStyleButton}
+                    <div className="flex justify-center">
+                      <button
+                        onClick={onAddImage}
+                        disabled={disabled}
+                        className={`w-48 aspect-square rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 transition-all duration-200 ${
+                          disabled
+                            ? 'cursor-not-allowed bg-gray-100 opacity-50'
+                            : 'cursor-pointer hover:border-indigo-500 hover:bg-indigo-50 hover:text-indigo-500'
+                        }`}
+                      >
+                        <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        <p className="text-xs font-bold">스타일 추가</p>
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div>
@@ -331,4 +349,82 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
   );
 };
 
-export default HairstyleGallery;
+// Demo with sample data
+const MasonryDemo = () => {
+  const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
+  
+  const sampleImages: Hairstyle[] = [
+    {
+      name: '웨이브 보브',
+      url: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=400&h=600&fit=crop',
+      gender: 'Female',
+      majorCategory: 'B length',
+      description: '자연스러운 웨이브',
+      tags: ['웨이브', '보브']
+    },
+    {
+      name: '롱 스트레이트',
+      url: 'https://images.unsplash.com/photo-1594736797933-d0501ba2fe65?w=400&h=500&fit=crop',
+      gender: 'Female',
+      majorCategory: 'G length',
+      description: '긴 생머리',
+      tags: ['롱헤어', '스트레이트']
+    },
+    {
+      name: '픽시 컷',
+      url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=550&fit=crop',
+      gender: 'Female',
+      majorCategory: 'A length',
+      description: '짧은 픽시',
+      tags: ['픽시', '짧은머리']
+    },
+    {
+      name: '컬리 미디움',
+      url: 'https://images.unsplash.com/photo-1487412912498-0447578fcca8?w=400&h=650&fit=crop',
+      gender: 'Female',
+      majorCategory: 'D length',
+      description: '자연스러운 컬',
+      tags: ['컬', '미디움']
+    },
+    {
+      name: '레이어드 컷',
+      url: 'https://images.unsplash.com/photo-1524502397800-2eeaad7c3fe5?w=400&h=500&fit=crop',
+      gender: 'Female',
+      majorCategory: 'C length',
+      description: '층진 레이어',
+      tags: ['레이어', '볼륨']
+    },
+    {
+      name: '앞머리 보브',
+      url: 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=400&h=600&fit=crop',
+      gender: 'Female',
+      majorCategory: 'B length',
+      description: '귀여운 앞머리',
+      tags: ['보브', '앞머리']
+    }
+  ];
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-2xl mx-auto">        
+        <HairstyleGallery
+          images={sampleImages}
+          onSelect={(hairstyle) => setSelectedUrl(hairstyle.url)}
+          selectedUrl={selectedUrl}
+          disabled={false}
+          showCategories={true}
+        />
+        
+        {selectedUrl && (
+          <div className="mt-6 p-4 bg-white rounded-xl shadow-md text-center">
+            <p className="text-gray-700 text-sm font-medium">
+              선택됨: {sampleImages.find(img => img.url === selectedUrl)?.name}
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default MasonryDemo;
