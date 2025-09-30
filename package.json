@@ -1,7 +1,7 @@
 {
   "name": "hairfolio-vmodel",
   "version": "1.0.0",
-  "description": "AI-powered hairstyle try-on platform for hair designers",
+  "description": "AI-powered hairstyle try-on platform for hair designers with multi-language support",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,12 +9,16 @@
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "lint:fix": "eslint . --ext ts,tsx --fix"
+    "lint:fix": "eslint . --ext ts,tsx --fix",
+    "i18n:check": "node scripts/check-translations.js"
   },
   "dependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "firebase": "^10.7.1"
+    "firebase": "^10.7.1",
+    "react-i18next": "^13.5.0",
+    "i18next": "^23.7.6",
+    "i18next-browser-languagedetector": "^7.2.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
@@ -41,7 +45,16 @@
     "hairstyle",
     "vmodel",
     "tailwindcss",
-    "firebase"
+    "firebase",
+    "i18n",
+    "internationalization",
+    "multi-language",
+    "korean",
+    "english",
+    "chinese",
+    "japanese",
+    "vietnamese",
+    "indonesian"
   ],
   "author": "Hairfolio Team",
   "license": "MIT",
@@ -49,5 +62,15 @@
     "type": "git",
     "url": "https://github.com/kimminjae413/hairgator-hairfolio.git"
   },
-  "homepage": "https://hairfolio.netlify.app"
+  "homepage": "https://hairfolio.netlify.app",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "browserslist": [
+    "> 0.5%",
+    "last 2 versions",
+    "not dead",
+    "not ie 11"
+  ]
 }
