@@ -1,0 +1,53 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "success": "Successfully completed",
+    "upload": "Upload",
+    "preview": "Preview",
+    "confirm": "Confirm",
+    "close": "Close"
+  },
+  "designer": {
+    "profile": "Profile",
+    "portfolio": "Portfolio",
+    "settings": "Settings",
+    "addStyle": "Add Style",
+    "editProfile": "Edit Profile",
+    "reservationLink": "Booking Link",
+    "clientView": "Client View",
+    "designerView": "Designer View"
+  },
+  "style": {
+    "name": "Style Name",
+    "category": "Category",
+    "price": "Price",
+    "description": "Description",
+    "gender": "Gender",
+    "male": "Male",
+    "female": "Female",
+    "tags": "Tags",
+    "uploadNew": "Upload New Style"
+  },
+  "client": {
+    "tryOnStyle": "Try On Style",
+    "uploadPhoto": "Upload Photo",
+    "selectStyle": "Select Style",
+    "generateResult": "Generate Result",
+    "bookAppointment": "Book Appointment",
+    "contactDesigner": "Contact Designer"
+  },
+  "messages": {
+    "uploadSuccess": "Upload successful",
+    "uploadError": "Upload failed",
+    "saveSuccess": "Save successful",
+    "saveError": "Save failed",
+    "pleaseSelectFile": "Please select a file",
+    "fileTooBig": "File too large",
+    "invalidFileType": "Unsupported file type"
+  }
+}
