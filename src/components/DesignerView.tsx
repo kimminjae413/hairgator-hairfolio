@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Hairstyle, Gender, FemaleMajorCategory, MaleMajorCategory, MinorCategory, DesignerStats, DesignerProfile } from '../types';
 import * as firebaseService from '../services/firebaseService';
 import HairstyleGallery from './HairstyleGallery';
@@ -8,6 +9,7 @@ import UploadStyleModal from './UploadStyleModal';
 import EditStyleModal from './EditStyleModal';
 import DesignerProfileModal from './DesignerProfileModal';
 import AnalyticsDashboard from './AnalyticsDashboard';
+import LanguageSelector from './LanguageSelector';
 import ShareIcon from './icons/ShareIcon';
 import SettingsIcon from './icons/SettingsIcon';
 import UserIcon from './icons/UserIcon';
@@ -23,6 +25,7 @@ interface DesignerViewProps {
 type ActiveView = 'gallery' | 'analytics';
 
 const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) => {
+  const { t } = useTranslation();
   const [portfolio, setPortfolio] = useState<Hairstyle[]>([]);
   const [reservationUrl, setReservationUrl] = useState('');
   const [stats, setStats] = useState<DesignerStats | null>(null);
@@ -78,11 +81,11 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
         setPortfolio(updatedPortfolio);
         setShowUploadModal(false);
       } else {
-        alert('포트폴리오 저장에 실패했습니다.');
+        alert(t('messages.portfolioSaveError'));
       }
     } catch (error) {
       console.error('Error adding portfolio image:', error);
-      alert('포트폴리오 저장 중 오류가 발생했습니다.');
+      alert(t('messages.portfolioSaveError'));
     }
   };
 
@@ -102,11 +105,11 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
         );
         setPortfolio(updatedPortfolio);
       } else {
-        alert('포트폴리오 삭제에 실패했습니다.');
+        alert(t('messages.portfolioDeleteError'));
       }
     } catch (error) {
       console.error('Error deleting portfolio image:', error);
-      alert('포트폴리오 삭제 중 오류가 발생했습니다.');
+      alert(t('messages.portfolioDeleteError'));
     }
   };
 
@@ -129,11 +132,11 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
         setShowEditModal(false);
         setEditingStyle(null);
       } else {
-        alert('스타일 수정에 실패했습니다.');
+        alert(t('messages.styleUpdateError'));
       }
     } catch (error) {
       console.error('Error updating style:', error);
-      alert('스타일 수정 중 오류가 발생했습니다.');
+      alert(t('messages.styleUpdateError'));
     }
   };
 
@@ -144,11 +147,11 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
         setReservationUrl(newUrl);
         setShowSettingsModal(false);
       } else {
-        alert('설정 저장에 실패했습니다.');
+        alert(t('messages.settingsSaveError'));
       }
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert('설정 저장 중 오류가 발생했습니다.');
+      alert(t('messages.settingsSaveError'));
     }
   };
 
@@ -159,11 +162,11 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
         setDesignerProfile(profile);
         setShowProfileModal(false);
       } else {
-        alert('프로필 저장에 실패했습니다.');
+        alert(t('messages.profileSaveError'));
       }
     } catch (error) {
       console.error('Error saving profile:', error);
-      alert('프로필 저장 중 오류가 발생했습니다.');
+      alert(t('messages.profileSaveError'));
     }
   };
 
@@ -185,7 +188,7 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">디자이너 데이터 로딩 중...</p>
+          <p className="text-gray-600">{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -197,52 +200,55 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
         <header className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
           <div className="text-center sm:text-left">
             <h1 
-  className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight"
-  style={{
-    fontFamily: designerProfile?.brandSettings?.fontFamily || 'Inter',
-    color: designerProfile?.brandSettings?.textColor || '#1f2937'
-  }}
->
-  {designerProfile?.brandSettings?.salonName || 'Hairfolio'}
-</h1>
+              className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight"
+              style={{
+                fontFamily: designerProfile?.brandSettings?.fontFamily || 'Inter',
+                color: designerProfile?.brandSettings?.textColor || '#1f2937'
+              }}
+            >
+              {designerProfile?.brandSettings?.salonName || 'Hairfolio'}
+            </h1>
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-center">
+            {/* Language Selector */}
+            <LanguageSelector />
+            
             <button
               onClick={() => setShowProfileModal(true)}
               className={`${headerButtonStyle} bg-blue-600 text-white hover:bg-blue-700`}
-              title="Edit Profile"
+              title={t('designer.profile')}
             >
               <div className="w-5 h-5">
                 <UserIcon />
               </div>
-              <span className="hidden sm:inline ml-2 text-sm">Profile</span>
+              <span className="hidden sm:inline ml-2 text-sm">{t('designer.profile')}</span>
             </button>
             <button
               onClick={() => setShowShareModal(true)}
               className={`${headerButtonStyle} bg-indigo-600 text-white hover:bg-indigo-700`}
-              title="Share Portfolio"
+              title={t('designer.sharePortfolio')}
             >
               <div className="w-5 h-5">
                 <ShareIcon />
               </div>
-              <span className="hidden sm:inline ml-2 text-sm">Share</span>
+              <span className="hidden sm:inline ml-2 text-sm">{t('common.share')}</span>
             </button>
             <button
               onClick={() => setShowSettingsModal(true)}
               className={`${headerButtonStyle} bg-gray-200 text-gray-700 hover:bg-gray-300`}
-              title="Settings"
+              title={t('designer.settings')}
             >
               <div className="w-5 h-5">
                 <SettingsIcon />
               </div>
-              <span className="hidden sm:inline ml-2 text-sm">Settings</span>
+              <span className="hidden sm:inline ml-2 text-sm">{t('designer.settings')}</span>
             </button>
             <button
               onClick={onLogout}
               className={`${headerButtonStyle} bg-gray-600 text-white hover:bg-gray-700`}
-              title="Logout"
+              title={t('common.logout')}
             >
-              <span className="text-sm px-1">Logout</span>
+              <span className="text-sm px-1">{t('common.logout')}</span>
             </button>
           </div>
         </header>
@@ -321,7 +327,7 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
                 onClick={() => setShowProfileModal(true)}
                 className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors font-medium"
               >
-                편집
+                {t('common.edit')}
               </button>
             </div>
           </div>
@@ -336,15 +342,15 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
                   <UserIcon />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-800">프로필을 설정해보세요!</h3>
-                  <p className="text-sm text-gray-600">고객에게 보여질 프로필 정보를 추가하면 더 전문적으로 보입니다.</p>
+                  <h3 className="text-lg font-semibold text-gray-800">{t('designer.setupProfile')}</h3>
+                  <p className="text-sm text-gray-600">{t('designer.setupProfileDesc')}</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowProfileModal(true)}
                 className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors font-medium"
               >
-                프로필 설정
+                {t('designer.setupProfile')}
               </button>
             </div>
           </div>
@@ -361,7 +367,7 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
                     <div className="w-4 h-4">
                       <HairIcon />
                     </div>
-                    <span>Your Styles</span>
+                    <span>{t('designer.yourStyles')}</span>
                  </button>
                  <button 
                    onClick={() => setActiveView('analytics')} 
@@ -371,7 +377,7 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
                     <div className="w-4 h-4">
                       <AnalyticsIcon />
                     </div>
-                    <span>Analytics</span>
+                    <span>{t('designer.analytics')}</span>
                  </button>
              </div>
           </div>
@@ -393,8 +399,8 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
                     <div className="w-24 h-24 mx-auto text-indigo-200">
                         <HairIcon />
                     </div>
-                    <h3 className="mt-4 text-2xl font-bold text-gray-800">Your Portfolio is Live!</h3>
-                    <p className="mt-2 text-gray-600 max-w-md mx-auto">This is your gallery. Add your first hairstyle and share it with your clients to let them try it on virtually.</p>
+                    <h3 className="mt-4 text-2xl font-bold text-gray-800">{t('designer.portfolioLive')}</h3>
+                    <p className="mt-2 text-gray-600 max-w-md mx-auto">{t('designer.portfolioLiveDesc')}</p>
                     <button
                         onClick={() => setShowUploadModal(true)}
                         className="mt-6 inline-flex items-center justify-center px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition-colors duration-300"
@@ -402,12 +408,12 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
                         <div className="w-5 h-5">
                           <PlusIcon />
                         </div>
-                        <span className="ml-2">Add Your First Style</span>
+                        <span className="ml-2">{t('designer.addFirstStyle')}</span>
                     </button>
                 </div>
               )
           ) : (
-            stats ? <AnalyticsDashboard stats={stats} portfolio={portfolio} /> : <div className="text-center py-16 text-gray-500">Loading analytics...</div>
+            stats ? <AnalyticsDashboard stats={stats} portfolio={portfolio} /> : <div className="text-center py-16 text-gray-500">{t('designer.loadingAnalytics')}</div>
           )}
         </main>
         
