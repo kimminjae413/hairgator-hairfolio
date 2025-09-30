@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { analyzeHairstyle, applyHairstyle } from '../services/vmodelService'
 import * as firebaseService from '../services/firebaseService'
 import { LoadingState, Hairstyle, DesignerProfile } from '../types'
@@ -6,6 +7,7 @@ import ImageUploader from './ImageUploader'
 import ResultDisplay from './ResultDisplay'
 import HairstyleGallery from './HairstyleGallery'
 import IntroScreen from './IntroScreen'
+import LanguageSelector from './LanguageSelector'
 import UserIcon from './icons/UserIcon'
 
 interface ClientViewProps {
@@ -28,6 +30,8 @@ const urlToFile = async (url: string, filename: string, mimeType: string): Promi
 }
 
 const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
+  const { t } = useTranslation()
+  
   // State for intro screen
   const [showIntro, setShowIntro] = useState(true)
   
@@ -72,7 +76,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
         }
       } catch (error) {
         console.error('Error loading designer data:', error)
-        setError('디자이너 정보를 불러올 수 없습니다.')
+        setError(t('client.designerDataError'))
         setShowIntro(false) // 에러 시 인트로 건너뛰기
       } finally {
         setIsDataLoading(false)
@@ -80,7 +84,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
     }
     
     loadDesignerData()
-  }, [designerName])
+  }, [designerName, t])
 
   // Handle intro completion
   const handleIntroComplete = useCallback(() => {
@@ -107,7 +111,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
   // Handle hairstyle selection and AI processing
   const handleHairstyleSelect = useCallback(async (hairstyle: Hairstyle) => {
     if (!faceFile) {
-      setError('먼저 얼굴 사진을 업로드해주세요.')
+      setError(t('client.uploadPhotoFirst'))
       return
     }
 
@@ -161,11 +165,11 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
     } catch (err) {
       console.error('Error processing hairstyle:', err)
       
-      const errorMessage = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.'
-      setError(`헤어스타일 적용 실패: ${errorMessage}`)
+      const errorMessage = err instanceof Error ? err.message : t('client.unknownError')
+      setError(`${t('client.hairstyleApplyError')}: ${errorMessage}`)
       setLoadingState('error')
     }
-  }, [faceFile, designerName])
+  }, [faceFile, designerName, t])
 
   // Handle result modal close
   const handleCloseModal = useCallback(() => {
@@ -189,9 +193,9 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
     if (reservationUrl) {
       window.open(reservationUrl, '_blank', 'noopener,noreferrer')
     } else {
-      alert('예약 링크가 설정되어 있지 않습니다.')
+      alert(t('client.noReservationLink'))
     }
-  }, [designerName, reservationUrl])
+  }, [designerName, reservationUrl, t])
   
   // Check if processing is in progress
   const isAIProcessing = loadingState === 'analyzing' || loadingState === 'generating'
@@ -224,7 +228,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">디자이너 포트폴리오 로딩 중...</p>
+          <p className="text-gray-600">{t('client.loadingPortfolio')}</p>
         </div>
       </div>
     )
@@ -235,6 +239,11 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
       <div className="w-full max-w-6xl mx-auto">
         {/* Header with Designer Profile */}
         <header className="text-center mb-8">
+          {/* Language Selector - positioned at top right */}
+          <div className="flex justify-end mb-4">
+            <LanguageSelector />
+          </div>
+
           {/* Custom Branded Title */}
           <h1 
             className="text-4xl md:text-5xl font-bold tracking-tight mb-6"
@@ -345,7 +354,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
                   <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
-                  <span>검증된 헤어 디자이너</span>
+                  <span>{t('client.verifiedDesigner')}</span>
                 </div>
               </div>
             )}
@@ -354,7 +363,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
           {/* Subtitle (optional) */}
           {showSubtitle && (
             <p className="text-lg text-gray-600">
-              AI로 새로운 헤어스타일을 미리 체험해보세요
+              {t('client.tryNewHairstyle')}
             </p>
           )}
         </header>
@@ -367,15 +376,15 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
               <div className="w-24 h-24 mx-auto text-gray-300 mb-4">
                 <UserIcon />
               </div>
-              <h2 className="text-2xl font-bold text-gray-700 mb-2">포트폴리오를 찾을 수 없습니다</h2>
+              <h2 className="text-2xl font-bold text-gray-700 mb-2">{t('client.portfolioNotFound')}</h2>
               <p className="text-gray-500">
-                "{designerProfile?.name || designerName}" 디자이너의 포트폴리오가 존재하지 않거나 아직 스타일이 등록되지 않았습니다.
+                {t('client.portfolioNotFoundDesc', { designerName: designerProfile?.name || designerName })}
               </p>
               <button
                 onClick={() => window.history.back()}
                 className="mt-4 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
               >
-                돌아가기
+                {t('common.goBack')}
               </button>
             </div>
           ) : (
@@ -384,27 +393,27 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
               {/* Step 1: Face Photo Upload */}
               <div className="lg:col-span-1">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center lg:text-left">
-                  1단계: 얼굴 사진 업로드
+                  {t('client.step1Title')}
                 </h2>
                 <ImageUploader
                   id="face-uploader"
-                  label="정면을 바라본 선명한 얼굴 사진을 업로드하세요"
+                  label={t('client.uploadClearPhoto')}
                   previewSrc={facePreview}
                   onFileChange={handleFaceFileChange}
                   icon={<UserIcon />}
                   disabled={isAIProcessing}
                 />
                 <div className="mt-4 text-xs text-gray-500 text-center">
-                  <p>• JPG, PNG, WEBP 형식 지원</p>
-                  <p>• 최대 10MB까지 업로드 가능</p>
-                  <p>• 개인정보는 안전하게 보호됩니다</p>
+                  <p>• {t('client.supportedFormats')}</p>
+                  <p>• {t('client.maxFileSize')}</p>
+                  <p>• {t('client.privacyProtected')}</p>
                 </div>
               </div>
 
               {/* Step 2: Hairstyle Selection */}
               <div className="lg:col-span-2">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center lg:text-left">
-                  2단계: 헤어스타일 선택
+                  {t('client.step2Title')}
                 </h2>
                 <HairstyleGallery 
                   images={portfolio}
@@ -415,13 +424,13 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
                 {!faceFile && (
                   <div className="text-center mt-6 p-4 bg-indigo-50 rounded-lg">
                     <p className="text-indigo-600 font-medium">
-                      ↑ 먼저 얼굴 사진을 업로드하여 갤러리를 활성화하세요
+                      {t('client.uploadPhotoToActivate')}
                     </p>
                   </div>
                 )}
                 {faceFile && portfolio.length > 0 && (
                   <div className="text-center mt-4 text-sm text-gray-600">
-                    <p>원하는 헤어스타일을 클릭하면 AI가 자동으로 적용해드립니다</p>
+                    <p>{t('client.clickToApplyHairstyle')}</p>
                   </div>
                 )}
               </div>
