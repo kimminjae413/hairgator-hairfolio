@@ -1,0 +1,53 @@
+{
+  "common": {
+    "save": "Simpan",
+    "cancel": "Batal",
+    "edit": "Edit",
+    "delete": "Hapus",
+    "loading": "Memuat...",
+    "error": "Terjadi kesalahan",
+    "success": "Berhasil diselesaikan",
+    "upload": "Unggah",
+    "preview": "Pratinjau",
+    "confirm": "Konfirmasi",
+    "close": "Tutup"
+  },
+  "designer": {
+    "profile": "Profil",
+    "portfolio": "Portofolio",
+    "settings": "Pengaturan",
+    "addStyle": "Tambah Gaya",
+    "editProfile": "Edit Profil",
+    "reservationLink": "Link Reservasi",
+    "clientView": "Tampilan Klien",
+    "designerView": "Tampilan Desainer"
+  },
+  "style": {
+    "name": "Nama Gaya",
+    "category": "Kategori",
+    "price": "Harga",
+    "description": "Deskripsi",
+    "gender": "Jenis Kelamin",
+    "male": "Pria",
+    "female": "Wanita",
+    "tags": "Tag",
+    "uploadNew": "Unggah Gaya Baru"
+  },
+  "client": {
+    "tryOnStyle": "Coba Gaya",
+    "uploadPhoto": "Unggah Foto",
+    "selectStyle": "Pilih Gaya",
+    "generateResult": "Buat Hasil",
+    "bookAppointment": "Buat Janji",
+    "contactDesigner": "Hubungi Desainer"
+  },
+  "messages": {
+    "uploadSuccess": "Unggah berhasil",
+    "uploadError": "Unggah gagal",
+    "saveSuccess": "Simpan berhasil",
+    "saveError": "Simpan gagal",
+    "pleaseSelectFile": "Silakan pilih file",
+    "fileTooBig": "File terlalu besar",
+    "invalidFileType": "Jenis file tidak didukung"
+  }
+}
