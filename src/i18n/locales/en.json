@@ -133,6 +133,19 @@
     "manageBookingLinks": "Manage booking links and basic settings",
     "popularPlatforms": "Popular Booking Platforms"
   },
+  "share": {
+    "title": "Share Your Portfolio",
+    "subtitle": "Clients can scan the QR code or use the link to try on your styles.",
+    "qrCodeAlt": "Portfolio QR Code",
+    "copyQR": "Copy QR Code",
+    "qrCopied": "QR Code copied!",
+    "shareableLink": "Shareable Link",
+    "copyLinkAria": "Copy link",
+    "linkCopied": "Link copied to clipboard!",
+    "done": "Done",
+    "qrFetchError": "QR code image could not be fetched.",
+    "qrCopyError": "Could not copy QR code. This feature may not be supported by your browser."
+  },
   "result": {
     "processing": "Processing...",
     "completed": "Transformation Complete!",
