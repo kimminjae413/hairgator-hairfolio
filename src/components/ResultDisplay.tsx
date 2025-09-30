@@ -1,16 +1,17 @@
-import React, { useState, useEffect } from 'react'
-import { LoadingState, Hairstyle } from '../types'
-import SparklesIcon from './icons/SparklesIcon'
+import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { LoadingState, Hairstyle } from '../types';
+import SparklesIcon from './icons/SparklesIcon';
 
 interface ResultDisplayProps {
-  beforeSrc: string
-  afterSrc: string | null
-  onReset: () => void
-  loadingState: LoadingState
-  error: string | null
-  reservationUrl?: string
-  hairstyle?: Hairstyle
-  onBookNow?: (hairstyle: Hairstyle) => void
+  beforeSrc: string;
+  afterSrc: string | null;
+  onReset: () => void;
+  loadingState: LoadingState;
+  error: string | null;
+  reservationUrl?: string;
+  hairstyle?: Hairstyle;
+  onBookNow?: (hairstyle: Hairstyle) => void;
 }
 
 const ResultDisplay: React.FC<ResultDisplayProps> = ({
@@ -23,93 +24,94 @@ const ResultDisplay: React.FC<ResultDisplayProps> = ({
   hairstyle,
   onBookNow
 }) => {
-  const [imageLoaded, setImageLoaded] = useState(false)
+  const { t } = useTranslation();
+  const [imageLoaded, setImageLoaded] = useState(false);
 
-  const isLoading = loadingState === 'analyzing' || loadingState === 'generating'
-  const isSuccess = loadingState === 'done' && afterSrc
+  const isLoading = loadingState === 'analyzing' || loadingState === 'generating';
+  const isSuccess = loadingState === 'done' && afterSrc;
 
   // Loading messages for different states
   const loadingMessages: { [key in LoadingState]?: { title: string; subtitle: string } } = {
     analyzing: {
-      title: '헤어스타일 분석 중...',
-      subtitle: '업로드된 스타일의 특징을 분석하고 있습니다'
+      title: t('result.analyzingStyle', '헤어스타일 분석 중...'),
+      subtitle: t('result.analyzingStyleDesc', '업로드된 스타일의 특징을 분석하고 있습니다')
     },
     generating: {
-      title: 'AI 변환 처리 중...',
-      subtitle: '얼굴에 새로운 헤어스타일을 적용하고 있습니다'
+      title: t('result.generatingAI', 'AI 변환 처리 중...'),
+      subtitle: t('result.generatingAIDesc', '얼굴에 새로운 헤어스타일을 적용하고 있습니다')
     }
-  }
+  };
 
   // Handle booking click
   const handleBookNowClick = () => {
     if (hairstyle && onBookNow) {
-      onBookNow(hairstyle)
+      onBookNow(hairstyle);
     }
-  }
+  };
 
   // Handle image download
   const handleDownload = () => {
     if (afterSrc) {
-      const link = document.createElement('a')
-      link.href = afterSrc
-      link.download = `hairfolio-${hairstyle?.name || 'style'}-result.jpg`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
+      const link = document.createElement('a');
+      link.href = afterSrc;
+      link.download = `hairfolio-${hairstyle?.name || 'style'}-result.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
-  }
+  };
 
   // Handle image share (Web Share API)
   const handleShare = async () => {
-    if (!afterSrc) return
+    if (!afterSrc) return;
 
     try {
       // Convert base64 to blob
-      const response = await fetch(afterSrc)
-      const blob = await response.blob()
-      const file = new File([blob], `hairfolio-result.jpg`, { type: 'image/jpeg' })
+      const response = await fetch(afterSrc);
+      const blob = await response.blob();
+      const file = new File([blob], `hairfolio-result.jpg`, { type: 'image/jpeg' });
 
       if (navigator.share && navigator.canShare({ files: [file] })) {
         await navigator.share({
-          title: `Hairfolio - ${hairstyle?.name} 스타일`,
-          text: `Hairfolio에서 ${hairstyle?.name} 스타일을 체험해봤어요!`,
+          title: `Hairfolio - ${hairstyle?.name} ${t('result.style', '스타일')}`,
+          text: t('result.shareText', 'Hairfolio에서 {{styleName}} 스타일을 체험해봤어요!', { styleName: hairstyle?.name }),
           files: [file]
-        })
+        });
       } else {
         // Fallback to copying image URL
         if (navigator.clipboard && window.isSecureContext) {
-          await navigator.clipboard.writeText(window.location.href)
-          alert('링크가 클립보드에 복사되었습니다!')
+          await navigator.clipboard.writeText(window.location.href);
+          alert(t('result.linkCopied', '링크가 클립보드에 복사되었습니다!'));
         } else {
-          alert('공유 기능을 지원하지 않는 브라우저입니다.')
+          alert(t('result.shareNotSupported', '공유 기능을 지원하지 않는 브라우저입니다.'));
         }
       }
     } catch (error) {
-      console.error('Share failed:', error)
+      console.error('Share failed:', error);
       // Fallback to download
-      handleDownload()
+      handleDownload();
     }
-  }
+  };
 
   // Close modal with escape key
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        onReset()
+        onReset();
       }
-    }
+    };
 
-    document.addEventListener('keydown', handleEscape)
-    return () => document.removeEventListener('keydown', handleEscape)
-  }, [onReset])
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [onReset]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
-    document.body.style.overflow = 'hidden'
+    document.body.style.overflow = 'hidden';
     return () => {
-      document.body.style.overflow = 'unset'
-    }
-  }, [])
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
 
   return (
     <div 
@@ -128,11 +130,11 @@ const ResultDisplay: React.FC<ResultDisplayProps> = ({
           <div className="flex items-center gap-3">
             <div>
               <h2 id="result-title" className="text-2xl font-bold text-gray-800">
-                {isLoading ? '처리중...' : isSuccess ? '변환 완료!' : '오류 발생'}
+                {isLoading ? t('result.processing', '처리중...') : isSuccess ? t('result.completed', '변환 완료!') : t('result.errorOccurred', '오류 발생')}
               </h2>
               {hairstyle && (
                 <p className="text-sm text-gray-600 mt-1">
-                  {hairstyle.name} 스타일 적용
+                  {t('result.styleApplied', '{{styleName}} 스타일 적용', { styleName: hairstyle.name })}
                 </p>
               )}
             </div>
@@ -142,14 +144,14 @@ const ResultDisplay: React.FC<ResultDisplayProps> = ({
                 <div className="w-4 h-4">
                   <SparklesIcon />
                 </div>
-                <span>완료</span>
+                <span>{t('result.complete', '완료')}</span>
               </div>
             )}
           </div>
           <button
             onClick={onReset}
             className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
-            aria-label="닫기"
+            aria-label={t('common.close', '닫기')}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -190,19 +192,19 @@ const ResultDisplay: React.FC<ResultDisplayProps> = ({
                         </svg>
                       )}
                     </div>
-                    <span className="text-sm font-medium">분석</span>
+                    <span className="text-sm font-medium">{t('result.step1', '분석')}</span>
                   </div>
                   
                   <div className={`w-8 h-0.5 ${loadingState === 'generating' ? 'bg-indigo-600' : 'bg-gray-300'}`}></div>
                   
                   <div className={`flex items-center space-x-2 ${loadingState === 'generating' ? 'text-indigo-600' : 'text-gray-400'}`}>
                     <div className={`w-4 h-4 rounded-full ${loadingState === 'generating' ? 'bg-indigo-600 animate-pulse' : 'bg-gray-300'}`}></div>
-                    <span className="text-sm font-medium">변환</span>
+                    <span className="text-sm font-medium">{t('result.step2', '변환')}</span>
                   </div>
                 </div>
                 
                 <p className="text-xs text-gray-500 mt-4">
-                  잠시만 기다려주세요. 보통 30초 정도 소요됩니다.
+                  {t('result.waitMessage', '잠시만 기다려주세요. 보통 30초 정도 소요됩니다.')}
                 </p>
               </div>
             </div>
@@ -218,7 +220,7 @@ const ResultDisplay: React.FC<ResultDisplayProps> = ({
               </div>
               
               <div className="text-center max-w-md">
-                <h3 className="text-xl font-semibold text-red-600 mb-4">처리 중 오류가 발생했습니다</h3>
+                <h3 className="text-xl font-semibold text-red-600 mb-4">{t('result.errorTitle', '처리 중 오류가 발생했습니다')}</h3>
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
                   <p className="text-red-700 text-sm">{error}</p>
                 </div>
@@ -228,13 +230,13 @@ const ResultDisplay: React.FC<ResultDisplayProps> = ({
                     onClick={onReset}
                     className="w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
-                    다시 시도하기
+                    {t('result.tryAgain', '다시 시도하기')}
                   </button>
                   
                   <div className="text-xs text-gray-500 space-y-1">
-                    <p>• 얼굴이 명확히 보이는 사진을 사용해주세요</p>
-                    <p>• 인터넷 연결 상태를 확인해주세요</p>
-                    <p>• 문제가 계속되면 다른 사진으로 시도해보세요</p>
+                    <p>{t('result.tip1', '• 얼굴이 명확히 보이는 사진을 사용해주세요')}</p>
+                    <p>{t('result.tip2', '• 인터넷 연결 상태를 확인해주세요')}</p>
+                    <p>{t('result.tip3', '• 문제가 계속되면 다른 사진으로 시도해보세요')}</p>
                   </div>
                 </div>
               </div>
@@ -248,11 +250,11 @@ const ResultDisplay: React.FC<ResultDisplayProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Before */}
                 <div className="space-y-3">
-                  <h3 className="text-lg font-semibold text-gray-700 text-center">변환 전</h3>
+                  <h3 className="text-lg font-semibold text-gray-700 text-center">{t('result.before', '변환 전')}</h3>
                   <div className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden shadow-md">
                     <img 
                       src={beforeSrc} 
-                      alt="원본 사진" 
+                      alt={t('result.originalPhoto', '원본 사진')} 
                       className="w-full h-full object-cover"
                     />
                   </div>
@@ -260,16 +262,16 @@ const ResultDisplay: React.FC<ResultDisplayProps> = ({
 
                 {/* After */}
                 <div className="space-y-3">
-                  <h3 className="text-lg font-semibold text-gray-700 text-center">변환 후</h3>
+                  <h3 className="text-lg font-semibold text-gray-700 text-center">{t('result.after', '변환 후')}</h3>
                   <div className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden shadow-md">
                     {afterSrc && (
                       <img 
                         src={afterSrc} 
-                        alt={`${hairstyle?.name} 스타일 적용 결과`}
+                        alt={t('result.styleResult', '{{styleName}} 스타일 적용 결과', { styleName: hairstyle?.name })}
                         className="w-full h-full object-cover"
                         onLoad={() => setImageLoaded(true)}
                         onError={(e) => {
-                          console.error('Image failed to load:', afterSrc)
+                          console.error('Image failed to load:', afterSrc);
                           // 이미지 로드 실패 시 fallback 처리
                         }}
                       />
@@ -315,7 +317,7 @@ const ResultDisplay: React.FC<ResultDisplayProps> = ({
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 0V6a2 2 0 012-2h4a2 2 0 012 2v1m-6 0h6m-6 0a2 2 0 00-2 2v3a2 2 0 002 2h6a2 2 0 002-2V9a2 2 0 00-2-2m-6 0V7" />
                     </svg>
-                    예약하기
+                    {t('result.bookNow', '예약하기')}
                   </button>
                 )}
 
@@ -327,7 +329,7 @@ const ResultDisplay: React.FC<ResultDisplayProps> = ({
                   <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  다운로드
+                  {t('result.download', '다운로드')}
                 </button>
 
                 {/* Share */}
@@ -338,7 +340,7 @@ const ResultDisplay: React.FC<ResultDisplayProps> = ({
                   <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
                   </svg>
-                  공유
+                  {t('result.share', '공유')}
                 </button>
 
                 {/* Try Another */}
@@ -349,17 +351,17 @@ const ResultDisplay: React.FC<ResultDisplayProps> = ({
                   <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  다른 스타일
+                  {t('result.tryAnother', '다른 스타일')}
                 </button>
               </div>
 
               {/* Tips */}
               <div className="bg-indigo-50 rounded-lg p-4">
-                <h4 className="font-semibold text-indigo-800 mb-2">💡 결과가 마음에 드시나요?</h4>
+                <h4 className="font-semibold text-indigo-800 mb-2">{t('result.tipsTitle', '💡 결과가 마음에 드시나요?')}</h4>
                 <ul className="text-sm text-indigo-700 space-y-1">
-                  <li>• 이 스타일이 마음에 드시면 예약 버튼을 눌러보세요</li>
-                  <li>• 결과 이미지를 저장하여 미용실에서 보여주세요</li>
-                  <li>• 다른 스타일도 체험해보고 비교해보세요</li>
+                  <li>{t('result.tipsItem1', '• 이 스타일이 마음에 드시면 예약 버튼을 눌러보세요')}</li>
+                  <li>{t('result.tipsItem2', '• 결과 이미지를 저장하여 미용실에서 보여주세요')}</li>
+                  <li>{t('result.tipsItem3', '• 다른 스타일도 체험해보고 비교해보세요')}</li>
                 </ul>
               </div>
             </div>
@@ -367,7 +369,7 @@ const ResultDisplay: React.FC<ResultDisplayProps> = ({
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default ResultDisplay
+export default ResultDisplay;
