@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Gender, FemaleMajorCategory, MaleMajorCategory, MinorCategory, UploadStyleFormData } from '../types';
 import { uploadWithProgress, isValidImageFile, isValidFileSize } from '../services/cloudinaryService';
 import UploadIcon from './icons/UploadIcon';
@@ -23,6 +24,7 @@ const MINOR_CATEGORIES: MinorCategory[] = [
 ];
 
 const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }) => {
+  const { t } = useTranslation();
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [styleName, setStyleName] = useState('');
@@ -50,11 +52,11 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
   // Handle file validation
   const validateFile = (selectedFile: File): string | null => {
     if (!isValidImageFile(selectedFile)) {
-      return '지원되지 않는 파일 형식입니다. JPEG, PNG, WebP 파일만 업로드 가능합니다.';
+      return t('upload.invalidFileFormat');
     }
 
     if (!isValidFileSize(selectedFile, 10)) {
-      return '파일 크기가 너무 큽니다. 10MB 이하의 파일만 업로드 가능합니다.';
+      return t('upload.fileTooLarge');
     }
 
     return null;
@@ -86,28 +88,28 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
   // 성별과 카테고리에 따른 추천 스타일명 생성
   const getSuggestedStyleName = (gender: Gender, majorCategory: string): string => {
     const femaleSuggestions: { [key: string]: string[] } = {
-      'A length': ['픽시 컷', '짧은 단발', '보이시 컷', '크롭 헤어'],
-      'B length': ['보브 컷', '턱선 보브', '웨이브 보브', '일자 보브'],
-      'C length': ['어깨 레이어드', '미디엄 컷', '쇄골 컷', 'C컬 스타일'],
-      'D length': ['가슴라인 컷', '롱 레이어드', '미디엄 롱', '자연 웨이브'],
-      'E length': ['롱 스트레이트', '긴 웨이브', '롱 레이어', '가슴 아래 컷'],
-      'F length': ['허리 길이 컷', '수퍼 롱', '긴 생머리', '롱 웨이브'],
-      'G length': ['힙 라인 컷', '익스트라 롱', '극장발', '초장발'],
-      'H length': ['엉덩이 아래 컷', '울트라 롱', '라푼젤 헤어', '최장발'],
+      'A length': [t('styles.suggestions.female.aLength.1'), t('styles.suggestions.female.aLength.2'), t('styles.suggestions.female.aLength.3'), t('styles.suggestions.female.aLength.4')],
+      'B length': [t('styles.suggestions.female.bLength.1'), t('styles.suggestions.female.bLength.2'), t('styles.suggestions.female.bLength.3'), t('styles.suggestions.female.bLength.4')],
+      'C length': [t('styles.suggestions.female.cLength.1'), t('styles.suggestions.female.cLength.2'), t('styles.suggestions.female.cLength.3'), t('styles.suggestions.female.cLength.4')],
+      'D length': [t('styles.suggestions.female.dLength.1'), t('styles.suggestions.female.dLength.2'), t('styles.suggestions.female.dLength.3'), t('styles.suggestions.female.dLength.4')],
+      'E length': [t('styles.suggestions.female.eLength.1'), t('styles.suggestions.female.eLength.2'), t('styles.suggestions.female.eLength.3'), t('styles.suggestions.female.eLength.4')],
+      'F length': [t('styles.suggestions.female.fLength.1'), t('styles.suggestions.female.fLength.2'), t('styles.suggestions.female.fLength.3'), t('styles.suggestions.female.fLength.4')],
+      'G length': [t('styles.suggestions.female.gLength.1'), t('styles.suggestions.female.gLength.2'), t('styles.suggestions.female.gLength.3'), t('styles.suggestions.female.gLength.4')],
+      'H length': [t('styles.suggestions.female.hLength.1'), t('styles.suggestions.female.hLength.2'), t('styles.suggestions.female.hLength.3'), t('styles.suggestions.female.hLength.4')],
     };
 
     const maleSuggestions: { [key: string]: string[] } = {
-      'SIDE FRINGE': ['사이드 뱅', '옆머리 스타일', '사이드 프린지', '비대칭 뱅'],
-      'SIDE PART': ['사이드 파트', '클래식 파트', '신사 스타일', '정통 파트'],
-      'FRINGE UP': ['업뱅 스타일', '올린 앞머리', '리프트 뱅', '볼륨 업'],
-      'PUSHED BACK': ['올백 스타일', '뒤로 넘긴 머리', '슬릭백', '젤 백'],
-      'BUZZ': ['버즈 컷', '삭발', '군인 컷', '스포츠 컷'],
-      'CROP': ['크롭 컷', '텍스처 크롭', '모던 크롭', '페이드 크롭'],
-      'MOHICAN': ['모히칸', '펑크 스타일', '리젠트 컷', '언더 컷'],
+      'SIDE FRINGE': [t('styles.suggestions.male.sideFringe.1'), t('styles.suggestions.male.sideFringe.2'), t('styles.suggestions.male.sideFringe.3'), t('styles.suggestions.male.sideFringe.4')],
+      'SIDE PART': [t('styles.suggestions.male.sidePart.1'), t('styles.suggestions.male.sidePart.2'), t('styles.suggestions.male.sidePart.3'), t('styles.suggestions.male.sidePart.4')],
+      'FRINGE UP': [t('styles.suggestions.male.fringeUp.1'), t('styles.suggestions.male.fringeUp.2'), t('styles.suggestions.male.fringeUp.3'), t('styles.suggestions.male.fringeUp.4')],
+      'PUSHED BACK': [t('styles.suggestions.male.pushedBack.1'), t('styles.suggestions.male.pushedBack.2'), t('styles.suggestions.male.pushedBack.3'), t('styles.suggestions.male.pushedBack.4')],
+      'BUZZ': [t('styles.suggestions.male.buzz.1'), t('styles.suggestions.male.buzz.2'), t('styles.suggestions.male.buzz.3'), t('styles.suggestions.male.buzz.4')],
+      'CROP': [t('styles.suggestions.male.crop.1'), t('styles.suggestions.male.crop.2'), t('styles.suggestions.male.crop.3'), t('styles.suggestions.male.crop.4')],
+      'MOHICAN': [t('styles.suggestions.male.mohican.1'), t('styles.suggestions.male.mohican.2'), t('styles.suggestions.male.mohican.3'), t('styles.suggestions.male.mohican.4')],
     };
 
     const suggestions = gender === 'Female' ? femaleSuggestions : maleSuggestions;
-    const categoryOptions = suggestions[majorCategory] || ['새로운 스타일'];
+    const categoryOptions = suggestions[majorCategory] || [t('upload.newStyle')];
     
     return categoryOptions[Math.floor(Math.random() * categoryOptions.length)];
   };
@@ -139,7 +141,7 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
           const inputElement = document.getElementById('style-name') as HTMLInputElement;
           if (inputElement) {
             const suggestion = getSuggestedStyleName(gender, majorCategory);
-            inputElement.placeholder = `예: ${suggestion}`;
+            inputElement.placeholder = `${t('upload.example')}: ${suggestion}`;
           }
         }, 100);
       } else {
@@ -196,7 +198,7 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
       onUpload(uploadData);
     } catch (err) {
       console.error('Upload error:', err);
-      setError(err instanceof Error ? err.message : '업로드 중 오류가 발생했습니다.');
+      setError(err instanceof Error ? err.message : t('upload.uploadError'));
       setUploadProgress(0);
     } finally {
       setIsUploading(false);
@@ -223,7 +225,7 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
       >
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-800">새 스타일 추가</h2>
+          <h2 className="text-2xl font-bold text-gray-800">{t('upload.addNewStyle')}</h2>
           <button
             onClick={onClose}
             className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
@@ -241,7 +243,7 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
             
             {/* File Upload */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">스타일 이미지 *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('upload.styleImage')} *</label>
               <div
                 onClick={() => !isUploading && inputRef.current?.click()}
                 className={`relative w-full aspect-video bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden transition-all duration-200 ${
@@ -257,14 +259,14 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
                   disabled={isUploading}
                 />
                 {previewUrl ? (
-                  <img src={previewUrl} alt="미리보기" className="w-full h-full object-cover" />
+                  <img src={previewUrl} alt={t('upload.preview')} className="w-full h-full object-cover" />
                 ) : (
                   <div className="text-center text-gray-500 p-4">
                     <div className="w-12 h-12 mx-auto mb-2 text-gray-400">
                       <UploadIcon />
                     </div>
-                    <p className="font-medium">이미지 업로드</p>
-                    <p className="text-xs mt-1">JPEG, PNG, WebP (최대 10MB)</p>
+                    <p className="font-medium">{t('upload.uploadImage')}</p>
+                    <p className="text-xs mt-1">{t('upload.supportedFormatsShort')}</p>
                   </div>
                 )}
                 
@@ -273,7 +275,7 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
                   <div className="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center">
                     <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mb-4"></div>
                     <div className="text-white text-center">
-                      <p className="text-sm mb-2">Cloudinary에 업로드 중...</p>
+                      <p className="text-sm mb-2">{t('upload.uploadingToCloudinary')}</p>
                       <div className="w-48 bg-gray-300 rounded-full h-2">
                         <div 
                           className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
@@ -290,9 +292,9 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
             {/* Style Name */}
             <div>
               <label htmlFor="style-name" className="block text-sm font-medium text-gray-700 mb-1">
-                스타일 이름 * 
+                {t('upload.styleName')} * 
                 <span className="text-xs text-gray-500 font-normal ml-1">
-                  (고객에게 표시될 이름)
+                  ({t('upload.nameDisplayedToClients')})
                 </span>
               </label>
               <input
@@ -300,7 +302,7 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
                 type="text"
                 value={styleName}
                 onChange={(e) => setStyleName(e.target.value)}
-                placeholder="예: 소프트 레이어드 컷"
+                placeholder={t('upload.styleNamePlaceholder')}
                 className="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 disabled={isUploading}
                 maxLength={50}
@@ -310,14 +312,14 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
                   <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
                   </svg>
-                  의미있는 스타일 이름을 입력해주세요
+                  {t('upload.enterMeaningfulName')}
                 </p>
               )}
             </div>
 
             {/* Gender Selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">성별 *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('upload.gender')} *</label>
               <div className="flex gap-2 rounded-lg bg-gray-100 p-1">
                 <button 
                   type="button"
@@ -329,7 +331,7 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
                       : 'text-gray-600 hover:text-gray-800'
                   }`}
                 >
-                  여성
+                  {t('upload.female')}
                 </button>
                 <button 
                   type="button"
@@ -341,7 +343,7 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
                       : 'text-gray-600 hover:text-gray-800'
                   }`}
                 >
-                  남성
+                  {t('upload.male')}
                 </button>
               </div>
             </div>
@@ -350,7 +352,7 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label htmlFor="major-category" className="block text-sm font-medium text-gray-700 mb-1">
-                  주요 카테고리 *
+                  {t('upload.majorCategory')} *
                 </label>
                 <select 
                   id="major-category" 
@@ -366,7 +368,7 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
               </div>
               <div>
                 <label htmlFor="minor-category" className="block text-sm font-medium text-gray-700 mb-1">
-                  부가 카테고리
+                  {t('upload.minorCategory')}
                 </label>
                 <select 
                   id="minor-category" 
@@ -376,7 +378,7 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
                   disabled={isUploading}
                 >
                   {MINOR_CATEGORIES.map(cat => (
-                    <option key={cat} value={cat}>{cat === 'None' ? '없음' : cat}</option>
+                    <option key={cat} value={cat}>{cat === 'None' ? t('upload.none') : cat}</option>
                   ))}
                 </select>
               </div>
@@ -385,13 +387,13 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
             {/* Description */}
             <div>
               <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                스타일 설명
+                {t('upload.styleDescription')}
               </label>
               <textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="스타일에 대한 간단한 설명을 입력해주세요..."
+                placeholder={t('upload.descriptionPlaceholder')}
                 rows={3}
                 className="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
                 disabled={isUploading}
@@ -405,19 +407,19 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
             {/* Tags */}
             <div>
               <label htmlFor="tags" className="block text-sm font-medium text-gray-700 mb-1">
-                태그 (쉼표로 구분)
+                {t('upload.tags')} ({t('upload.commaSeparated')})
               </label>
               <input
                 id="tags"
                 type="text"
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
-                placeholder="웨이브, 자연스러운, 세련된"
+                placeholder={t('upload.tagsPlaceholder')}
                 className="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 disabled={isUploading}
               />
               <p className="text-xs text-gray-500 mt-1">
-                검색에 도움이 되는 키워드를 입력해주세요
+                {t('upload.tagsHelp')}
               </p>
             </div>
 
@@ -440,11 +442,11 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <div>
-                  <h4 className="font-medium text-green-800 text-sm">스타일명 작성 팁</h4>
+                  <h4 className="font-medium text-green-800 text-sm">{t('upload.namingTips')}</h4>
                   <ul className="text-green-700 text-xs mt-1 space-y-1">
-                    <li>• 고객이 이해하기 쉬운 이름을 사용하세요</li>
-                    <li>• 예: "웨이브 보브", "레이어드 컷", "픽시 컷"</li>
-                    <li>• 파일명(IMG_1234) 대신 스타일의 특징을 담아주세요</li>
+                    <li>• {t('upload.tip1')}</li>
+                    <li>• {t('upload.tip2')}</li>
+                    <li>• {t('upload.tip3')}</li>
                   </ul>
                 </div>
               </div>
@@ -457,9 +459,9 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <div>
-                  <h4 className="font-medium text-blue-800 text-sm">클라우드 저장</h4>
+                  <h4 className="font-medium text-blue-800 text-sm">{t('upload.cloudStorage')}</h4>
                   <p className="text-blue-700 text-xs mt-1">
-                    이미지는 Cloudinary 클라우드에 안전하게 저장되며, 모든 디바이스에서 접근 가능합니다.
+                    {t('upload.cloudStorageDesc')}
                   </p>
                 </div>
               </div>
@@ -477,14 +479,14 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
             {isUploading ? (
               <>
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                업로드 중... ({uploadProgress}%)
+                {t('upload.uploading')} ({uploadProgress}%)
               </>
             ) : (
               <>
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-                스타일 추가
+                {t('upload.addStyle')}
               </>
             )}
           </button>
@@ -493,7 +495,7 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
             disabled={isUploading}
             className="w-full sm:w-auto px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            취소
+            {t('common.cancel')}
           </button>
         </div>
       </div>
