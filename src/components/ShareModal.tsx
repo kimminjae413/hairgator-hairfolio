@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import CopyIcon from './icons/CopyIcon';
 
 interface ShareModalProps {
@@ -7,6 +8,7 @@ interface ShareModalProps {
 }
 
 const ShareModal: React.FC<ShareModalProps> = ({ designerName, onClose }) => {
+  const { t } = useTranslation();
   const [linkCopied, setLinkCopied] = useState(false);
   const [qrCopied, setQrCopied] = useState(false);
 
@@ -24,7 +26,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ designerName, onClose }) => {
     try {
       const response = await fetch(qrCodeUrl);
       if (!response.ok) {
-        throw new Error('QR code image could not be fetched.');
+        throw new Error(t('share.qrFetchError', 'QR code image could not be fetched.'));
       }
       const blob = await response.blob();
       await navigator.clipboard.write([
@@ -36,7 +38,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ designerName, onClose }) => {
       setTimeout(() => setQrCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy QR code image: ', err);
-      alert('Could not copy QR code. This feature may not be supported by your browser.');
+      alert(t('share.qrCopyError', 'Could not copy QR code. This feature may not be supported by your browser.'));
     }
   };
 
@@ -51,8 +53,12 @@ const ShareModal: React.FC<ShareModalProps> = ({ designerName, onClose }) => {
       >
         {/* Header */}
         <div className="px-6 pt-6 pb-4 text-center border-b border-gray-100">
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Share Your Portfolio</h2>
-          <p className="text-gray-600 text-sm">Clients can scan the QR code or use the link to try on your styles.</p>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">
+            {t('share.title', 'Share Your Portfolio')}
+          </h2>
+          <p className="text-gray-600 text-sm">
+            {t('share.subtitle', 'Clients can scan the QR code or use the link to try on your styles.')}
+          </p>
         </div>
 
         {/* Content */}
@@ -62,7 +68,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ designerName, onClose }) => {
             <div className="inline-block p-3 bg-white rounded-lg shadow-md border border-gray-200 mb-4">
               <img 
                 src={qrCodeUrl} 
-                alt="Portfolio QR Code" 
+                alt={t('share.qrCodeAlt', 'Portfolio QR Code')}
                 className="w-[180px] h-[180px]"
                 loading="lazy"
               />
@@ -74,17 +80,19 @@ const ShareModal: React.FC<ShareModalProps> = ({ designerName, onClose }) => {
               <div className="w-4 h-4 mr-2">
                 <CopyIcon />
               </div>
-              <span>Copy QR Code</span>
+              <span>{t('share.copyQR', 'Copy QR Code')}</span>
             </button>
             {qrCopied && (
-              <p className="text-green-600 text-sm mt-2 font-medium">QR Code copied!</p>
+              <p className="text-green-600 text-sm mt-2 font-medium">
+                {t('share.qrCopied', 'QR Code copied!')}
+              </p>
             )}
           </div>
 
           {/* URL Section */}
           <div>
             <label htmlFor="share-url" className="block text-sm font-medium text-gray-700 mb-2">
-              Shareable Link
+              {t('share.shareableLink', 'Shareable Link')}
             </label>
             <div className="relative">
               <input
@@ -97,7 +105,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ designerName, onClose }) => {
               <button
                 onClick={handleLinkCopy}
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-500 hover:text-indigo-600 transition-colors duration-200 hover:bg-gray-100 rounded-md"
-                aria-label="Copy link"
+                aria-label={t('share.copyLinkAria', 'Copy link')}
               >
                 <div className="w-4 h-4">
                   <CopyIcon />
@@ -105,7 +113,9 @@ const ShareModal: React.FC<ShareModalProps> = ({ designerName, onClose }) => {
               </button>
             </div>
             {linkCopied && (
-              <p className="text-green-600 text-sm mt-2 font-medium">Link copied to clipboard!</p>
+              <p className="text-green-600 text-sm mt-2 font-medium">
+                {t('share.linkCopied', 'Link copied to clipboard!')}
+              </p>
             )}
           </div>
         </div>
@@ -116,7 +126,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ designerName, onClose }) => {
             onClick={onClose}
             className="w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors duration-200 min-h-[48px]"
           >
-            Done
+            {t('share.done', 'Done')}
           </button>
         </div>
       </div>
