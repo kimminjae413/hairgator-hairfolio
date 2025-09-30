@@ -133,6 +133,19 @@
     "manageBookingLinks": "예약 링크 및 기본 설정을 관리하세요",
     "popularPlatforms": "인기 예약 플랫폼"
   },
+  "share": {
+    "title": "포트폴리오 공유",
+    "subtitle": "고객이 QR코드를 스캔하거나 링크를 사용하여 스타일을 체험할 수 있습니다.",
+    "qrCodeAlt": "포트폴리오 QR코드",
+    "copyQR": "QR코드 복사",
+    "qrCopied": "QR코드가 복사되었습니다!",
+    "shareableLink": "공유 링크",
+    "copyLinkAria": "링크 복사",
+    "linkCopied": "링크가 클립보드에 복사되었습니다!",
+    "done": "완료",
+    "qrFetchError": "QR코드 이미지를 가져올 수 없습니다.",
+    "qrCopyError": "QR코드를 복사할 수 없습니다. 브라우저에서 지원하지 않는 기능일 수 있습니다."
+  },
   "result": {
     "processing": "처리중...",
     "completed": "변환 완료!",
