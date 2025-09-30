@@ -1,8 +1,15 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-// 기존 파일의 더 완성된 버전을 사용하세요
-// 이 파일은 이미 프로젝트에 있는 고품질 LanguageSelector를 대체합니다
+// languages 배열 정의 추가
+const languages = [
+  { code: 'ko', name: '한국어', flag: '🇰🇷' },
+  { code: 'en', name: 'English', flag: '🇺🇸' },
+  { code: 'zh', name: '中文', flag: '🇨🇳' },
+  { code: 'ja', name: '日本語', flag: '🇯🇵' },
+  { code: 'vi', name: 'Tiếng Việt', flag: '🇻🇳' },
+  { code: 'id', name: 'Bahasa Indonesia', flag: '🇮🇩' }
+];
 
 const LanguageSelector: React.FC = () => {
   const { i18n } = useTranslation();
