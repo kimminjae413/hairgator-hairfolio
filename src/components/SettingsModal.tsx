@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 
 interface SettingsModalProps {
   currentUrl: string
@@ -7,6 +8,7 @@ interface SettingsModalProps {
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ currentUrl, onSave, onClose }) => {
+  const { t } = useTranslation()
   const [url, setUrl] = useState(currentUrl)
   const [isValidUrl, setIsValidUrl] = useState(true)
   const [showPreview, setShowPreview] = useState(false)
@@ -17,7 +19,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentUrl, onSave, onClo
     
     try {
       new URL(inputUrl)
-      return inputUrl.startsWith('http://') || inputUrl.startsWith('https://')
+      return inputUrl.startsWith('http://') || inputUrl.startsWith('https://') || inputUrl.startsWith('tel:')
     } catch {
       return false
     }
@@ -35,7 +37,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentUrl, onSave, onClo
     const trimmedUrl = url.trim()
     
     if (!validateUrl(trimmedUrl)) {
-      alert('올바른 URL 형식이 아닙니다. http:// 또는 https://로 시작하는 URL을 입력해주세요.')
+      alert(t('settings.invalidUrlFormat'))
       return
     }
     
@@ -45,28 +47,32 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentUrl, onSave, onClo
   // Handle test URL
   const handleTestUrl = () => {
     if (url && isValidUrl) {
-      window.open(url, '_blank', 'noopener,noreferrer')
+      if (url.startsWith('tel:')) {
+        window.location.href = url
+      } else {
+        window.open(url, '_blank', 'noopener,noreferrer')
+      }
     }
   }
 
-  // Popular booking platforms in Korea
+  // Popular booking platforms - can be localized
   const popularPlatforms = [
     {
-      name: '네이버 예약',
+      name: t('settings.platforms.naver'),
       baseUrl: 'https://booking.naver.com/',
-      description: '네이버 예약 시스템',
+      description: t('settings.platforms.naverDesc'),
       color: 'bg-green-500'
     },
     {
-      name: '카카오 헤어샵',
+      name: t('settings.platforms.kakao'),
       baseUrl: 'https://hairshop.kakao.com/',
-      description: '카카오 헤어샵 예약',
+      description: t('settings.platforms.kakaoDesc'),
       color: 'bg-yellow-500'
     },
     {
-      name: '직접 입력',
+      name: t('settings.platforms.custom'),
       baseUrl: '',
-      description: '다른 예약 시스템 또는 연락처',
+      description: t('settings.platforms.customDesc'),
       color: 'bg-blue-500'
     }
   ]
@@ -95,12 +101,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentUrl, onSave, onClo
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
           <div>
-            <h2 className="text-2xl font-bold">포트폴리오 설정</h2>
-            <p className="text-indigo-100 text-sm">예약 링크 및 기본 설정을 관리하세요</p>
+            <h2 className="text-2xl font-bold">{t('settings.portfolioSettings')}</h2>
+            <p className="text-indigo-100 text-sm">{t('settings.manageBookingLinks')}</p>
           </div>
           <button
             onClick={onClose}
             className="p-2 text-indigo-100 hover:text-white hover:bg-white/20 rounded-full transition-colors"
+            aria-label={t('common.close')}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -111,7 +118,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentUrl, onSave, onClo
         <div className="p-6 max-h-[70vh] overflow-y-auto space-y-6">
           {/* Popular Platforms */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">인기 예약 플랫폼</h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-3">{t('settings.popularPlatforms')}</h3>
             <div className="grid grid-cols-1 gap-2">
               {popularPlatforms.map((platform, index) => (
                 <button
@@ -140,7 +147,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentUrl, onSave, onClo
           {/* URL Input */}
           <div>
             <label htmlFor="reservation-url" className="block text-sm font-medium text-gray-700 mb-2">
-              예약 링크 URL
+              {t('settings.reservationUrl')}
             </label>
             <div className="space-y-2">
               <input
@@ -148,7 +155,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentUrl, onSave, onClo
                 type="url"
                 value={url}
                 onChange={handleUrlChange}
-                placeholder="https://booking.naver.com/your-salon-id"
+                placeholder={t('settings.urlPlaceholder')}
                 className={`w-full px-4 py-3 border rounded-lg text-gray-700 focus:outline-none focus:ring-2 transition-colors ${
                   isValidUrl 
                     ? 'border-gray-300 focus:ring-indigo-500 focus:border-transparent' 
@@ -161,7 +168,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentUrl, onSave, onClo
                   <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  올바른 URL 형식이 아닙니다 (http:// 또는 https://로 시작해야 함)
+                  {t('settings.invalidUrlMessage')}
                 </p>
               )}
 
@@ -174,7 +181,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentUrl, onSave, onClo
                   <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                   </svg>
-                  링크 테스트
+                  {t('settings.testLink')}
                 </button>
               )}
             </div>
@@ -182,26 +189,26 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentUrl, onSave, onClo
 
           {/* URL Examples */}
           <div className="bg-gray-50 rounded-lg p-4">
-            <h4 className="font-medium text-gray-800 mb-2">URL 예시:</h4>
+            <h4 className="font-medium text-gray-800 mb-2">{t('settings.urlExamples')}:</h4>
             <div className="space-y-1 text-sm text-gray-600">
-              <p>• 네이버 예약: https://booking.naver.com/booking/12/bizes/123456</p>
-              <p>• 카카오 헤어샵: https://hairshop.kakao.com/salon/12345</p>
-              <p>• 자체 웹사이트: https://mysalon.com/booking</p>
-              <p>• 전화번호: tel:010-1234-5678</p>
+              <p>• {t('settings.examples.naver')}</p>
+              <p>• {t('settings.examples.kakao')}</p>
+              <p>• {t('settings.examples.website')}</p>
+              <p>• {t('settings.examples.phone')}</p>
             </div>
           </div>
 
           {/* Settings Preview */}
           {url && isValidUrl && (
             <div className="bg-indigo-50 rounded-lg p-4">
-              <h4 className="font-medium text-indigo-800 mb-2">설정 미리보기</h4>
+              <h4 className="font-medium text-indigo-800 mb-2">{t('settings.settingsPreview')}</h4>
               <div className="bg-white rounded-lg p-3 border border-indigo-200">
-                <p className="text-sm text-gray-600 mb-2">고객이 헤어스타일을 체험한 후 보게 될 예약 버튼:</p>
+                <p className="text-sm text-gray-600 mb-2">{t('settings.previewDesc')}:</p>
                 <button className="w-full flex items-center justify-center px-4 py-2 bg-green-600 text-white font-semibold rounded-lg">
                   <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 0V6a2 2 0 012-2h4a2 2 0 012 2v1m-6 0h6m-6 0a2 2 0 00-2 2v3a2 2 0 002 2h6a2 2 0 002-2V9a2 2 0 00-2-2m-6 0V7" />
                   </svg>
-                  예약하기
+                  {t('settings.bookNow')}
                 </button>
               </div>
             </div>
@@ -214,11 +221,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentUrl, onSave, onClo
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.95-.833-2.72 0L4.096 15.5C3.326 16.333 4.286 18 5.826 18z" />
               </svg>
               <div>
-                <h4 className="font-medium text-yellow-800 mb-1">참고사항</h4>
+                <h4 className="font-medium text-yellow-800 mb-1">{t('settings.importantNotes')}</h4>
                 <ul className="text-sm text-yellow-700 space-y-1">
-                  <li>• 예약 링크를 설정하지 않으면 예약 버튼이 표시되지 않습니다</li>
-                  <li>• 설정한 링크는 새 탭에서 열립니다</li>
-                  <li>• 전화번호를 입력하면 모바일에서 바로 전화를 걸 수 있습니다</li>
+                  <li>• {t('settings.notes.noLink')}</li>
+                  <li>• {t('settings.notes.newTab')}</li>
+                  <li>• {t('settings.notes.phoneNumber')}</li>
                 </ul>
               </div>
             </div>
@@ -232,13 +239,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentUrl, onSave, onClo
             disabled={url && !isValidUrl}
             className="w-full sm:w-auto px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            저장하기
+            {t('common.save')}
           </button>
           <button
             onClick={onClose}
             className="w-full sm:w-auto px-6 py-3 bg-white text-gray-700 font-semibold border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-colors"
           >
-            취소
+            {t('common.cancel')}
           </button>
         </div>
       </div>
