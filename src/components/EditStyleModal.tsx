@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Gender, FemaleMajorCategory, MaleMajorCategory, MinorCategory, Hairstyle } from '../types';
 
 interface EditStyleModalProps {
@@ -22,6 +23,7 @@ const MINOR_CATEGORIES: MinorCategory[] = [
 ];
 
 const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose }) => {
+  const { t } = useTranslation();
   const [styleName, setStyleName] = useState(style.name);
   const [gender, setGender] = useState<Gender>(style.gender || 'Female');
   const [majorCategory, setMajorCategory] = useState<FemaleMajorCategory | MaleMajorCategory>(
@@ -46,7 +48,7 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
 
   const handleSave = async () => {
     if (!styleName.trim()) {
-      setError('스타일 이름을 입력해주세요.');
+      setError(t('edit.styleNameRequired'));
       return;
     }
 
@@ -72,7 +74,7 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
       onSave(style.id || style.url, updates);
     } catch (err) {
       console.error('Edit error:', err);
-      setError(err instanceof Error ? err.message : '수정 중 오류가 발생했습니다.');
+      setError(err instanceof Error ? err.message : t('edit.editError'));
     } finally {
       setIsSaving(false);
     }
@@ -98,11 +100,12 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
       >
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-800">스타일 편집</h2>
+          <h2 className="text-2xl font-bold text-gray-800">{t('edit.editStyle')}</h2>
           <button
             onClick={onClose}
             className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             disabled={isSaving}
+            aria-label={t('common.close')}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -127,15 +130,15 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
                   }}
                 />
               </div>
-              <p className="text-sm text-gray-500 mt-2">현재 스타일 이미지</p>
+              <p className="text-sm text-gray-500 mt-2">{t('edit.currentStyleImage')}</p>
             </div>
 
             {/* Style Name */}
             <div>
               <label htmlFor="style-name" className="block text-sm font-medium text-gray-700 mb-1">
-                스타일 이름 * 
+                {t('edit.styleName')} * 
                 <span className="text-xs text-gray-500 font-normal ml-1">
-                  (고객에게 표시될 이름)
+                  ({t('edit.nameDisplayedToClients')})
                 </span>
               </label>
               <input
@@ -143,7 +146,7 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
                 type="text"
                 value={styleName}
                 onChange={(e) => setStyleName(e.target.value)}
-                placeholder="예: 소프트 레이어드 컷"
+                placeholder={t('edit.styleNamePlaceholder')}
                 className="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 disabled={isSaving}
                 maxLength={50}
@@ -152,7 +155,7 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
 
             {/* Gender Selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">성별 *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('edit.gender')} *</label>
               <div className="flex gap-2 rounded-lg bg-gray-100 p-1">
                 <button 
                   type="button"
@@ -164,7 +167,7 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
                       : 'text-gray-600 hover:text-gray-800'
                   }`}
                 >
-                  여성
+                  {t('edit.female')}
                 </button>
                 <button 
                   type="button"
@@ -176,7 +179,7 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
                       : 'text-gray-600 hover:text-gray-800'
                   }`}
                 >
-                  남성
+                  {t('edit.male')}
                 </button>
               </div>
             </div>
@@ -185,7 +188,7 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label htmlFor="major-category" className="block text-sm font-medium text-gray-700 mb-1">
-                  주요 카테고리 *
+                  {t('edit.majorCategory')} *
                 </label>
                 <select 
                   id="major-category" 
@@ -201,7 +204,7 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
               </div>
               <div>
                 <label htmlFor="minor-category" className="block text-sm font-medium text-gray-700 mb-1">
-                  부가 카테고리
+                  {t('edit.minorCategory')}
                 </label>
                 <select 
                   id="minor-category" 
@@ -211,7 +214,7 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
                   disabled={isSaving}
                 >
                   {MINOR_CATEGORIES.map(cat => (
-                    <option key={cat} value={cat}>{cat === 'None' ? '없음' : cat}</option>
+                    <option key={cat} value={cat}>{cat === 'None' ? t('edit.none') : cat}</option>
                   ))}
                 </select>
               </div>
@@ -220,13 +223,13 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
             {/* Description */}
             <div>
               <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                스타일 설명
+                {t('edit.styleDescription')}
               </label>
               <textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="스타일에 대한 간단한 설명을 입력해주세요..."
+                placeholder={t('edit.descriptionPlaceholder')}
                 rows={3}
                 className="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
                 disabled={isSaving}
@@ -240,19 +243,19 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
             {/* Tags */}
             <div>
               <label htmlFor="tags" className="block text-sm font-medium text-gray-700 mb-1">
-                태그 (쉼표로 구분)
+                {t('edit.tags')} ({t('edit.commaSeparated')})
               </label>
               <input
                 id="tags"
                 type="text"
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
-                placeholder="웨이브, 자연스러운, 세련된"
+                placeholder={t('edit.tagsPlaceholder')}
                 className="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 disabled={isSaving}
               />
               <p className="text-xs text-gray-500 mt-1">
-                검색에 도움이 되는 키워드를 입력해주세요
+                {t('edit.tagsHelp')}
               </p>
             </div>
 
@@ -275,11 +278,11 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <div>
-                  <h4 className="font-medium text-blue-800 text-sm">스타일 편집</h4>
+                  <h4 className="font-medium text-blue-800 text-sm">{t('edit.editInfo')}</h4>
                   <ul className="text-blue-700 text-xs mt-1 space-y-1">
-                    <li>• 이미지는 변경할 수 없습니다</li>
-                    <li>• 이름, 카테고리, 설명, 태그만 수정 가능합니다</li>
-                    <li>• 변경사항은 즉시 고객에게 반영됩니다</li>
+                    <li>• {t('edit.imageCannotChange')}</li>
+                    <li>• {t('edit.canEditNameCategoryDesc')}</li>
+                    <li>• {t('edit.changesReflectedImmediately')}</li>
                   </ul>
                 </div>
               </div>
@@ -297,14 +300,14 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
             {isSaving ? (
               <>
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                저장 중...
+                {t('edit.saving')}
               </>
             ) : (
               <>
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
-                변경사항 저장
+                {t('edit.saveChanges')}
               </>
             )}
           </button>
@@ -313,7 +316,7 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
             disabled={isSaving}
             className="w-full sm:w-auto px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            취소
+            {t('common.cancel')}
           </button>
         </div>
       </div>
