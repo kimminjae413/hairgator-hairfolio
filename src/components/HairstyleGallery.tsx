@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 // 타입 정의
 interface Hairstyle {
@@ -34,18 +35,19 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
   onEditImage,
   isDesignerView = false
 }) => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'Female' | 'Male'>('Female');
   const [searchTerm, setSearchTerm] = useState('');
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 
-  // Fallback image
+  // Fallback image with translation
   const fallbackImageSvg = `data:image/svg+xml,${encodeURIComponent(`
     <svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
       <rect width="400" height="400" fill="#e5e7eb"/>
       <text x="200" y="200" text-anchor="middle" dominant-baseline="middle" 
             font-family="Arial, sans-serif" font-size="24" fill="#9ca3af" font-weight="bold">
-        이미지 없음
+        ${t('gallery.noImage', '이미지 없음')}
       </text>
     </svg>
   `)}`;
@@ -82,21 +84,22 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
 
   // Group by category
   const groupedImages = useMemo(() => {
-    if (!showCategories) return { 'All Styles': filteredImages };
+    if (!showCategories) return { [t('gallery.allStyles', 'All Styles')]: filteredImages };
     
     return filteredImages.reduce((acc, image) => {
-      const category = image.majorCategory || 'Uncategorized';
+      const category = image.majorCategory || t('gallery.uncategorized', 'Uncategorized');
       if (!acc[category]) {
         acc[category] = [];
       }
       acc[category].push(image);
       return acc;
     }, {} as Record<string, Hairstyle[]>);
-  }, [filteredImages, showCategories]);
+  }, [filteredImages, showCategories, t]);
 
   const sortedCategories = Object.entries(groupedImages).sort(([a], [b]) => {
-    if (a === 'Uncategorized') return 1;
-    if (b === 'Uncategorized') return -1;
+    const uncategorized = t('gallery.uncategorized', 'Uncategorized');
+    if (a === uncategorized) return 1;
+    if (b === uncategorized) return -1;
     return a.localeCompare(b);
   });
 
@@ -111,7 +114,7 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
         <div className="relative">
           <input
             type="text"
-            placeholder="스타일 검색..."
+            placeholder={t('gallery.searchPlaceholder', '스타일 검색...')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -130,21 +133,21 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
           className={`${tabStyle} ${activeTab === 'Female' ? activeTabStyle : inactiveTabStyle}`}
           disabled={disabled}
         >
-          여성 스타일
+          {t('gallery.femaleStyles', '여성 스타일')}
         </button>
         <button
           onClick={() => setActiveTab('Male')}
           className={`${tabStyle} ${activeTab === 'Male' ? activeTabStyle : inactiveTabStyle}`}
           disabled={disabled}
         >
-          남성 스타일
+          {t('gallery.maleStyles', '남성 스타일')}
         </button>
       </div>
 
       {/* Results Count */}
       {searchTerm && (
         <div className="text-sm text-gray-600">
-          검색 결과: {filteredImages.length}개
+          {t('gallery.searchResults', '검색 결과: {{count}}개', { count: filteredImages.length })}
         </div>
       )}
 
@@ -178,7 +181,7 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                     <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
-                    <p className="text-xs font-bold">스타일 추가</p>
+                    <p className="text-xs font-bold">{t('gallery.addStyle', '스타일 추가')}</p>
                   </button>
                 )}
                 
@@ -262,7 +265,7 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                               onEditImage(image);
                             }}
                             className="w-7 h-7 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg transition-all duration-200 flex items-center justify-center"
-                            title="편집"
+                            title={t('gallery.edit', '편집')}
                           >
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -273,12 +276,12 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (window.confirm('이 스타일을 삭제하시겠습니까?')) {
+                              if (window.confirm(t('gallery.deleteConfirm', '이 스타일을 삭제하시겠습니까?'))) {
                                 onDeleteImage(image);
                               }
                             }}
                             className="w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-all duration-200 flex items-center justify-center"
-                            title="삭제"
+                            title={t('gallery.delete', '삭제')}
                           >
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -299,15 +302,18 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
             {searchTerm ? (
               <div>
                 <div className="text-4xl mb-4">🔍</div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">검색 결과가 없습니다</h3>
+                <h3 className="text-lg font-semibold text-gray-700 mb-2">{t('gallery.noSearchResults', '검색 결과가 없습니다')}</h3>
                 <p className="text-gray-500 mb-4">
-                  "{searchTerm}"에 대한 '{activeTab}' 스타일을 찾을 수 없습니다.
+                  {t('gallery.noSearchResultsDesc', '{{searchTerm}}에 대한 {{activeTab}} 스타일을 찾을 수 없습니다.', { 
+                    searchTerm, 
+                    activeTab: activeTab === 'Female' ? t('gallery.female', '여성') : t('gallery.male', '남성')
+                  })}
                 </p>
                 <button
                   onClick={() => setSearchTerm('')}
                   className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
                 >
-                  전체 보기
+                  {t('gallery.showAll', '전체 보기')}
                 </button>
               </div>
             ) : (
@@ -315,8 +321,12 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                 {onAddImage ? (
                   <div className="space-y-4">
                     <div className="text-4xl">💇‍♀️</div>
-                    <h3 className="text-lg font-semibold text-gray-700">아직 등록된 스타일이 없습니다</h3>
-                    <p className="text-gray-500 mb-6">첫 번째 '{activeTab}' 스타일을 추가해보세요!</p>
+                    <h3 className="text-lg font-semibold text-gray-700">{t('gallery.noStylesYet', '아직 등록된 스타일이 없습니다')}</h3>
+                    <p className="text-gray-500 mb-6">
+                      {t('gallery.addFirstStyle', '첫 번째 {{activeTab}} 스타일을 추가해보세요!', { 
+                        activeTab: activeTab === 'Female' ? t('gallery.female', '여성') : t('gallery.male', '남성')
+                      })}
+                    </p>
                     <div className="flex justify-center">
                       <button
                         onClick={onAddImage}
@@ -330,14 +340,18 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                         <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
-                        <p className="text-xs font-bold">스타일 추가</p>
+                        <p className="text-xs font-bold">{t('gallery.addStyle', '스타일 추가')}</p>
                       </button>
                     </div>
                   </div>
                 ) : (
                   <div>
                     <div className="text-4xl mb-4">😊</div>
-                    <p className="text-gray-500">'{activeTab}' 카테고리에 스타일이 없습니다.</p>
+                    <p className="text-gray-500">
+                      {t('gallery.noCategoryStyles', '{{activeTab}} 카테고리에 스타일이 없습니다.', { 
+                        activeTab: activeTab === 'Female' ? t('gallery.female', '여성') : t('gallery.male', '남성')
+                      })}
+                    </p>
                   </div>
                 )}
               </div>
@@ -351,56 +365,57 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
 
 // Demo with sample data
 const MasonryDemo = () => {
+  const { t } = useTranslation();
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
   
   const sampleImages: Hairstyle[] = [
     {
-      name: '웨이브 보브',
+      name: t('gallery.demo.waveBoB', '웨이브 보브'),
       url: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=400&h=600&fit=crop',
       gender: 'Female',
       majorCategory: 'B length',
-      description: '자연스러운 웨이브',
-      tags: ['웨이브', '보브']
+      description: t('gallery.demo.naturalWave', '자연스러운 웨이브'),
+      tags: [t('gallery.demo.wave', '웨이브'), t('gallery.demo.bob', '보브')]
     },
     {
-      name: '롱 스트레이트',
+      name: t('gallery.demo.longStraight', '롱 스트레이트'),
       url: 'https://images.unsplash.com/photo-1594736797933-d0501ba2fe65?w=400&h=500&fit=crop',
       gender: 'Female',
       majorCategory: 'G length',
-      description: '긴 생머리',
-      tags: ['롱헤어', '스트레이트']
+      description: t('gallery.demo.longHair', '긴 생머리'),
+      tags: [t('gallery.demo.longHairTag', '롱헤어'), t('gallery.demo.straight', '스트레이트')]
     },
     {
-      name: '픽시 컷',
+      name: t('gallery.demo.pixieCut', '픽시 컷'),
       url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=550&fit=crop',
       gender: 'Female',
       majorCategory: 'A length',
-      description: '짧은 픽시',
-      tags: ['픽시', '짧은머리']
+      description: t('gallery.demo.shortPixie', '짧은 픽시'),
+      tags: [t('gallery.demo.pixie', '픽시'), t('gallery.demo.shortHair', '짧은머리')]
     },
     {
-      name: '컬리 미디움',
+      name: t('gallery.demo.curlyMedium', '컬리 미디움'),
       url: 'https://images.unsplash.com/photo-1487412912498-0447578fcca8?w=400&h=650&fit=crop',
       gender: 'Female',
       majorCategory: 'D length',
-      description: '자연스러운 컬',
-      tags: ['컬', '미디움']
+      description: t('gallery.demo.naturalCurl', '자연스러운 컬'),
+      tags: [t('gallery.demo.curl', '컬'), t('gallery.demo.medium', '미디움')]
     },
     {
-      name: '레이어드 컷',
+      name: t('gallery.demo.layeredCut', '레이어드 컷'),
       url: 'https://images.unsplash.com/photo-1524502397800-2eeaad7c3fe5?w=400&h=500&fit=crop',
       gender: 'Female',
       majorCategory: 'C length',
-      description: '층진 레이어',
-      tags: ['레이어', '볼륨']
+      description: t('gallery.demo.layered', '층진 레이어'),
+      tags: [t('gallery.demo.layer', '레이어'), t('gallery.demo.volume', '볼륨')]
     },
     {
-      name: '앞머리 보브',
+      name: t('gallery.demo.bangsBob', '앞머리 보브'),
       url: 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=400&h=600&fit=crop',
       gender: 'Female',
       majorCategory: 'B length',
-      description: '귀여운 앞머리',
-      tags: ['보브', '앞머리']
+      description: t('gallery.demo.cuteBangs', '귀여운 앞머리'),
+      tags: [t('gallery.demo.bob', '보브'), t('gallery.demo.bangs', '앞머리')]
     }
   ];
 
@@ -418,7 +433,7 @@ const MasonryDemo = () => {
         {selectedUrl && (
           <div className="mt-6 p-4 bg-white rounded-xl shadow-md text-center">
             <p className="text-gray-700 text-sm font-medium">
-              선택됨: {sampleImages.find(img => img.url === selectedUrl)?.name}
+              {t('gallery.demo.selected', '선택됨')}: {sampleImages.find(img => img.url === selectedUrl)?.name}
             </p>
           </div>
         )}
