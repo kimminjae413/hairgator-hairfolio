@@ -1,21 +1,27 @@
-// src/App.tsx - Firebase Authentication 적용
+// src/App.tsx - Firebase Authentication + i18n 적용
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import * as firebaseService from './services/firebaseService';
 import * as authService from './services/firebaseAuthService';
 import ClientView from './components/ClientView';
 import DesignerView from './components/DesignerView';
-import AuthLogin from './components/AuthLogin'; // 기존 Login 대신 AuthLogin 사용
+import AuthLogin from './components/AuthLogin';
 import ErrorBoundary from './components/ErrorBoundary';
+import './i18n'; // i18n 초기화
 
 const App: React.FC = () => {
+  const { t, ready } = useTranslation(); // i18n 준비 상태 확인
   const [loggedInDesigner, setLoggedInDesigner] = useState<string | null>(null);
-  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(null); // Firebase UID 추가
+  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(null);
   const [clientViewDesigner, setClientViewDesigner] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        // i18n이 준비될 때까지 대기
+        if (!ready) return;
+
         // Initialize Firebase Auth
         authService.initializeAuth();
         
@@ -45,7 +51,7 @@ const App: React.FC = () => {
               
               // Get designer data to get display name
               const designerData = await firebaseService.getDesignerData(user.uid);
-              const displayName = user.displayName || designerData.profile?.name || '디자이너';
+              const displayName = user.displayName || designerData.profile?.name || t('common.designer', '디자이너');
               
               setLoggedInDesigner(displayName);
               setLoggedInUserId(user.uid);
@@ -79,7 +85,7 @@ const App: React.FC = () => {
     };
 
     initializeApp();
-  }, []);
+  }, [ready, t]); // ready와 t 의존성 추가
 
   const handleLogin = (name: string, userId: string) => {
     if (name.trim() && userId) {
@@ -109,20 +115,23 @@ const App: React.FC = () => {
         console.log('✅ 로그아웃 완료');
       } else {
         console.error('❌ 로그아웃 실패:', result.error);
-        alert('로그아웃 중 오류가 발생했습니다.');
+        alert(t('messages.logoutError', '로그아웃 중 오류가 발생했습니다.'));
       }
     } catch (error) {
       console.error('❌ Logout error:', error);
-      alert('로그아웃 중 오류가 발생했습니다.');
+      alert(t('messages.logoutError', '로그아웃 중 오류가 발생했습니다.'));
     }
   };
 
-  if (isLoading) {
+  // i18n이 준비되지 않았으면 로딩 표시
+  if (!ready || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Firebase 초기화 중...</p>
+          <p className="text-gray-600">
+            {!ready ? t('common.initializingLanguage', '언어 설정 초기화 중...') : t('common.initializingFirebase', 'Firebase 초기화 중...')}
+          </p>
         </div>
       </div>
     );
