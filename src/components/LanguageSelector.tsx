@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 // languages 배열 정의 추가
@@ -14,18 +14,67 @@ const languages = [
 const LanguageSelector: React.FC = () => {
   const { i18n } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState<'bottom' | 'top'>('bottom');
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const currentLanguage = languages.find(lang => lang.code === i18n.language) || languages[0];
+
+  // 드롭다운 위치 계산
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const buttonRect = buttonRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - buttonRect.bottom;
+      const spaceAbove = buttonRect.top;
+      
+      // 드롭다운 예상 높이 (6개 언어 * 40px + padding)
+      const dropdownHeight = 250;
+      
+      // 아래 공간이 충분하지 않고 위 공간이 더 클 때 위로 열기
+      if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+        setDropdownPosition('top');
+      } else {
+        setDropdownPosition('bottom');
+      }
+    }
+  }, [isOpen]);
+
+  // 외부 클릭 감지
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current && 
+        !dropdownRef.current.contains(event.target as Node) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [isOpen]);
 
   const handleLanguageChange = (languageCode: string) => {
     i18n.changeLanguage(languageCode);
     setIsOpen(false);
   };
 
+  const toggleDropdown = () => {
+    setIsOpen(!isOpen);
+  };
+
   return (
     <div className="relative">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        ref={buttonRef}
+        onClick={toggleDropdown}
         className="flex items-center gap-2 px-3 py-2 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg shadow-sm hover:bg-white hover:shadow-md transition-all duration-200 text-sm font-medium text-gray-700"
       >
         <span className="text-lg">{currentLanguage.flag}</span>
@@ -44,12 +93,25 @@ const LanguageSelector: React.FC = () => {
         <>
           {/* Backdrop */}
           <div
-            className="fixed inset-0 z-10"
+            className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
           />
           
           {/* Dropdown */}
-          <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
+          <div 
+            ref={dropdownRef}
+            className={`absolute right-0 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1 ${
+              dropdownPosition === 'top' 
+                ? 'bottom-full mb-2' 
+                : 'top-full mt-2'
+            }`}
+            style={{
+              // 화면 우측 경계를 벗어나지 않도록 조정
+              transform: 'translateX(0)',
+              maxHeight: '240px',
+              overflowY: 'auto'
+            }}
+          >
             {languages.map((language) => (
               <button
                 key={language.code}
