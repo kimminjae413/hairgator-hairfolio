@@ -41,6 +41,15 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 
+  // Debug logging
+  console.log('=== GALLERY DEBUG ===');
+  console.log('isDesignerView:', isDesignerView);
+  console.log('onAddImage exists:', !!onAddImage);
+  console.log('Should show button:', isDesignerView && onAddImage);
+  console.log('images length:', images.length);
+  console.log('disabled:', disabled);
+  console.log('=== END GALLERY DEBUG ===');
+
   // Fallback image with translation
   const fallbackImageSvg = `data:image/svg+xml,${encodeURIComponent(`
     <svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
