@@ -1,6 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Gender, FemaleMajorCategory, MaleMajorCategory, MinorCategory, UploadStyleFormData } from '../types';
+import { 
+  Gender, 
+  ServiceMajorCategory, 
+  ServiceMinorCategory, 
+  UploadStyleFormData,
+  SERVICE_MAJOR_CATEGORIES,
+  SERVICE_CATEGORY_LABELS,
+  SERVICE_SUBCATEGORY_SUGGESTIONS,
+  // Legacy imports for backward compatibility
+  FemaleMajorCategory,
+  MaleMajorCategory,
+  MinorCategory,
+  FEMALE_MAJOR_CATEGORIES,
+  MALE_MAJOR_CATEGORIES,
+  MINOR_CATEGORIES
+} from '../types';
 import { uploadWithProgress, isValidImageFile, isValidFileSize } from '../services/cloudinaryService';
 import UploadIcon from './icons/UploadIcon';
 
@@ -9,28 +24,21 @@ interface UploadStyleModalProps {
   onClose: () => void;
 }
 
-const FEMALE_MAJOR_CATEGORIES: FemaleMajorCategory[] = [
-  'A length', 'B length', 'C length', 'D length', 
-  'E length', 'F length', 'G length', 'H length'
-];
-
-const MALE_MAJOR_CATEGORIES: MaleMajorCategory[] = [
-  'SIDE FRINGE', 'SIDE PART', 'FRINGE UP', 'PUSHED BACK', 
-  'BUZZ', 'CROP', 'MOHICAN'
-];
-
-const MINOR_CATEGORIES: MinorCategory[] = [
-  'None', 'Forehead', 'Eyebrow', 'Eye', 'Cheekbone'
-];
-
 const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }) => {
   const { t } = useTranslation();
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [styleName, setStyleName] = useState('');
   const [gender, setGender] = useState<Gender>('Female');
-  const [majorCategory, setMajorCategory] = useState<FemaleMajorCategory | MaleMajorCategory>(FEMALE_MAJOR_CATEGORIES[0]);
-  const [minorCategory, setMinorCategory] = useState<MinorCategory>(MINOR_CATEGORIES[0]);
+  
+  // NEW: Service-based categories (primary system)
+  const [serviceCategory, setServiceCategory] = useState<ServiceMajorCategory>('cut');
+  const [serviceSubCategory, setServiceSubCategory] = useState<ServiceMinorCategory>('');
+  
+  // LEGACY: Keep for backward compatibility (hidden from UI)
+  const [majorCategory] = useState<FemaleMajorCategory | MaleMajorCategory>(FEMALE_MAJOR_CATEGORIES[0]);
+  const [minorCategory] = useState<MinorCategory>(MINOR_CATEGORIES[0]);
+  
   const [description, setDescription] = useState('');
   const [tags, setTags] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
@@ -39,15 +47,6 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
 
   const inputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    // When gender changes, update the major category dropdown and reset its value
-    if (gender === 'Female') {
-      setMajorCategory(FEMALE_MAJOR_CATEGORIES[0]);
-    } else {
-      setMajorCategory(MALE_MAJOR_CATEGORIES[0]);
-    }
-  }, [gender]);
 
   // Handle file validation
   const validateFile = (selectedFile: File): string | null => {
@@ -85,33 +84,24 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
     return meaninglessPatterns.some(pattern => pattern.test(fileName));
   };
 
-  // 성별과 카테고리에 따른 추천 스타일명 생성
-  const getSuggestedStyleName = (gender: Gender, majorCategory: string): string => {
-    const femaleSuggestions: { [key: string]: string[] } = {
-      'A length': [t('styles.suggestions.female.aLength.1'), t('styles.suggestions.female.aLength.2'), t('styles.suggestions.female.aLength.3'), t('styles.suggestions.female.aLength.4')],
-      'B length': [t('styles.suggestions.female.bLength.1'), t('styles.suggestions.female.bLength.2'), t('styles.suggestions.female.bLength.3'), t('styles.suggestions.female.bLength.4')],
-      'C length': [t('styles.suggestions.female.cLength.1'), t('styles.suggestions.female.cLength.2'), t('styles.suggestions.female.cLength.3'), t('styles.suggestions.female.cLength.4')],
-      'D length': [t('styles.suggestions.female.dLength.1'), t('styles.suggestions.female.dLength.2'), t('styles.suggestions.female.dLength.3'), t('styles.suggestions.female.dLength.4')],
-      'E length': [t('styles.suggestions.female.eLength.1'), t('styles.suggestions.female.eLength.2'), t('styles.suggestions.female.eLength.3'), t('styles.suggestions.female.eLength.4')],
-      'F length': [t('styles.suggestions.female.fLength.1'), t('styles.suggestions.female.fLength.2'), t('styles.suggestions.female.fLength.3'), t('styles.suggestions.female.fLength.4')],
-      'G length': [t('styles.suggestions.female.gLength.1'), t('styles.suggestions.female.gLength.2'), t('styles.suggestions.female.gLength.3'), t('styles.suggestions.female.gLength.4')],
-      'H length': [t('styles.suggestions.female.hLength.1'), t('styles.suggestions.female.hLength.2'), t('styles.suggestions.female.hLength.3'), t('styles.suggestions.female.hLength.4')],
-    };
-
-    const maleSuggestions: { [key: string]: string[] } = {
-      'SIDE FRINGE': [t('styles.suggestions.male.sideFringe.1'), t('styles.suggestions.male.sideFringe.2'), t('styles.suggestions.male.sideFringe.3'), t('styles.suggestions.male.sideFringe.4')],
-      'SIDE PART': [t('styles.suggestions.male.sidePart.1'), t('styles.suggestions.male.sidePart.2'), t('styles.suggestions.male.sidePart.3'), t('styles.suggestions.male.sidePart.4')],
-      'FRINGE UP': [t('styles.suggestions.male.fringeUp.1'), t('styles.suggestions.male.fringeUp.2'), t('styles.suggestions.male.fringeUp.3'), t('styles.suggestions.male.fringeUp.4')],
-      'PUSHED BACK': [t('styles.suggestions.male.pushedBack.1'), t('styles.suggestions.male.pushedBack.2'), t('styles.suggestions.male.pushedBack.3'), t('styles.suggestions.male.pushedBack.4')],
-      'BUZZ': [t('styles.suggestions.male.buzz.1'), t('styles.suggestions.male.buzz.2'), t('styles.suggestions.male.buzz.3'), t('styles.suggestions.male.buzz.4')],
-      'CROP': [t('styles.suggestions.male.crop.1'), t('styles.suggestions.male.crop.2'), t('styles.suggestions.male.crop.3'), t('styles.suggestions.male.crop.4')],
-      'MOHICAN': [t('styles.suggestions.male.mohican.1'), t('styles.suggestions.male.mohican.2'), t('styles.suggestions.male.mohican.3'), t('styles.suggestions.male.mohican.4')],
-    };
-
-    const suggestions = gender === 'Female' ? femaleSuggestions : maleSuggestions;
-    const categoryOptions = suggestions[majorCategory] || [t('upload.newStyle')];
+  // 서비스 카테고리에 따른 추천 스타일명 생성
+  const getSuggestedStyleName = (gender: Gender, serviceCategory: ServiceMajorCategory): string => {
+    const suggestions = SERVICE_SUBCATEGORY_SUGGESTIONS[serviceCategory];
+    if (!suggestions || suggestions.length === 0) {
+      return t('upload.newStyle');
+    }
     
-    return categoryOptions[Math.floor(Math.random() * categoryOptions.length)];
+    // 성별에 따라 적절한 스타일 선택
+    const genderAppropriate = suggestions.filter(style => {
+      if (gender === 'Male') {
+        const maleStyles = ['Buzz Cut', 'Fade Cut', 'Undercut', 'Crew Cut', 'Pompadour'];
+        return maleStyles.some(maleStyle => style.includes(maleStyle.split(' ')[0]));
+      }
+      return true; // Female에는 모든 스타일 허용
+    });
+    
+    const targetSuggestions = genderAppropriate.length > 0 ? genderAppropriate : suggestions;
+    return targetSuggestions[Math.floor(Math.random() * targetSuggestions.length)];
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -140,7 +130,7 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
         setTimeout(() => {
           const inputElement = document.getElementById('style-name') as HTMLInputElement;
           if (inputElement) {
-            const suggestion = getSuggestedStyleName(gender, majorCategory);
+            const suggestion = getSuggestedStyleName(gender, serviceCategory);
             inputElement.placeholder = `${t('upload.example')}: ${suggestion}`;
           }
         }, 100);
@@ -175,7 +165,7 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
         (progress) => setUploadProgress(progress),
         {
           folder: 'hairfolio/styles',
-          tags: ['hairfolio', 'hairstyle', gender.toLowerCase()]
+          tags: ['hairfolio', 'hairstyle', gender.toLowerCase(), serviceCategory]
         }
       );
 
@@ -188,6 +178,9 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
         file,
         name: styleName.trim(),
         gender,
+        serviceCategory,
+        serviceSubCategory: serviceSubCategory.trim() || undefined,
+        // Include legacy fields for backward compatibility
         majorCategory,
         minorCategory,
         description: description.trim() || undefined,
@@ -198,12 +191,17 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
       onUpload(uploadData);
     } catch (err) {
       console.error('Upload error:', err);
-      setError(err instanceof Error ? err.message : t('upload.uploadError'));
+      setError(err instanceof Error ? err.message : t('upload.uploadFailed'));
       setUploadProgress(0);
     } finally {
       setIsUploading(false);
     }
   };
+
+  // 서비스 카테고리가 변경될 때 서브 카테고리 초기화
+  useEffect(() => {
+    setServiceSubCategory('');
+  }, [serviceCategory]);
 
   const handleModalClick = (e: React.MouseEvent) => {
     if (e.target === modalRef.current) {
@@ -259,14 +257,14 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
                   disabled={isUploading}
                 />
                 {previewUrl ? (
-                  <img src={previewUrl} alt={t('upload.preview')} className="w-full h-full object-cover" />
+                  <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
                 ) : (
                   <div className="text-center text-gray-500 p-4">
                     <div className="w-12 h-12 mx-auto mb-2 text-gray-400">
                       <UploadIcon />
                     </div>
-                    <p className="font-medium">{t('upload.uploadImage')}</p>
-                    <p className="text-xs mt-1">{t('upload.supportedFormatsShort')}</p>
+                    <p className="font-medium">{t('upload.selectImage')}</p>
+                    <p className="text-xs mt-1">{t('upload.supportedFormats')}</p>
                   </div>
                 )}
                 
@@ -275,7 +273,7 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
                   <div className="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center">
                     <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mb-4"></div>
                     <div className="text-white text-center">
-                      <p className="text-sm mb-2">{t('upload.uploadingToCloudinary')}</p>
+                      <p className="text-sm mb-2">{t('upload.uploading')}</p>
                       <div className="w-48 bg-gray-300 rounded-full h-2">
                         <div 
                           className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
@@ -292,17 +290,14 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
             {/* Style Name */}
             <div>
               <label htmlFor="style-name" className="block text-sm font-medium text-gray-700 mb-1">
-                {t('upload.styleName')} * 
-                <span className="text-xs text-gray-500 font-normal ml-1">
-                  ({t('upload.nameDisplayedToClients')})
-                </span>
+                {t('upload.styleName')} *
               </label>
               <input
                 id="style-name"
                 type="text"
                 value={styleName}
                 onChange={(e) => setStyleName(e.target.value)}
-                placeholder={t('upload.styleNamePlaceholder')}
+                placeholder={`${t('upload.example')}: ${getSuggestedStyleName(gender, serviceCategory)}`}
                 className="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 disabled={isUploading}
                 maxLength={50}
@@ -312,7 +307,7 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
                   <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
                   </svg>
-                  {t('upload.enterMeaningfulName')}
+                  의미있는 스타일명을 입력해주세요
                 </p>
               )}
             </div>
@@ -348,39 +343,50 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
               </div>
             </div>
             
-            {/* Categories */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Service Categories */}
+            <div className="grid grid-cols-1 gap-4">
               <div>
-                <label htmlFor="major-category" className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('upload.majorCategory')} *
+                <label htmlFor="service-category" className="block text-sm font-medium text-gray-700 mb-1">
+                  {t('upload.serviceCategory')} *
                 </label>
                 <select 
-                  id="major-category" 
-                  value={majorCategory} 
-                  onChange={(e) => setMajorCategory(e.target.value as any)} 
+                  id="service-category" 
+                  value={serviceCategory} 
+                  onChange={(e) => setServiceCategory(e.target.value as ServiceMajorCategory)} 
                   className="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   disabled={isUploading}
                 >
-                  {(gender === 'Female' ? FEMALE_MAJOR_CATEGORIES : MALE_MAJOR_CATEGORIES).map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
+                  {SERVICE_MAJOR_CATEGORIES.map(cat => (
+                    <option key={cat} value={cat}>
+                      {t(`upload.services.${cat}`, SERVICE_CATEGORY_LABELS[cat])}
+                    </option>
                   ))}
                 </select>
               </div>
+              
               <div>
-                <label htmlFor="minor-category" className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('upload.minorCategory')}
+                <label htmlFor="service-subcategory" className="block text-sm font-medium text-gray-700 mb-1">
+                  {t('upload.serviceSubCategory')} ({t('upload.optional')})
                 </label>
-                <select 
-                  id="minor-category" 
-                  value={minorCategory} 
-                  onChange={(e) => setMinorCategory(e.target.value as MinorCategory)} 
-                  className="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                <input
+                  id="service-subcategory"
+                  type="text"
+                  value={serviceSubCategory}
+                  onChange={(e) => setServiceSubCategory(e.target.value)}
+                  placeholder={t('upload.serviceSubCategoryPlaceholder')}
+                  className="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   disabled={isUploading}
-                >
-                  {MINOR_CATEGORIES.map(cat => (
-                    <option key={cat} value={cat}>{cat === 'None' ? t('upload.none') : cat}</option>
+                  maxLength={30}
+                  list="subcategory-suggestions"
+                />
+                <datalist id="subcategory-suggestions">
+                  {SERVICE_SUBCATEGORY_SUGGESTIONS[serviceCategory]?.map(suggestion => (
+                    <option key={suggestion} value={suggestion} />
                   ))}
-                </select>
+                </datalist>
+                <div className="text-xs text-gray-500 mt-1">
+                  {t('upload.serviceSubCategoryHint')}
+                </div>
               </div>
             </div>
 
@@ -418,9 +424,6 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
                 className="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 disabled={isUploading}
               />
-              <p className="text-xs text-gray-500 mt-1">
-                {t('upload.tagsHelp')}
-              </p>
             </div>
 
             {/* Error Message */}
@@ -435,34 +438,21 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
               </div>
             )}
 
-            {/* Style Name Tip */}
-            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-              <div className="flex items-start">
-                <svg className="w-5 h-5 text-green-600 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div>
-                  <h4 className="font-medium text-green-800 text-sm">{t('upload.namingTips')}</h4>
-                  <ul className="text-green-700 text-xs mt-1 space-y-1">
-                    <li>• {t('upload.tip1')}</li>
-                    <li>• {t('upload.tip2')}</li>
-                    <li>• {t('upload.tip3')}</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            {/* Cloudinary Info */}
+            {/* Service Category Guide */}
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <div className="flex items-start">
                 <svg className="w-5 h-5 text-blue-600 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <div>
-                  <h4 className="font-medium text-blue-800 text-sm">{t('upload.cloudStorage')}</h4>
-                  <p className="text-blue-700 text-xs mt-1">
-                    {t('upload.cloudStorageDesc')}
-                  </p>
+                  <h4 className="font-medium text-blue-800 text-sm">서비스 분류 가이드</h4>
+                  <ul className="text-blue-700 text-xs mt-1 space-y-1">
+                    <li>• <strong>커트:</strong> 헤어 커팅, 층내기, 스타일 컷</li>
+                    <li>• <strong>염색:</strong> 전체염색, 하이라이트, 옴브레 등</li>
+                    <li>• <strong>펌:</strong> 웨이브펌, 볼륨펌, 일자펌 등</li>
+                    <li>• <strong>스타일링:</strong> 드라이, 세팅, 업스타일</li>
+                    <li>• <strong>트리트먼트:</strong> 케어, 영양공급, 손상복구</li>
+                  </ul>
                 </div>
               </div>
             </div>
