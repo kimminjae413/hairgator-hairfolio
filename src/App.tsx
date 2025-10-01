@@ -168,28 +168,50 @@ const App: React.FC = () => {
     );
   }
 
-  // 디버그 로그 추가
+  // sessionStorage에서 직접 확인 (JSON 파싱)
+  const storedDesigner = sessionStorage.getItem('hairfolio_designer');
+  const storedUserId = sessionStorage.getItem('hairfolio_userId');
+  
+  let parsedDesigner = null;
+  let parsedUserId = null;
+  
+  try {
+    parsedDesigner = storedDesigner ? JSON.parse(storedDesigner) : null;
+    parsedUserId = storedUserId ? JSON.parse(storedUserId) : null;
+  } catch (e) {
+    console.error('SessionStorage 파싱 오류:', e);
+  }
+
+  // 디버그 로그
   console.log('🎯 App 렌더링 상태:', {
     loggedInDesigner,
     loggedInUserId,
     clientViewDesigner,
+    storedDesigner,
+    storedUserId,
+    parsedDesigner,
+    parsedUserId,
     url: window.location.href
   });
+
+  // sessionStorage 값을 우선으로 사용
+  const effectiveDesigner = loggedInDesigner || parsedDesigner;
+  const effectiveUserId = loggedInUserId || parsedUserId;
 
   // 라우팅 로직: 우선순위에 따른 화면 렌더링
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-gray-50">
-        {loggedInDesigner && loggedInUserId ? (
+        {effectiveDesigner && effectiveUserId ? (
           // 1순위: 디자이너가 로그인되어 있으면 DesignerView
           <>
-            {console.log('✅ DesignerView 렌더링 중...')}
-            <DesignerView designerName={loggedInUserId} onLogout={handleLogout} />
+            {console.log('✅ DesignerView 렌더링 중...', { effectiveDesigner, effectiveUserId })}
+            <DesignerView designerName={effectiveUserId} onLogout={handleLogout} />
           </>
         ) : clientViewDesigner ? (
           // 2순위: URL 파라미터로 디자이너가 지정되어 있으면 ClientView
           <>
-            {console.log('👤 ClientView 렌더링 중...')}
+            {console.log('👤 ClientView 렌더링 중...', { clientViewDesigner })}
             <ClientView designerName={clientViewDesigner} />
           </>
         ) : (
