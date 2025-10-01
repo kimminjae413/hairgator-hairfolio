@@ -168,19 +168,36 @@ const App: React.FC = () => {
     );
   }
 
+  // 디버그 로그 추가
+  console.log('🎯 App 렌더링 상태:', {
+    loggedInDesigner,
+    loggedInUserId,
+    clientViewDesigner,
+    url: window.location.href
+  });
+
   // 라우팅 로직: 우선순위에 따른 화면 렌더링
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-gray-50">
         {loggedInDesigner && loggedInUserId ? (
           // 1순위: 디자이너가 로그인되어 있으면 DesignerView
-          <DesignerView designerName={loggedInUserId} onLogout={handleLogout} />
+          <>
+            {console.log('✅ DesignerView 렌더링 중...')}
+            <DesignerView designerName={loggedInUserId} onLogout={handleLogout} />
+          </>
         ) : clientViewDesigner ? (
           // 2순위: URL 파라미터로 디자이너가 지정되어 있으면 ClientView
-          <ClientView designerName={clientViewDesigner} />
+          <>
+            {console.log('👤 ClientView 렌더링 중...')}
+            <ClientView designerName={clientViewDesigner} />
+          </>
         ) : (
           // 3순위: 로그인 화면
-          <AuthLogin onLogin={handleLogin} />
+          <>
+            {console.log('🔐 AuthLogin 렌더링 중...')}
+            <AuthLogin onLogin={handleLogin} />
+          </>
         )}
       </div>
     </ErrorBoundary>
