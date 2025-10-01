@@ -40,8 +40,8 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
-
-  // Debug logging
+  
+  // Debug logging - 단순히 props 값만 사용
   console.log('=== GALLERY DEBUG ===');
   console.log('isDesignerView:', isDesignerView);
   console.log('onAddImage exists:', !!onAddImage);
@@ -194,24 +194,6 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
               
               {/* True Masonry Grid with CSS Columns */}
               <div className="columns-2 gap-2">
-                {/* Add Style Button in grid - only for non-designer view and first category */}
-                {!isDesignerView && categoryIndex === 0 && onAddImage && (
-                  <button
-                    onClick={onAddImage}
-                    disabled={disabled}
-                    className={`w-full aspect-square rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 transition-all duration-200 mb-2 break-inside-avoid ${
-                      disabled
-                        ? 'cursor-not-allowed bg-gray-100 opacity-50'
-                        : 'cursor-pointer hover:border-indigo-500 hover:bg-indigo-50 hover:text-indigo-500'
-                    }`}
-                  >
-                    <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    <p className="text-xs font-bold">{t('gallery.addStyle', '스타일 추가')}</p>
-                  </button>
-                )}
-                
                 {/* Hairstyle Images */}
                 {hairstyles.map((image, index) => {
                   // Pinterest style: vary heights for zigzag effect
@@ -345,7 +327,7 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
               </div>
             ) : (
               <div>
-                {onAddImage ? (
+                {onAddImage && isDesignerView ? (
                   <div className="space-y-4">
                     <div className="text-4xl">💇‍♀️</div>
                     <h3 className="text-lg font-semibold text-gray-700">{t('gallery.noStylesYet', '아직 등록된 스타일이 없습니다')}</h3>
@@ -389,6 +371,8 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
     </div>
   );
 };
+
+export default HairstyleGallery;
 
 // Demo with sample data
 const MasonryDemo = () => {
@@ -469,4 +453,4 @@ const MasonryDemo = () => {
   );
 };
 
-export default MasonryDemo;
+export { MasonryDemo };
