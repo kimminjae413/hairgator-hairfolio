@@ -4,7 +4,21 @@ export type LoadingState = 'idle' | 'analyzing' | 'generating' | 'error' | 'done
 // Gender types for hairstyle categorization
 export type Gender = 'Female' | 'Male';
 
-// Major categories for female hairstyles (by length)
+// ===== NEW SERVICE-BASED CATEGORY SYSTEM =====
+// Service-based major categories (required selection)
+export type ServiceMajorCategory = 
+  | 'cut'        // 커트 (Cut)
+  | 'color'      // 염색 (Color/Dye)
+  | 'perm'       // 펌 (Perm)
+  | 'styling'    // 스타일링 (Styling)
+  | 'treatment'  // 트리트먼트 (Treatment)
+  | 'other';     // 기타 (Other)
+
+// Service sub-categories (user input - optional)
+export type ServiceMinorCategory = string;
+
+// ===== LEGACY CATEGORIES (DEPRECATED) =====
+// Major categories for female hairstyles (by length) - DEPRECATED
 export type FemaleMajorCategory = 
   | 'A length'  // Very short (pixie cuts, buzz cuts)
   | 'B length'  // Short (bob, chin length)
@@ -15,7 +29,7 @@ export type FemaleMajorCategory =
   | 'G length'  // Very long (hip length)
   | 'H length'; // Extra long (tailbone length)
 
-// Major categories for male hairstyles (by style)
+// Major categories for male hairstyles (by style) - DEPRECATED
 export type MaleMajorCategory = 
   | 'SIDE FRINGE'  // Side-swept bangs
   | 'SIDE PART'    // Classic side part
@@ -25,7 +39,7 @@ export type MaleMajorCategory =
   | 'CROP'         // Textured crops
   | 'MOHICAN';     // Mohawk and faux hawk styles
 
-// Minor categories based on facial features highlighted
+// Minor categories based on facial features highlighted - DEPRECATED
 export type MinorCategory = 
   | 'None'       // No specific feature emphasis
   | 'Forehead'   // Emphasizes forehead
@@ -33,15 +47,22 @@ export type MinorCategory =
   | 'Eye'        // Emphasizes eyes
   | 'Cheekbone'; // Emphasizes cheekbones
 
-// Hairstyle data structure
+// Hairstyle data structure - Updated with new service categories
 export interface Hairstyle {
   id?: string;                                          // Unique identifier
   name: string;                                         // Display name
   url: string;                                         // Image URL
   isLocal?: boolean;                                   // Whether it's a locally uploaded image
   gender?: Gender;                                     // Target gender
+  
+  // NEW: Service-based categorization (preferred)
+  serviceCategory?: ServiceMajorCategory;              // Primary service categorization
+  serviceSubCategory?: ServiceMinorCategory;           // Secondary service categorization (user input)
+  
+  // LEGACY: Length/style-based categorization (deprecated but maintained for compatibility)
   majorCategory?: FemaleMajorCategory | MaleMajorCategory; // Primary categorization
   minorCategory?: MinorCategory;                       // Secondary categorization
+  
   description?: string;                                // Optional description
   tags?: string[];                                     // Optional tags for searching
   uploadedAt?: Date;                                   // When it was uploaded
@@ -109,13 +130,20 @@ export interface DesignerData {
   updatedAt?: string;                                 // ISO date string
 }
 
-// Form data types
+// Form data types - Updated to support both new and legacy systems
 export interface UploadStyleFormData {
   file: File;
   name: string;
   gender: Gender;
-  majorCategory: FemaleMajorCategory | MaleMajorCategory;
-  minorCategory: MinorCategory;
+  
+  // NEW: Service-based categories (preferred)
+  serviceCategory?: ServiceMajorCategory;
+  serviceSubCategory?: ServiceMinorCategory;
+  
+  // LEGACY: For backward compatibility (deprecated)
+  majorCategory?: FemaleMajorCategory | MaleMajorCategory;
+  minorCategory?: MinorCategory;
+  
   description?: string;
   tags?: string[];
 }
@@ -168,6 +196,125 @@ export interface VModelResponse {
   error?: string;
   processingTime?: number;
 }
+
+// ===== NEW SERVICE CATEGORY CONSTANTS =====
+// Service category constants
+export const SERVICE_MAJOR_CATEGORIES: ServiceMajorCategory[] = [
+  'cut',
+  'color', 
+  'perm',
+  'styling',
+  'treatment',
+  'other'
+];
+
+// Service category display names (for i18n)
+export const SERVICE_CATEGORY_LABELS = {
+  cut: 'Cut',
+  color: 'Color',
+  perm: 'Perm', 
+  styling: 'Styling',
+  treatment: 'Treatment',
+  other: 'Other'
+} as const;
+
+// Common sub-category suggestions by service type
+export const SERVICE_SUBCATEGORY_SUGGESTIONS = {
+  cut: [
+    'Bob Cut', 'Pixie Cut', 'Layer Cut', 'Shag Cut', 'Wolf Cut',
+    'Buzz Cut', 'Fade Cut', 'Undercut', 'Crew Cut', 'Pompadour',
+    'Long Layer', 'Short Bob', 'Asymmetric Cut', 'Graduation Cut'
+  ],
+  color: [
+    'Full Color', 'Highlights', 'Lowlights', 'Balayage', 'Ombre',
+    'Gradient', 'Two-tone', 'Fantasy Color', 'Root Touch-up', 'Color Correction',
+    'Bleaching', 'Tone-on-Tone', 'Foil Highlights', 'Cap Highlights'
+  ],
+  perm: [
+    'Digital Perm', 'Cold Perm', 'Hot Perm', 'Root Perm', 'Point Perm',
+    'Body Wave', 'Spiral Perm', 'Beach Wave', 'Volume Perm', 'Setting Perm',
+    'Straightening Perm', 'Relaxer', 'Keratin Treatment'
+  ],
+  styling: [
+    'Blow Dry', 'Curling', 'Straightening', 'Braiding', 'Updo',
+    'Half Up', 'Beach Waves', 'Vintage Style', 'Party Style', 'Casual Style',
+    'Wedding Style', 'Event Styling', 'Daily Styling'
+  ],
+  treatment: [
+    'Hair Treatment', 'Scalp Treatment', 'Protein Treatment', 'Moisture Treatment', 'Keratin Treatment',
+    'Hair Mask', 'Deep Conditioning', 'Damage Repair', 'Anti-aging Treatment', 'Scalp Massage',
+    'Oil Treatment', 'Steam Treatment', 'Vitamin Treatment'
+  ],
+  other: [
+    'Consultation', 'Hair Extension', 'Hair Piece', 'Wig Styling', 'Special Occasion',
+    'Bridal Hair', 'Photo Shoot', 'Fashion Show', 'Color Consultation', 'Style Consultation',
+    'Hair Analysis', 'Maintenance Guide'
+  ]
+} as const;
+
+// ===== LEGACY CATEGORY CONSTANTS (DEPRECATED) =====
+// Legacy category constants for backward compatibility
+export const FEMALE_MAJOR_CATEGORIES: FemaleMajorCategory[] = [
+  'A length', 'B length', 'C length', 'D length', 
+  'E length', 'F length', 'G length', 'H length'
+];
+
+export const MALE_MAJOR_CATEGORIES: MaleMajorCategory[] = [
+  'SIDE FRINGE', 'SIDE PART', 'FRINGE UP', 'PUSHED BACK', 
+  'BUZZ', 'CROP', 'MOHICAN'
+];
+
+export const MINOR_CATEGORIES: MinorCategory[] = [
+  'None', 'Forehead', 'Eyebrow', 'Eye', 'Cheekbone'
+];
+
+// ===== UTILITY FUNCTIONS =====
+// Function to migrate legacy category to service category
+export const migrateLegacyToService = (hairstyle: Hairstyle): Partial<Hairstyle> => {
+  // If already has service category, return as is
+  if (hairstyle.serviceCategory) {
+    return hairstyle;
+  }
+
+  // Try to infer service category from legacy categories
+  let serviceCategory: ServiceMajorCategory = 'cut'; // default
+  let serviceSubCategory: ServiceMinorCategory = '';
+
+  if (hairstyle.majorCategory) {
+    // Convert legacy major category to service category
+    if (hairstyle.majorCategory.includes('length')) {
+      serviceCategory = 'cut';
+      serviceSubCategory = hairstyle.majorCategory;
+    } else {
+      // Male categories are mostly cuts/styling
+      serviceCategory = 'cut';
+      serviceSubCategory = hairstyle.majorCategory;
+    }
+  }
+
+  return {
+    ...hairstyle,
+    serviceCategory,
+    serviceSubCategory: serviceSubCategory || undefined
+  };
+};
+
+// Function to get display category (prioritizes service over legacy)
+export const getDisplayCategory = (hairstyle: Hairstyle): string => {
+  if (hairstyle.serviceCategory) {
+    if (hairstyle.serviceSubCategory) {
+      return `${SERVICE_CATEGORY_LABELS[hairstyle.serviceCategory]} - ${hairstyle.serviceSubCategory}`;
+    }
+    return SERVICE_CATEGORY_LABELS[hairstyle.serviceCategory];
+  }
+  
+  // Fallback to legacy category
+  if (hairstyle.majorCategory) {
+    return hairstyle.majorCategory;
+  }
+  
+  return 'Uncategorized';
+};
 
 // Default values for new designers
 export const DEFAULT_STATS: DesignerStats = {
