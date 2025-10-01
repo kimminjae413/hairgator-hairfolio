@@ -1,6 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Gender, FemaleMajorCategory, MaleMajorCategory, MinorCategory, Hairstyle } from '../types';
+import { 
+  Gender, 
+  ServiceMajorCategory, 
+  ServiceMinorCategory, 
+  Hairstyle,
+  SERVICE_MAJOR_CATEGORIES,
+  SERVICE_CATEGORY_LABELS,
+  SERVICE_SUBCATEGORY_SUGGESTIONS,
+  migrateLegacyToService,
+  // Legacy imports for backward compatibility
+  FemaleMajorCategory,
+  MaleMajorCategory,
+  MinorCategory,
+  FEMALE_MAJOR_CATEGORIES,
+  MALE_MAJOR_CATEGORIES,
+  MINOR_CATEGORIES
+} from '../types';
 
 interface EditStyleModalProps {
   style: Hairstyle;
@@ -8,28 +24,22 @@ interface EditStyleModalProps {
   onClose: () => void;
 }
 
-const FEMALE_MAJOR_CATEGORIES: FemaleMajorCategory[] = [
-  'A length', 'B length', 'C length', 'D length', 
-  'E length', 'F length', 'G length', 'H length'
-];
-
-const MALE_MAJOR_CATEGORIES: MaleMajorCategory[] = [
-  'SIDE FRINGE', 'SIDE PART', 'FRINGE UP', 'PUSHED BACK', 
-  'BUZZ', 'CROP', 'MOHICAN'
-];
-
-const MINOR_CATEGORIES: MinorCategory[] = [
-  'None', 'Forehead', 'Eyebrow', 'Eye', 'Cheekbone'
-];
-
 const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose }) => {
   const { t } = useTranslation();
   const [styleName, setStyleName] = useState(style.name);
   const [gender, setGender] = useState<Gender>(style.gender || 'Female');
-  const [majorCategory, setMajorCategory] = useState<FemaleMajorCategory | MaleMajorCategory>(
-    style.majorCategory || (style.gender === 'Male' ? MALE_MAJOR_CATEGORIES[0] : FEMALE_MAJOR_CATEGORIES[0])
+  
+  // Migrate legacy data if needed
+  const migratedStyle = migrateLegacyToService(style);
+  
+  // NEW: Service-based categories (primary system)
+  const [serviceCategory, setServiceCategory] = useState<ServiceMajorCategory>(
+    migratedStyle.serviceCategory || 'cut'
   );
-  const [minorCategory, setMinorCategory] = useState<MinorCategory>(style.minorCategory || 'None');
+  const [serviceSubCategory, setServiceSubCategory] = useState<ServiceMinorCategory>(
+    migratedStyle.serviceSubCategory || ''
+  );
+  
   const [description, setDescription] = useState(style.description || '');
   const [tags, setTags] = useState<string>(style.tags?.join(', ') || '');
   const [isSaving, setIsSaving] = useState(false);
@@ -37,14 +47,12 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
 
   const modalRef = useRef<HTMLDivElement>(null);
 
+  // 서비스 카테고리가 변경될 때 서브 카테고리 초기화
   useEffect(() => {
-    // When gender changes, update the major category dropdown and reset its value
-    if (gender === 'Female') {
-      setMajorCategory(FEMALE_MAJOR_CATEGORIES[0]);
-    } else {
-      setMajorCategory(MALE_MAJOR_CATEGORIES[0]);
+    if (serviceCategory !== migratedStyle.serviceCategory) {
+      setServiceSubCategory('');
     }
-  }, [gender]);
+  }, [serviceCategory, migratedStyle.serviceCategory]);
 
   const handleSave = async () => {
     if (!styleName.trim()) {
@@ -64,8 +72,8 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
       const updates = {
         name: styleName.trim(),
         gender,
-        majorCategory,
-        minorCategory,
+        serviceCategory,
+        serviceSubCategory: serviceSubCategory.trim() || undefined,
         description: description.trim() || undefined,
         tags: tagsArray.length > 0 ? tagsArray : undefined,
         updatedAt: new Date().toISOString()
@@ -74,7 +82,7 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
       onSave(style.id || style.url, updates);
     } catch (err) {
       console.error('Edit error:', err);
-      setError(err instanceof Error ? err.message : t('edit.editError'));
+      setError(err instanceof Error ? err.message : t('edit.saveFailed'));
     } finally {
       setIsSaving(false);
     }
@@ -136,10 +144,7 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
             {/* Style Name */}
             <div>
               <label htmlFor="style-name" className="block text-sm font-medium text-gray-700 mb-1">
-                {t('edit.styleName')} * 
-                <span className="text-xs text-gray-500 font-normal ml-1">
-                  ({t('edit.nameDisplayedToClients')})
-                </span>
+                {t('edit.styleName')} *
               </label>
               <input
                 id="style-name"
@@ -184,41 +189,69 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
               </div>
             </div>
             
-            {/* Categories */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Service Categories */}
+            <div className="grid grid-cols-1 gap-4">
               <div>
-                <label htmlFor="major-category" className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('edit.majorCategory')} *
+                <label htmlFor="service-category" className="block text-sm font-medium text-gray-700 mb-1">
+                  {t('edit.serviceCategory')} *
                 </label>
                 <select 
-                  id="major-category" 
-                  value={majorCategory} 
-                  onChange={(e) => setMajorCategory(e.target.value as any)} 
+                  id="service-category" 
+                  value={serviceCategory} 
+                  onChange={(e) => setServiceCategory(e.target.value as ServiceMajorCategory)} 
                   className="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   disabled={isSaving}
                 >
-                  {(gender === 'Female' ? FEMALE_MAJOR_CATEGORIES : MALE_MAJOR_CATEGORIES).map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
+                  {SERVICE_MAJOR_CATEGORIES.map(cat => (
+                    <option key={cat} value={cat}>
+                      {t(`edit.services.${cat}`, SERVICE_CATEGORY_LABELS[cat])}
+                    </option>
                   ))}
                 </select>
               </div>
+              
               <div>
-                <label htmlFor="minor-category" className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('edit.minorCategory')}
+                <label htmlFor="service-subcategory" className="block text-sm font-medium text-gray-700 mb-1">
+                  {t('edit.serviceSubCategory')} ({t('edit.optional')})
                 </label>
-                <select 
-                  id="minor-category" 
-                  value={minorCategory} 
-                  onChange={(e) => setMinorCategory(e.target.value as MinorCategory)} 
-                  className="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                <input
+                  id="service-subcategory"
+                  type="text"
+                  value={serviceSubCategory}
+                  onChange={(e) => setServiceSubCategory(e.target.value)}
+                  placeholder={t('edit.serviceSubCategoryPlaceholder')}
+                  className="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   disabled={isSaving}
-                >
-                  {MINOR_CATEGORIES.map(cat => (
-                    <option key={cat} value={cat}>{cat === 'None' ? t('edit.none') : cat}</option>
+                  maxLength={30}
+                  list="subcategory-suggestions"
+                />
+                <datalist id="subcategory-suggestions">
+                  {SERVICE_SUBCATEGORY_SUGGESTIONS[serviceCategory]?.map(suggestion => (
+                    <option key={suggestion} value={suggestion} />
                   ))}
-                </select>
+                </datalist>
+                <div className="text-xs text-gray-500 mt-1">
+                  {t('edit.serviceSubCategoryHint')}
+                </div>
               </div>
             </div>
+
+            {/* Legacy Categories Info (if migrated) */}
+            {style.majorCategory && !style.serviceCategory && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-start">
+                  <svg className="w-5 h-5 text-amber-600 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <h4 className="font-medium text-amber-800 text-sm">카테고리 시스템 업데이트</h4>
+                    <p className="text-amber-700 text-xs mt-1">
+                      기존 카테고리 "{style.majorCategory}"에서 새로운 서비스 기반 시스템으로 자동 변환되었습니다.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Description */}
             <div>
@@ -254,9 +287,6 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
                 className="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 disabled={isSaving}
               />
-              <p className="text-xs text-gray-500 mt-1">
-                {t('edit.tagsHelp')}
-              </p>
             </div>
 
             {/* Error Message */}
@@ -271,18 +301,18 @@ const EditStyleModal: React.FC<EditStyleModalProps> = ({ style, onSave, onClose 
               </div>
             )}
 
-            {/* Info */}
+            {/* Service Category Guide */}
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <div className="flex items-start">
                 <svg className="w-5 h-5 text-blue-600 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <div>
-                  <h4 className="font-medium text-blue-800 text-sm">{t('edit.editInfo')}</h4>
+                  <h4 className="font-medium text-blue-800 text-sm">편집 안내</h4>
                   <ul className="text-blue-700 text-xs mt-1 space-y-1">
-                    <li>• {t('edit.imageCannotChange')}</li>
-                    <li>• {t('edit.canEditNameCategoryDesc')}</li>
-                    <li>• {t('edit.changesReflectedImmediately')}</li>
+                    <li>• 이미지는 변경할 수 없습니다</li>
+                    <li>• 서비스 분류를 통해 고객이 더 쉽게 찾을 수 있어요</li>
+                    <li>• 변경사항은 즉시 포트폴리오에 반영됩니다</li>
                   </ul>
                 </div>
               </div>
