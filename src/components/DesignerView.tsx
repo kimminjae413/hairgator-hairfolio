@@ -408,16 +408,27 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
 
           {activeView === 'gallery' ? (
              portfolio.length > 0 ? (
-                <HairstyleGallery 
-                  images={portfolio}
-                  onSelect={() => {}} // No action on select in designer view
-                  selectedUrl={null}
-                  disabled={false}
-                  onAddImage={() => setShowUploadModal(true)}
-                  onDeleteImage={handlePortfolioImageDelete}
-                  onEditImage={handlePortfolioImageEdit}
-                  isDesignerView={true}
-                />
+                <>
+                  {/* DesignerView Gallery Debug */}
+                  {console.log('=== DESIGNER VIEW GALLERY CALL ===')}
+                  {console.log('Calling HairstyleGallery with props:', {
+                    isDesignerView: true,
+                    onAddImage: !!(() => setShowUploadModal(true)),
+                    images: portfolio.length,
+                    portfolio: portfolio
+                  })}
+                  
+                  <HairstyleGallery 
+                    images={portfolio}
+                    onSelect={() => {}} // No action on select in designer view
+                    selectedUrl={null}
+                    disabled={false}
+                    onAddImage={() => setShowUploadModal(true)}
+                    onDeleteImage={handlePortfolioImageDelete}
+                    onEditImage={handlePortfolioImageEdit}
+                    isDesignerView={true}
+                  />
+                </>
               ) : (
                  <div className="text-center py-16 px-6 bg-gray-50 rounded-lg">
                     <div className="w-24 h-24 mx-auto text-indigo-200">
