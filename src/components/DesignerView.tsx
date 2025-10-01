@@ -58,6 +58,30 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
     loadDesignerData();
   }, [designerName]);
 
+  // Cloudinary 환경변수 디버그
+  useEffect(() => {
+    console.log('=== CLOUDINARY DEBUG ===');
+    console.log('Cloud Name:', import.meta.env.VITE_CLOUDINARY_CLOUD_NAME);
+    console.log('Upload Preset:', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
+    console.log('Mode:', import.meta.env.MODE);
+    console.log('NODE_ENV:', import.meta.env.NODE_ENV);
+    
+    // 환경변수 상태에 따른 경고
+    if (!import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 
+        import.meta.env.VITE_CLOUDINARY_CLOUD_NAME === 'your_cloud_name_here') {
+      console.error('❌ CLOUDINARY_CLOUD_NAME 문제');
+      alert('이미지 업로드 설정 오류: Cloudinary Cloud Name이 설정되지 않음');
+    }
+    
+    if (!import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 
+        import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET === 'your_upload_preset_here') {
+      console.error('❌ CLOUDINARY_UPLOAD_PRESET 문제');
+      alert('이미지 업로드 설정 오류: Cloudinary Upload Preset이 설정되지 않음');
+    }
+    
+    console.log('=== END DEBUG ===');
+  }, []);
+
   const handlePortfolioImageAdd = async (styleData: {
     file: File;
     name: string;
