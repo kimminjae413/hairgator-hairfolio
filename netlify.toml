@@ -1,19 +1,16 @@
 [build]
   publish = "dist"
-  command = "npm ci --legacy-peer-deps && npm run build"
+  command = "npm ci && npm run build"
 
 [build.environment]
   NODE_VERSION = "18.18.2"
-  NPM_FLAGS = "--legacy-peer-deps"
-  PYTHON_VERSION = "3.8"
+  NODE_OPTIONS = "--max-old-space-size=4096"
 
-# SPA 라우팅을 위한 리다이렉트
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-# 보안 및 성능 헤더
 [[headers]]
   for = "/*"
   [headers.values]
@@ -21,29 +18,8 @@
     X-XSS-Protection = "1; mode=block"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
 
 [[headers]]
   for = "/assets/*"
   [headers.values]
     Cache-Control = "max-age=31536000, immutable"
-
-[[headers]]
-  for = "*.js"
-  [headers.values]
-    Cache-Control = "max-age=31536000, immutable"
-
-[[headers]]
-  for = "*.css"
-  [headers.values]
-    Cache-Control = "max-age=31536000, immutable"
-
-# 빌드 컨텍스트별 설정
-[context.production]
-  command = "npm ci --legacy-peer-deps && npm run build"
-
-[context.deploy-preview]
-  command = "npm ci --legacy-peer-deps && npm run build"
-
-[context.branch-deploy]
-  command = "npm ci --legacy-peer-deps && npm run build"
