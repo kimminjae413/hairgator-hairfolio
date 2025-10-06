@@ -53,7 +53,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
   const [error, setError] = useState<string | null>(null)
   const [isResultModalOpen, setIsResultModalOpen] = useState(false)
   
-  // State for Color Try-On (Gemini)
+  // State for Color Try-On (Advanced AI)
   const [showColorModal, setShowColorModal] = useState(false)
   const [selectedColorStyle, setSelectedColorStyle] = useState<Hairstyle | null>(null)
   const [colorTryOnResult, setColorTryOnResult] = useState<any>(null)
@@ -177,7 +177,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
     }
   }, [faceFile, designerName, t])
 
-  // Handle color try-on selection (Gemini processing) - 개선된 버전
+  // Handle color try-on selection (Advanced AI processing)
   const handleColorTryOn = useCallback((colorStyle: Hairstyle) => {
     // 얼굴 사진이 업로드되지 않은 경우 안내
     if (!faceFile) {
@@ -191,7 +191,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
     
     // Track color style view
     firebaseService.trackStyleView(designerName, colorStyle.url).catch(console.error)
-  }, [designerName, faceFile]) // faceFile 의존성 추가
+  }, [designerName, faceFile])
 
   // Handle color try-on completion
   const handleColorTryOnComplete = useCallback((result: any) => {
@@ -516,7 +516,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
                         <path d="M12 2L13.09 8.26L22 9L13.09 9.74L12 16L10.91 9.74L2 9L10.91 8.26L12 2Z"/>
                       </svg>
                       <span className="font-medium">새로운 기능: </span>
-                      <span>염색 스타일은 Gemini AI로 전문 분석됩니다</span>
+                      <span>염색 스타일은 고급 AI로 전문 분석됩니다</span>
                     </div>
                   </div>
                 )}
@@ -524,7 +524,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
                 <HairstyleGallery 
                   images={portfolio}
                   onSelect={handleHairstyleSelect}  // VModel 처리
-                  onColorTryOn={handleColorTryOn}   // Gemini 처리
+                  onColorTryOn={handleColorTryOn}   // Advanced AI 처리
                   selectedUrl={selectedHairstyle?.url || null}
                   disabled={!faceFile || isAIProcessing}
                 />
@@ -559,12 +559,12 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
           />
         )}
 
-        {/* Gemini Color Try-On Modal - 기존 얼굴사진 전달 */}
+        {/* Advanced Color AI Try-On Modal */}
         {showColorModal && selectedColorStyle && (
           <ColorTryOnModal
             colorStyleImage={selectedColorStyle}
-            userFaceFile={faceFile}          // 기존 얼굴 사진 파일 전달
-            userFacePreview={facePreview}    // 기존 얼굴 사진 미리보기 전달
+            userFaceFile={faceFile}
+            userFacePreview={facePreview}
             onClose={handleColorModalClose}
             onComplete={handleColorTryOnComplete}
           />
