@@ -355,7 +355,7 @@ class GeminiColorTryOnService {
         temperature: 0.1,
         topK: 32,
         topP: 1,
-        maxOutputTokens: 2048,
+        maxOutputTokens: 2048
       }
     };
 
@@ -486,11 +486,11 @@ Generate a realistic photo showing this person with the new hair color.
             ]
           }],
           generationConfig: {
-            temperature: 0.3, // 일관성을 위해 낮은 temperature
+            temperature: 0.3,
             topK: 32,
             topP: 1,
             maxOutputTokens: 4096,
-            response_modalities: ["TEXT", "IMAGE"] // 이미지 생성 명시
+            response_modalities: ["TEXT", "IMAGE"]
           }
         })
       });
@@ -525,54 +525,6 @@ Generate a realistic photo showing this person with the new hair color.
               
               console.log('이미지 생성 성공, Blob URL 생성:', blobUrl);
               return blobUrl;
-            }
-          }
-        }
-      }
-
-      // 이미지 생성 실패 시 원본 반환
-      console.warn('Gemini에서 이미지 생성 실패, 원본 이미지 반환');
-      return originalImageUrl;
-
-    } catch (error) {
-      console.error('이미지 변환 중 오류:', error);
-      
-      // 오류 발생 시 처리 시간 시뮬레이션 후 원본 반환
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      return originalImageUrl;
-    }
-  }
-            temperature: 0.3, // 일관성을 위해 낮은 temperature
-            topK: 32,
-            topP: 1,
-            maxOutputTokens: 2048,
-          }
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`이미지 변환 실패: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      // Gemini API 응답에서 생성된 이미지 URL 추출
-      if (result.candidates && result.candidates[0]) {
-        const content = result.candidates[0].content;
-        // 생성된 이미지가 있는지 확인
-        if (content.parts && content.parts.length > 0) {
-          for (const part of content.parts) {
-            if (part.inline_data && part.inline_data.data) {
-              // Base64 이미지를 Blob URL로 변환
-              const base64Data = part.inline_data.data;
-              const byteCharacters = atob(base64Data);
-              const byteNumbers = new Array(byteCharacters.length);
-              for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-              }
-              const byteArray = new Uint8Array(byteNumbers);
-              const blob = new Blob([byteArray], { type: 'image/jpeg' });
-              return URL.createObjectURL(blob);
             }
           }
         }
