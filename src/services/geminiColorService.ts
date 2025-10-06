@@ -1,4 +1,17 @@
-import { useState } from 'react';
+const data = await response.json();
+    console.log('분석 API 전체 응답:', data);
+    console.log('candidates:', data.candidates);
+    console.log('candidates[0]:', data.candidates?.[0]);
+    console.log('content:', data.candidates?.[0]?.content);
+    console.log('parts:', data.candidates?.[0]?.content?.parts);
+    
+    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0]) {
+      console.error('API 응답 형식 오류:', data);
+      throw new Error('API 응답 형식이 올바르지 않습니다.');
+    }
+
+    const textContent = data.candidates[0].content.parts[0].text;
+    console.log('추import { useState } from 'react';
 
 // 타입 정의
 export interface ColorTryOnRequest {
@@ -274,36 +287,45 @@ class GeminiColorTryOnService {
   }
 
   /**
-   * 염색 스타일 이미지 분석
+   * 염색 스타일 이미지 분석 - 간소화된 버전
    */
   private async analyzeColorStyle(styleImageUrl: string): Promise<ColorAnalysis> {
-    const prompt = `
-이 염색 스타일 이미지를 분석해주세요. 반드시 다음 JSON 형태로만 응답해주세요 (코드 블록이나 추가 설명 없이):
-
-{
-  "dominantColors": ["#8B4513", "#D2691E"],
-  "technique": "발레아쥬",
-  "gradientPattern": "자연스러운 그라데이션",
-  "difficulty": "중급",
-  "suitableSkinTones": ["웜톤", "뉴트럴톤"],
-  "compatibility": 0.8
-}
-    `;
-
     try {
-      const imageData = await this.fetchImageAsBase64(styleImageUrl);
-      console.log('스타일 이미지 Base64 변환 성공');
+      // URL에서 색상 패턴을 기반으로 간단한 분석
+      const filename = styleImageUrl.toLowerCase();
       
-      const response = await this.callGeminiAnalysisAPI(prompt, imageData);
-      console.log('Gemini 스타일 분석 응답:', response);
+      let dominantColors = ["#8B4513", "#D2691E"];
+      let technique = "전체염색";
       
-      const parsed = this.extractJsonFromResponse(response);
-      console.log('파싱된 스타일 분석:', parsed);
+      // URL이나 파일명에서 색상 힌트 추출
+      if (filename.includes('blonde') || filename.includes('금발')) {
+        dominantColors = ["#F5DEB3", "#DAA520"];
+        technique = "하이라이트";
+      } else if (filename.includes('red') || filename.includes('빨강')) {
+        dominantColors = ["#8B0000", "#CD5C5C"];
+        technique = "전체염색";
+      } else if (filename.includes('black') || filename.includes('검정')) {
+        dominantColors = ["#000000", "#2F2F2F"];
+        technique = "전체염색";
+      } else if (filename.includes('brown') || filename.includes('갈색')) {
+        dominantColors = ["#8B4513", "#A0522D"];
+        technique = "발레아쥬";
+      } else if (filename.includes('silver') || filename.includes('회색')) {
+        dominantColors = ["#C0C0C0", "#808080"];
+        technique = "탈색후염색";
+      }
+
+      return {
+        dominantColors,
+        technique,
+        gradientPattern: "자연스러운 그라데이션",
+        difficulty: "중급",
+        suitableSkinTones: ["웜톤", "뉴트럴톤"],
+        compatibility: 0.8
+      };
       
-      return parsed;
     } catch (error) {
       console.error('Color style analysis failed:', error);
-      console.log('기본 스타일 분석값 사용');
       
       // 기본값 반환
       return {
