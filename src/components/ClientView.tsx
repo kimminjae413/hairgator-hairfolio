@@ -6,6 +6,7 @@ import { LoadingState, Hairstyle, DesignerProfile } from '../types'
 import ImageUploader from './ImageUploader'
 import ResultDisplay from './ResultDisplay'
 import HairstyleGallery from './HairstyleGallery'
+import ColorTryOnModal from './ColorTryOnModal'
 import IntroScreen from './IntroScreen'
 import LanguageSelector from './LanguageSelector'
 import UserIcon from './icons/UserIcon'
@@ -45,12 +46,17 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
   const [designerProfile, setDesignerProfile] = useState<DesignerProfile | null>(null)
   const [isDataLoading, setIsDataLoading] = useState(true)
   
-  // State for AI processing
+  // State for AI processing (VModel)
   const [selectedHairstyle, setSelectedHairstyle] = useState<Hairstyle | null>(null)
   const [generatedImage, setGeneratedImage] = useState<string | null>(null)
   const [loadingState, setLoadingState] = useState<LoadingState>('idle')
   const [error, setError] = useState<string | null>(null)
   const [isResultModalOpen, setIsResultModalOpen] = useState(false)
+  
+  // State for Color Try-On (Gemini)
+  const [showColorModal, setShowColorModal] = useState(false)
+  const [selectedColorStyle, setSelectedColorStyle] = useState<Hairstyle | null>(null)
+  const [colorTryOnResult, setColorTryOnResult] = useState<any>(null)
   
   // Load designer data on mount
   useEffect(() => {
@@ -108,7 +114,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
     }
   }, [facePreview, error])
 
-  // Handle hairstyle selection and AI processing
+  // Handle regular hairstyle selection (VModel processing)
   const handleHairstyleSelect = useCallback(async (hairstyle: Hairstyle) => {
     if (!faceFile) {
       setError(t('client.uploadPhotoFirst'))
@@ -170,6 +176,38 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
       setLoadingState('error')
     }
   }, [faceFile, designerName, t])
+
+  // Handle color try-on selection (Gemini processing)
+  const handleColorTryOn = useCallback((colorStyle: Hairstyle) => {
+    console.log('염색 가상체험 선택:', colorStyle)
+    setSelectedColorStyle(colorStyle)
+    setShowColorModal(true)
+    
+    // Track color style view
+    firebaseService.trackStyleView(designerName, colorStyle.url).catch(console.error)
+  }, [designerName])
+
+  // Handle color try-on completion
+  const handleColorTryOnComplete = useCallback((result: any) => {
+    console.log('염색 가상체험 결과:', result)
+    setColorTryOnResult(result)
+    
+    // Track color trial result
+    if (result && selectedColorStyle) {
+      firebaseService.trackTrialResult(designerName, {
+        styleUrl: selectedColorStyle.url,
+        resultUrl: result.resultImageUrl,
+        styleName: selectedColorStyle.name,
+        type: 'color'
+      }).catch(console.error)
+    }
+  }, [designerName, selectedColorStyle])
+
+  // Handle color modal close
+  const handleColorModalClose = useCallback(() => {
+    setShowColorModal(false)
+    setSelectedColorStyle(null)
+  }, [])
 
   // Handle result modal close
   const handleCloseModal = useCallback(() => {
@@ -368,6 +406,54 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
           )}
         </header>
 
+        {/* Color Try-On Result Display */}
+        {colorTryOnResult && (
+          <div className="mb-6 p-6 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200">
+            <h3 className="font-semibold text-purple-800 mb-3 flex items-center gap-2">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2L13.09 8.26L22 9L13.09 9.74L12 16L10.91 9.74L2 9L10.91 8.26L12 2Z"/>
+              </svg>
+              염색 가상체험 결과
+            </h3>
+            <div className="grid md:grid-cols-3 gap-4">
+              <div>
+                <img 
+                  src={colorTryOnResult.resultImageUrl} 
+                  alt="염색 결과"
+                  className="w-full h-32 object-cover rounded-lg"
+                />
+              </div>
+              <div className="col-span-2">
+                <p className="text-sm text-purple-700 mb-2">
+                  <strong>신뢰도:</strong> {Math.round(colorTryOnResult.confidence * 100)}%
+                </p>
+                <p className="text-sm text-purple-700 mb-2">
+                  <strong>피부톤 매칭:</strong> 
+                  <span className={`ml-1 ${
+                    colorTryOnResult.colorAnalysis.skinToneMatch === 'excellent' ? 'text-green-600' :
+                    colorTryOnResult.colorAnalysis.skinToneMatch === 'good' ? 'text-blue-600' :
+                    'text-yellow-600'
+                  }`}>
+                    {colorTryOnResult.colorAnalysis.skinToneMatch === 'excellent' ? '매우 좋음' :
+                     colorTryOnResult.colorAnalysis.skinToneMatch === 'good' ? '좋음' : '보통'}
+                  </span>
+                </p>
+                <div className="text-xs text-purple-600">
+                  {colorTryOnResult.colorAnalysis.recommendations.slice(0, 2).map((rec: string, idx: number) => (
+                    <p key={idx}>• {rec}</p>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setColorTryOnResult(null)}
+                  className="mt-2 text-xs text-purple-500 hover:text-purple-700"
+                >
+                  결과 닫기
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Main Content */}
         <main className="bg-white p-6 md:p-8 rounded-2xl shadow-lg">
           {portfolio.length === 0 ? (
@@ -415,9 +501,24 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
                 <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center lg:text-left">
                   {t('client.step2Title')}
                 </h2>
+                
+                {/* Feature callout for color styles */}
+                {portfolio.some(style => style.serviceCategory === 'color') && (
+                  <div className="mb-4 p-3 bg-gradient-to-r from-purple-100 to-pink-100 rounded-lg border border-purple-200">
+                    <div className="flex items-center gap-2 text-sm text-purple-700">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2L13.09 8.26L22 9L13.09 9.74L12 16L10.91 9.74L2 9L10.91 8.26L12 2Z"/>
+                      </svg>
+                      <span className="font-medium">새로운 기능: </span>
+                      <span>염색 스타일은 Gemini AI로 전문 분석됩니다</span>
+                    </div>
+                  </div>
+                )}
+
                 <HairstyleGallery 
                   images={portfolio}
-                  onSelect={handleHairstyleSelect}
+                  onSelect={handleHairstyleSelect}  // VModel 처리
+                  onColorTryOn={handleColorTryOn}   // Gemini 처리
                   selectedUrl={selectedHairstyle?.url || null}
                   disabled={!faceFile || isAIProcessing}
                 />
@@ -438,7 +539,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
           )}
         </main>
         
-        {/* Result Modal */}
+        {/* VModel Result Modal */}
         {isResultModalOpen && selectedHairstyle && (
           <ResultDisplay 
             beforeSrc={facePreview!}
@@ -449,6 +550,15 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
             reservationUrl={reservationUrl}
             hairstyle={selectedHairstyle}
             onBookNow={handleBookNow}
+          />
+        )}
+
+        {/* Gemini Color Try-On Modal */}
+        {showColorModal && selectedColorStyle && (
+          <ColorTryOnModal
+            colorStyleImage={selectedColorStyle}
+            onClose={handleColorModalClose}
+            onComplete={handleColorTryOnComplete}
           />
         )}
 
