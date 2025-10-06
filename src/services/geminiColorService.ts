@@ -150,7 +150,7 @@ class GeminiColorTryOnService {
       "technique": "발레아쥬",
       "gradientPattern": "자연스러운 그라데이션",
       "difficulty": "중급",
-      "suitableS하므로Tones": ["웜톤", "뉴트럴톤"],
+      "suitableSkinTones": ["웜톤", "뉴트럴톤"],
       "compatibility": 0.8
     }
     
