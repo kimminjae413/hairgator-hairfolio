@@ -89,7 +89,12 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
     }
   };
 
-  // 스타일 선택 처리 - 서비스 카테고리별 분기
+  // Handle image load - 누락된 함수 추가
+  const handleImageLoad = (imageUrl: string) => {
+    setLoadedImages(prev => new Set([...prev, imageUrl]));
+  };
+
+  // 스타일 선택 처리 - 서비스 카테고리별 분기 (핵심 기능)
   const handleStyleSelect = (image: Hairstyle) => {
     if (image.serviceCategory === 'color' && onColorTryOn) {
       // 염색 카테고리: Gemini 가상체험
@@ -329,6 +334,18 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                         </div>
                       )}
                       
+                      {/* Special Color Badge for color category - Gemini AI 특별 표시 */}
+                      {image.serviceCategory === 'color' && (
+                        <div className="absolute top-2 right-2">
+                          <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-2 py-1 rounded-full text-xs font-bold shadow-lg flex items-center gap-1">
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12 2L13.09 8.26L22 9L13.09 9.74L12 16L10.91 9.74L2 9L10.91 8.26L12 2Z"/>
+                            </svg>
+                            AI 체험
+                          </div>
+                        </div>
+                      )}
+                      
                       {/* Overlay on hover */}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
                         <p className="text-white font-bold text-sm mb-1">{image.name}</p>
@@ -337,6 +354,17 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                         )}
                         {image.description && (
                           <p className="text-gray-200 text-xs line-clamp-2">{image.description}</p>
+                        )}
+                        {/* Color category special message */}
+                        {image.serviceCategory === 'color' && (
+                          <div className="mt-2 bg-purple-600/80 rounded-lg px-2 py-1">
+                            <p className="text-white text-xs font-medium flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M9.5 14.25l-5.584 2.718L5 13.25C5.001 6.52 7.51 4 9.5 4S14 6.52 14 13.25L15.084 16.968 9.5 14.25z"/>
+                              </svg>
+                              Gemini AI 분석 체험
+                            </p>
+                          </div>
                         )}
                       </div>
                       
@@ -468,90 +496,3 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
 };
 
 export default HairstyleGallery;
-
-// Demo with sample data - 서비스 카테고리 포함
-const MasonryDemo = () => {
-  const { t } = useTranslation();
-  const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
-  
-  const sampleImages: Hairstyle[] = [
-    {
-      name: '레이어드 보브 컷',
-      url: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=400&h=600&fit=crop',
-      gender: 'Female',
-      serviceCategory: 'cut',
-      serviceSubCategory: '레이어드 컷',
-      description: '자연스러운 레이어가 들어간 보브 스타일',
-      tags: ['레이어드', '보브', '커트']
-    },
-    {
-      name: '발레아쥬 염색',
-      url: 'https://images.unsplash.com/photo-1594736797933-d0501ba2fe65?w=400&h=500&fit=crop',
-      gender: 'Female',
-      serviceCategory: 'color',
-      serviceSubCategory: '발레아쥬',
-      description: '자연스러운 그라데이션 염색',
-      tags: ['발레아쥬', '염색', '그라데이션']
-    },
-    {
-      name: '볼륨 웨이브 펌',
-      url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=550&fit=crop',
-      gender: 'Female',
-      serviceCategory: 'perm',
-      serviceSubCategory: '볼륨 펌',
-      description: '자연스러운 볼륨감을 주는 웨이브 펌',
-      tags: ['웨이브', '펌', '볼륨']
-    },
-    {
-      name: '업스타일 세팅',
-      url: 'https://images.unsplash.com/photo-1487412912498-0447578fcca8?w=400&h=650&fit=crop',
-      gender: 'Female',
-      serviceCategory: 'styling',
-      serviceSubCategory: '업스타일',
-      description: '특별한 날을 위한 우아한 업스타일',
-      tags: ['업스타일', '세팅', '파티']
-    },
-    {
-      name: '케라틴 트리트먼트',
-      url: 'https://images.unsplash.com/photo-1524502397800-2eeaad7c3fe5?w=400&h=500&fit=crop',
-      gender: 'Female',
-      serviceCategory: 'treatment',
-      serviceSubCategory: '케라틴',
-      description: '손상된 모발을 건강하게 관리',
-      tags: ['케라틴', '트리트먼트', '케어']
-    },
-    {
-      name: '페이드 커트',
-      url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=600&fit=crop',
-      gender: 'Male',
-      serviceCategory: 'cut',
-      serviceSubCategory: '페이드 컷',
-      description: '깔끔한 페이드 커트',
-      tags: ['페이드', '커트', '남성']
-    }
-  ];
-
-  return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-2xl mx-auto">        
-        <HairstyleGallery
-          images={sampleImages}
-          onSelect={(hairstyle) => setSelectedUrl(hairstyle.url)}
-          selectedUrl={selectedUrl}
-          disabled={false}
-          showCategories={true}
-        />
-        
-        {selectedUrl && (
-          <div className="mt-6 p-4 bg-white rounded-xl shadow-md text-center">
-            <p className="text-gray-700 text-sm font-medium">
-              선택됨: {sampleImages.find(img => img.url === selectedUrl)?.name}
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export { MasonryDemo };
