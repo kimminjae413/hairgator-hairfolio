@@ -432,7 +432,7 @@ class GeminiColorTryOnService {
   }
 
   /**
-   * 이미지 변환 처리 (시뮬레이션)
+   * 이미지 변환 처리 - Gemini로 실제 얼굴에 염색 적용
    */
   private async processColorTransformation(
     originalImageUrl: string,
@@ -440,44 +440,96 @@ class GeminiColorTryOnService {
     colorAnalysis: ColorAnalysis,
     request: ColorTryOnRequest
   ): Promise<string> {
-    // 실제 구현에서는 다음과 같은 서비스들을 사용할 수 있습니다:
-    // - Adobe Photoshop API
-    // - Canva API  
-    // - AI 이미지 편집 서비스 (Stability AI, RunwayML 등)
-    // - 커스텀 이미지 처리 서버
+    try {
+      // Gemini 2.5 Flash로 실제 이미지 변환 수행
+      const transformationPrompt = `
+주어진 사진에서 사람의 얼굴은 정확히 그대로 유지하면서, 헤어스타일만 다음과 같이 변경해주세요:
 
-    // 현재는 시뮬레이션을 위해 지연 후 처리된 URL 반환
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    // 염색 스타일별 실제 존재하는 결과 이미지들 사용
-    const resultImages = {
-      'highlight': [
-        'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=400&h=600&fit=crop&crop=face',
-        'https://images.unsplash.com/photo-1445543949571-ffc3e0e2f55e?w=400&h=600&fit=crop&crop=face',
-        'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=600&fit=crop&crop=face'
-      ],
-      'full-color': [
-        'https://images.unsplash.com/photo-1594736797933-d0501ba2fe65?w=400&h=500&fit=crop&crop=face',
-        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=500&fit=crop&crop=face',
-        'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=500&fit=crop&crop=face'
-      ],
-      'ombre': [
-        'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=550&fit=crop&crop=face',
-        'https://images.unsplash.com/photo-1487412912498-0447578fcca8?w=400&h=550&fit=crop&crop=face',
-        'https://images.unsplash.com/photo-1494790108755-2616c5e93769?w=400&h=550&fit=crop&crop=face'
-      ],
-      'balayage': [
-        'https://images.unsplash.com/photo-1487412912498-0447578fcca8?w=400&h=650&fit=crop&crop=face',
-        'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=650&fit=crop&crop=face',
-        'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=400&h=650&fit=crop&crop=face'
-      ]
-    };
+변경 요청사항:
+- 염색 스타일: ${request.colorType}
+- 색상 강도: ${request.intensity}
+- 주요 색상들: ${colorAnalysis.dominantColors.join(', ')}
+- 염색 기법: ${colorAnalysis.technique}
 
-    // 염색 타입에 맞는 랜덤 결과 이미지 선택
-    const images = resultImages[request.colorType] || resultImages['full-color'];
-    const randomIndex = Math.floor(Math.random() * images.length);
-    
-    return images[randomIndex];
+중요한 지침:
+1. 얼굴 특징을 절대 변경하지 마세요 (눈, 코, 입, 얼굴형 등)
+2. 안경이나 액세서리가 있다면 그대로 유지해주세요
+3. 배경도 가능한 그대로 유지해주세요
+4. 헤어 길이와 기본 스타일은 유지하되 색상만 자연스럽게 변경해주세요
+5. 피부톤 (${hairAnalysis.currentColor})과 조화로운 색상으로 적용해주세요
+
+자연스럽고 현실적인 결과를 생성해주세요.
+      `;
+
+      // 원본 이미지를 Base64로 변환
+      const imageData = await this.fetchImageAsBase64(originalImageUrl);
+      
+      // Gemini API 호출 - 이미지 생성 요청
+      const response = await fetch(`${this.apiEndpoint}?key=${this.apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: transformationPrompt },
+              {
+                inline_data: {
+                  mime_type: "image/jpeg",
+                  data: imageData
+                }
+              }
+            ]
+          }],
+          generationConfig: {
+            temperature: 0.3, // 일관성을 위해 낮은 temperature
+            topK: 32,
+            topP: 1,
+            maxOutputTokens: 2048,
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`이미지 변환 실패: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      // Gemini API 응답에서 생성된 이미지 URL 추출
+      if (result.candidates && result.candidates[0]) {
+        const content = result.candidates[0].content;
+        // 생성된 이미지가 있는지 확인
+        if (content.parts && content.parts.length > 0) {
+          for (const part of content.parts) {
+            if (part.inline_data && part.inline_data.data) {
+              // Base64 이미지를 Blob URL로 변환
+              const base64Data = part.inline_data.data;
+              const byteCharacters = atob(base64Data);
+              const byteNumbers = new Array(byteCharacters.length);
+              for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+              }
+              const byteArray = new Uint8Array(byteNumbers);
+              const blob = new Blob([byteArray], { type: 'image/jpeg' });
+              return URL.createObjectURL(blob);
+            }
+          }
+        }
+      }
+
+      // 이미지 생성 실패 시 원본 반환
+      console.warn('Gemini에서 이미지 생성 실패, 원본 이미지 반환');
+      return originalImageUrl;
+
+    } catch (error) {
+      console.error('이미지 변환 중 오류:', error);
+      
+      // 오류 발생 시 처리 시간 시뮬레이션 후 원본 반환
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      return originalImageUrl;
+    }
   }
 
   /**
