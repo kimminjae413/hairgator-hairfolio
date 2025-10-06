@@ -4,11 +4,10 @@ import { useTranslation } from 'react-i18next';
 // 서비스 카테고리 타입 정의
 type ServiceCategory = 'cut' | 'color' | 'perm' | 'styling' | 'treatment';
 
-// 서비스 카테고리 라벨 매핑
-const SERVICE_CATEGORY_LABELS: Record<ServiceCategory, string> = {
+const SERVICE_CATEGORY_LABELS = {
   cut: '커트',
   color: '염색',
-  perm: '펌',
+  perm: '펌', 
   styling: '스타일링',
   treatment: '트리트먼트'
 };
@@ -22,12 +21,11 @@ const SERVICE_CATEGORY_COLORS: Record<ServiceCategory, string> = {
   treatment: 'bg-pink-100 text-pink-800 border-pink-200'
 };
 
-// 업데이트된 타입 정의
+// 타입 정의
 interface Hairstyle {
   name: string;
   url: string;
   gender: 'Female' | 'Male';
-  // 새로운 서비스 카테고리 필드
   serviceCategory?: ServiceCategory;
   serviceSubCategory?: string;
   // 레거시 필드들 (하위 호환성)
@@ -89,7 +87,7 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
     }
   };
 
-  // Handle image load - 누락된 함수 추가
+  // Handle image load
   const handleImageLoad = (imageUrl: string) => {
     setLoadedImages(prev => new Set([...prev, imageUrl]));
   };
@@ -97,7 +95,7 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
   // 스타일 선택 처리 - 서비스 카테고리별 분기 (핵심 기능)
   const handleStyleSelect = (image: Hairstyle) => {
     if (image.serviceCategory === 'color' && onColorTryOn) {
-      // 염색 카테고리: Gemini 가상체험
+      // 염색 카테고리: 고급 AI 가상체험
       onColorTryOn(image);
     } else {
       // 기타 카테고리: 기존 VModel 선택
@@ -334,14 +332,14 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                         </div>
                       )}
                       
-                      {/* Special Color Badge for color category - Gemini AI 특별 표시 */}
+                      {/* Special Color Badge for color category - 스마트 AI 표시 */}
                       {image.serviceCategory === 'color' && (
                         <div className="absolute top-2 right-2">
                           <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-2 py-1 rounded-full text-xs font-bold shadow-lg flex items-center gap-1">
                             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                               <path d="M12 2L13.09 8.26L22 9L13.09 9.74L12 16L10.91 9.74L2 9L10.91 8.26L12 2Z"/>
                             </svg>
-                            AI 체험
+                            스마트 체험
                           </div>
                         </div>
                       )}
@@ -362,7 +360,7 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M9.5 14.25l-5.584 2.718L5 13.25C5.001 6.52 7.51 4 9.5 4S14 6.52 14 13.25L15.084 16.968 9.5 14.25z"/>
                               </svg>
-                              Gemini AI 분석 체험
+                              고급 AI 분석 체험
                             </p>
                           </div>
                         )}
