@@ -445,23 +445,25 @@ class GeminiColorTryOnService {
     try {
       // Gemini 이미지 생성 모델로 실제 이미지 변환 수행
       const transformationPrompt = `
-Edit this person's hair color while keeping their face exactly the same. Apply the following hair color transformation:
+Change ONLY the hair color of this person. Do NOT change the hairstyle, length, or cut.
 
 Hair Color Style: ${request.colorType}
 Color Intensity: ${request.intensity}
 Target Colors: ${colorAnalysis.dominantColors.join(', ')}
 Technique: ${colorAnalysis.technique}
 
-IMPORTANT REQUIREMENTS:
+STRICT REQUIREMENTS:
 1. Keep the person's face EXACTLY the same (eyes, nose, mouth, facial structure)
-2. Preserve any glasses or accessories
-3. Keep the background unchanged
-4. Only change the hair color naturally
-5. Maintain the current hair length and basic style
+2. Keep the current hairstyle EXACTLY the same (length, cut, waves, texture)
+3. ONLY change the hair color - do NOT change the style
+4. Preserve any glasses or accessories
+5. Keep the background unchanged
 6. Make the color change look realistic and natural
-7. Ensure the new hair color complements the person's skin tone
+7. Do NOT add waves, layers, or change hair texture
+8. Do NOT change hair length or cut
+9. Apply color transformation only - maintain original hairstyle completely
 
-Generate a realistic photo showing this person with the new hair color.
+Generate a realistic photo with ONLY hair color changed, keeping everything else identical.
       `;
 
       // 원본 이미지를 Base64로 변환
