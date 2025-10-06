@@ -6,11 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "clean": "npx rimraf dist .vite node_modules/.vite",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "lint:fix": "eslint . --ext ts,tsx --fix",
+    "clean": "rimraf dist .vite node_modules/.vite",
     "i18n:check": "node scripts/check-translations.js"
   },
   "dependencies": {
@@ -37,7 +37,7 @@
     "tailwindcss": "^3.4.7",
     "typescript": "^5.5.0",
     "vite": "^6.0.0",
-    "rimraf": "^5.0.5"
+    "rimraf": "^5.0.0"
   },
   "keywords": [
     "react",
@@ -66,7 +66,7 @@
   },
   "homepage": "https://hairfolio.netlify.app",
   "engines": {
-    "node": "18.18.2",
+    "node": ">=18.0.0",
     "npm": ">=8.0.0"
   },
   "browserslist": [
