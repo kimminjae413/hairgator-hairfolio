@@ -1,17 +1,4 @@
-const data = await response.json();
-    console.log('분석 API 전체 응답:', data);
-    console.log('candidates:', data.candidates);
-    console.log('candidates[0]:', data.candidates?.[0]);
-    console.log('content:', data.candidates?.[0]?.content);
-    console.log('parts:', data.candidates?.[0]?.content?.parts);
-    
-    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0]) {
-      console.error('API 응답 형식 오류:', data);
-      throw new Error('API 응답 형식이 올바르지 않습니다.');
-    }
-
-    const textContent = data.candidates[0].content.parts[0].text;
-    console.log('추import { useState } from 'react';
+import { useState } from 'react';
 
 // 타입 정의
 export interface ColorTryOnRequest {
@@ -58,50 +45,38 @@ interface SkinToneAnalysis {
   avoidColors: string[];
 }
 
-// Gemini Color Try-On Service - JSON 파싱 오류 완전 해결 버전
+// Gemini Color Try-On Service
 class GeminiColorTryOnService {
   private apiKey: string;
-  // 이미지 분석용: gemini-2.5-flash
   private analysisEndpoint: string = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-  // 이미지 생성용: gemini-2.5-flash-image-preview
   private imageGenerationEndpoint: string = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent';
 
   constructor() {
     this.apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     
-    // API 키 검증 및 데모 모드 경고
     if (!this.apiKey || this.apiKey === 'your_gemini_api_key_here') {
       console.warn('VITE_GEMINI_API_KEY 환경변수가 설정되지 않았습니다. 데모 모드로 실행됩니다.');
     }
   }
 
-  /**
-   * JSON 응답에서 코드 블록을 제거하고 순수 JSON만 추출하는 핵심 함수
-   */
   private extractJsonFromResponse(text: string): any {
     try {
-      // 1. 먼저 그대로 JSON 파싱 시도
       return JSON.parse(text);
     } catch {
       try {
-        // 2. ```json 코드 블록 제거 후 파싱 시도
         let cleanText = text.trim();
         
-        // ```json으로 시작하는 코드 블록 처리
         const jsonBlockMatch = cleanText.match(/```json\s*([\s\S]*?)\s*```/);
         if (jsonBlockMatch && jsonBlockMatch[1]) {
           cleanText = jsonBlockMatch[1].trim();
         } else {
-          // ```로 시작하는 일반 코드 블록 처리
           const codeBlockMatch = cleanText.match(/```\s*([\s\S]*?)\s*```/);
           if (codeBlockMatch && codeBlockMatch[1]) {
             cleanText = codeBlockMatch[1].trim();
-            // 맨 앞에 'json'이라는 언어 지시자가 있으면 제거
             cleanText = cleanText.replace(/^json\s*\n?/, '');
           }
         }
 
-        // 3. { 로 시작하는 JSON 객체 찾기
         const jsonStart = cleanText.indexOf('{');
         const jsonEnd = cleanText.lastIndexOf('}');
         
@@ -109,40 +84,27 @@ class GeminiColorTryOnService {
           cleanText = cleanText.substring(jsonStart, jsonEnd + 1);
         }
 
-        // 4. 최종 JSON 파싱 시도
         return JSON.parse(cleanText);
         
       } catch (parseError) {
         console.error('JSON 파싱 실패:', parseError);
-        console.error('원본 텍스트:', text);
-        console.error('정제된 텍스트:', text.substring(0, 500) + '...');
-        throw new Error(`응답 파싱 실패: JSON 형식이 아닙니다`);
+        throw new Error('응답 파싱 실패: JSON 형식이 아닙니다');
       }
     }
   }
 
-  /**
-   * 메인 염색 가상체험 함수
-   */
   async tryOnHairColor(request: ColorTryOnRequest): Promise<ColorTryOnResult> {
     try {
       const startTime = Date.now();
 
-      // API 키가 없으면 데모 모드로 실행
       if (!this.apiKey || this.apiKey === 'your_gemini_api_key_here') {
         return this.createDemoResult(request, startTime);
       }
 
-      // 1. 사용자 사진에서 머리카락 영역 분석
       const hairAnalysis = await this.analyzeHairRegion(request.userPhotoUrl);
-      
-      // 2. 염색 스타일 분석
       const colorAnalysis = await this.analyzeColorStyle(request.colorStyleUrl);
-      
-      // 3. 피부톤 분석
       const skinToneAnalysis = await this.analyzeSkinTone(request.userPhotoUrl);
       
-      // 4. 이미지 변환 시뮬레이션 (실제로는 전문 이미지 처리 API 사용)
       const resultImageUrl = await this.processColorTransformation(
         request.userPhotoUrl,
         hairAnalysis,
@@ -150,7 +112,6 @@ class GeminiColorTryOnService {
         request
       );
 
-      // 5. AI 추천사항 생성
       const recommendations = await this.generateRecommendations(
         skinToneAnalysis,
         colorAnalysis,
@@ -173,7 +134,6 @@ class GeminiColorTryOnService {
     } catch (error) {
       console.error('Color try-on failed:', error);
       
-      // 오류 발생 시 데모 결과 반환 (사용자 경험 유지)
       if (error instanceof Error && (error.message.includes('API') || error.message.includes('파싱'))) {
         console.warn('AI 분석 오류 발생, 데모 모드로 전환합니다.');
         return this.createDemoResult(request, Date.now());
@@ -183,12 +143,8 @@ class GeminiColorTryOnService {
     }
   }
 
-  /**
-   * 데모 결과 생성 (API 키 없거나 오류 시)
-   */
   private createDemoResult(request: ColorTryOnRequest, startTime: number): ColorTryOnResult {
-    // 실제 처리 시간을 시뮬레이션
-    const processingTime = Date.now() - startTime + 2500; // 2.5초 추가
+    const processingTime = Date.now() - startTime + 2500;
     
     const demoResults = {
       'highlight': {
@@ -247,21 +203,10 @@ class GeminiColorTryOnService {
     };
   }
 
-  /**
-   * Gemini API를 사용하여 머리카락 영역 분석
-   */
   private async analyzeHairRegion(imageUrl: string): Promise<HairAnalysis> {
     const prompt = `
-이 이미지에서 머리카락을 분석해주세요. 반드시 다음 JSON 형태로만 응답해주세요 (코드 블록이나 추가 설명 없이):
+이 이미지에서 머리카락을 분석해주세요. 반드시 다음 JSON 형태로만 응답해주세요:
 
-{
-  "currentColor": "현재 머리카락 색상",
-  "texture": "머리카락 질감",
-  "length": "머리카락 길이",
-  "clarity": 0.8
-}
-
-예시:
 {
   "currentColor": "자연스러운 갈색",
   "texture": "직모",
@@ -276,7 +221,6 @@ class GeminiColorTryOnService {
       return this.extractJsonFromResponse(response);
     } catch (error) {
       console.error('Hair analysis failed:', error);
-      // 기본값 반환
       return {
         currentColor: "자연스러운 갈색",
         texture: "직모",
@@ -286,18 +230,13 @@ class GeminiColorTryOnService {
     }
   }
 
-  /**
-   * 염색 스타일 이미지 분석 - 간소화된 버전
-   */
   private async analyzeColorStyle(styleImageUrl: string): Promise<ColorAnalysis> {
     try {
-      // URL에서 색상 패턴을 기반으로 간단한 분석
       const filename = styleImageUrl.toLowerCase();
       
       let dominantColors = ["#8B4513", "#D2691E"];
       let technique = "전체염색";
       
-      // URL이나 파일명에서 색상 힌트 추출
       if (filename.includes('blonde') || filename.includes('금발')) {
         dominantColors = ["#F5DEB3", "#DAA520"];
         technique = "하이라이트";
@@ -327,7 +266,6 @@ class GeminiColorTryOnService {
     } catch (error) {
       console.error('Color style analysis failed:', error);
       
-      // 기본값 반환
       return {
         dominantColors: ["#8B4513", "#D2691E"],
         technique: "전체염색",
@@ -339,12 +277,9 @@ class GeminiColorTryOnService {
     }
   }
 
-  /**
-   * 피부톤 분석
-   */
   private async analyzeSkinTone(imageUrl: string): Promise<SkinToneAnalysis> {
     const prompt = `
-이 사진에서 피부톤을 분석해주세요. 반드시 다음 JSON 형태로만 응답해주세요 (코드 블록이나 추가 설명 없이):
+이 사진에서 피부톤을 분석해주세요. 반드시 다음 JSON 형태로만 응답해주세요:
 
 {
   "type": "웜톤",
@@ -361,7 +296,6 @@ class GeminiColorTryOnService {
       return this.extractJsonFromResponse(response);
     } catch (error) {
       console.error('Skin tone analysis failed:', error);
-      // 기본값 반환
       return {
         type: "뉴트럴톤",
         undertone: "중성 언더톤",
@@ -372,9 +306,6 @@ class GeminiColorTryOnService {
     }
   }
 
-  /**
-   * Gemini API 호출 함수 - 이미지 분석용 (gemini-2.5-flash)
-   */
   private async callGeminiAnalysisAPI(prompt: string, imageData?: string): Promise<string> {
     const requestBody: any = {
       contents: [{
@@ -390,7 +321,6 @@ class GeminiColorTryOnService {
       }
     };
 
-    // 이미지가 있는 경우 추가
     if (imageData) {
       requestBody.contents[0].parts.push({
         inline_data: {
@@ -410,13 +340,11 @@ class GeminiColorTryOnService {
 
     if (!response.ok) {
       if (response.status === 401) {
-        throw new Error('API 키가 유효하지 않습니다. 환경변수를 확인해주세요.');
+        throw new Error('API 키가 유효하지 않습니다.');
       } else if (response.status === 429) {
-        throw new Error('API 호출 한도를 초과했습니다. 잠시 후 다시 시도해주세요.');
-      } else if (response.status === 400) {
-        throw new Error('요청 형식이 올바르지 않습니다.');
+        throw new Error('API 호출 한도를 초과했습니다.');
       } else {
-        throw new Error(`API 요청 실패: ${response.status} ${response.statusText}`);
+        throw new Error(`API 요청 실패: ${response.status}`);
       }
     }
 
@@ -430,24 +358,17 @@ class GeminiColorTryOnService {
     return data.candidates[0].content.parts[0].text;
   }
 
-  /**
-   * 이미지를 Base64로 변환 - 향상된 오류 처리
-   */
   private async fetchImageAsBase64(imageUrl: string): Promise<string> {
     try {
-      // CORS 문제 해결을 위한 프록시 처리
-      const proxyUrl = imageUrl.startsWith('blob:') ? imageUrl : imageUrl;
-      
-      const response = await fetch(proxyUrl);
+      const response = await fetch(imageUrl);
       if (!response.ok) {
         throw new Error(`이미지 로드 실패: ${response.status}`);
       }
       
       const blob = await response.blob();
       
-      // 파일 크기 검증 (10MB 제한)
       if (blob.size > 10 * 1024 * 1024) {
-        throw new Error('이미지 파일이 너무 큽니다. 10MB 이하의 이미지를 사용해주세요.');
+        throw new Error('이미지 파일이 너무 큽니다.');
       }
       
       return new Promise((resolve, reject) => {
@@ -460,14 +381,11 @@ class GeminiColorTryOnService {
         reader.readAsDataURL(blob);
       });
     } catch (error) {
-      console.error('Image to base64 conversion failed:', error);
+      console.error('Image conversion failed:', error);
       throw new Error('이미지 변환에 실패했습니다.');
     }
   }
 
-  /**
-   * 이미지 변환 처리 - Gemini Image Preview 모델로 실제 얼굴에 염색 적용
-   */
   private async processColorTransformation(
     originalImageUrl: string,
     hairAnalysis: HairAnalysis,
@@ -475,7 +393,6 @@ class GeminiColorTryOnService {
     request: ColorTryOnRequest
   ): Promise<string> {
     try {
-      // Gemini 이미지 생성 모델로 실제 이미지 변환 수행
       const transformationPrompt = `
 Change ONLY the hair color of this person. Do NOT change the hairstyle, length, or cut.
 
@@ -485,23 +402,17 @@ Target Colors: ${colorAnalysis.dominantColors.join(', ')}
 Technique: ${colorAnalysis.technique}
 
 STRICT REQUIREMENTS:
-1. Keep the person's face EXACTLY the same (eyes, nose, mouth, facial structure)
-2. Keep the current hairstyle EXACTLY the same (length, cut, waves, texture)
-3. ONLY change the hair color - do NOT change the style
-4. Preserve any glasses or accessories
-5. Keep the background unchanged
-6. Make the color change look realistic and natural
-7. Do NOT add waves, layers, or change hair texture
-8. Do NOT change hair length or cut
-9. Apply color transformation only - maintain original hairstyle completely
+1. Keep the person's face EXACTLY the same
+2. Keep the current hairstyle EXACTLY the same
+3. ONLY change the hair color
+4. Do NOT change hair length or cut
+5. Apply color transformation only
 
-Generate a realistic photo with ONLY hair color changed, keeping everything else identical.
+Generate a realistic photo with ONLY hair color changed.
       `;
 
-      // 원본 이미지를 Base64로 변환
       const imageData = await this.fetchImageAsBase64(originalImageUrl);
       
-      // Gemini 이미지 생성 API 호출
       const response = await fetch(`${this.imageGenerationEndpoint}?key=${this.apiKey}`, {
         method: 'POST',
         headers: {
@@ -532,51 +443,23 @@ Generate a realistic photo with ONLY hair color changed, keeping everything else
       if (!response.ok) {
         const errorText = await response.text();
         console.error('이미지 생성 API 오류:', errorText);
-        throw new Error(`이미지 변환 실패: ${response.status} - ${errorText}`);
+        throw new Error(`이미지 변환 실패: ${response.status}`);
       }
 
       const result = await response.json();
       console.log('Gemini 이미지 생성 응답:', result);
       
-      // === 디버깅 로그 추가 ===
-      console.log('candidates[0] 상세:', result.candidates[0]);
-      console.log('finishReason:', result.candidates[0]?.finishReason);
-      console.log('safetyRatings:', result.candidates[0]?.safetyRatings);
-      
-      if (result.candidates[0]?.content?.parts) {
-        console.log('parts 배열:', result.candidates[0].content.parts);
-        result.candidates[0].content.parts.forEach((part, index) => {
-          console.log(`Part ${index}:`, part);
-          if (part.inline_data) {
-            console.log(`Part ${index} - 이미지 데이터 발견! mime_type:`, part.inline_data.mime_type);
-            console.log(`Part ${index} - 데이터 길이:`, part.inline_data.data?.length);
-          } else if (part.inlineData) {
-            console.log(`Part ${index} - 이미지 데이터 발견! mime_type:`, part.inlineData.mimeType);
-            console.log(`Part ${index} - 데이터 길이:`, part.inlineData.data?.length);
-          }
-          if (part.text) {
-            console.log(`Part ${index} - 텍스트:`, part.text);
-          }
-        });
-      }
-      // === 디버깅 로그 끝 ===
-      
-      // Gemini API 응답에서 생성된 이미지 추출
       if (result.candidates && result.candidates[0]) {
         const candidate = result.candidates[0];
         
-        // 안전성 필터 체크
         if (candidate.finishReason === 'SAFETY') {
-          console.warn('안전성 필터에 의해 이미지 생성이 차단되었습니다.');
-          console.log('안전성 등급:', candidate.safetyRatings);
+          console.warn('안전성 필터에 의해 차단됨');
           return originalImageUrl;
         }
         
-        // content.parts에서 이미지 데이터 찾기
         if (candidate.content && candidate.content.parts) {
           for (const part of candidate.content.parts) {
             if ((part.inline_data && part.inline_data.data) || (part.inlineData && part.inlineData.data)) {
-              // Base64 이미지를 Blob URL로 변환
               const base64Data = part.inline_data?.data || part.inlineData?.data;
               const byteCharacters = atob(base64Data);
               const byteNumbers = new Array(byteCharacters.length);
@@ -587,87 +470,52 @@ Generate a realistic photo with ONLY hair color changed, keeping everything else
               const blob = new Blob([byteArray], { type: 'image/jpeg' });
               const blobUrl = URL.createObjectURL(blob);
               
-              console.log('이미지 생성 성공, Blob URL 생성:', blobUrl);
+              console.log('이미지 생성 성공');
               return blobUrl;
             }
           }
         }
       }
 
-      // 이미지 생성 실패 시 원본 반환
-      console.warn('Gemini에서 이미지 생성 실패, 원본 이미지 반환');
+      console.warn('이미지 생성 실패, 원본 반환');
       return originalImageUrl;
 
     } catch (error) {
       console.error('이미지 변환 중 오류:', error);
-      
-      // 오류 발생 시 처리 시간 시뮬레이션 후 원본 반환
       await new Promise(resolve => setTimeout(resolve, 2000));
       return originalImageUrl;
     }
   }
 
-  /**
-   * AI 기반 추천사항 생성
-   */
   private async generateRecommendations(
     skinToneAnalysis: SkinToneAnalysis,
     colorAnalysis: ColorAnalysis,
     request: ColorTryOnRequest
   ): Promise<string[]> {
-    const prompt = `
-다음 정보를 바탕으로 염색에 대한 실용적인 조언을 4개만 해주세요. 반드시 다음 JSON 배열 형태로만 응답해주세요:
-
-["첫 번째 조언", "두 번째 조언", "세 번째 조언", "네 번째 조언"]
-
-정보:
-- 피부톤: ${skinToneAnalysis.type}
-- 염색 기법: ${colorAnalysis.technique}
-- 색상: ${colorAnalysis.dominantColors.join(', ')}
-- 염색 방식: ${request.colorType}
-    `;
-
-    try {
-      const response = await this.callGeminiAnalysisAPI(prompt);
-      const recommendations = this.extractJsonFromResponse(response);
-      return Array.isArray(recommendations) ? recommendations.slice(0, 4) : [];
-    } catch (error) {
-      console.error('Recommendations generation failed:', error);
-      // 기본 추천사항 반환
-      return [
-        "염색 후 컬러 전용 샴푸를 사용하여 색상을 오래 유지하세요",
-        "염색 후 2-3일은 머리를 감지 않는 것이 좋습니다",
-        "자외선 차단을 위해 모자나 헤어 보호제를 사용하세요",
-        "정기적인 트리트먼트로 모발 건강을 관리하세요"
-      ];
-    }
+    return [
+      "염색 후 컬러 전용 샴푸를 사용하여 색상을 오래 유지하세요",
+      "염색 후 2-3일은 머리를 감지 않는 것이 좋습니다",
+      "자외선 차단을 위해 모자나 헤어 보호제를 사용하세요",
+      "정기적인 트리트먼트로 모발 건강을 관리하세요"
+    ];
   }
 
-  /**
-   * 신뢰도 계산
-   */
   private calculateConfidence(hairAnalysis: HairAnalysis, colorAnalysis: ColorAnalysis): number {
-    let confidence = 0.7; // 기본 신뢰도
+    let confidence = 0.7;
     
-    // 머리카락 선명도가 높을수록 신뢰도 증가
     if (hairAnalysis.clarity > 0.8) confidence += 0.15;
     else if (hairAnalysis.clarity > 0.6) confidence += 0.1;
     
-    // 색상 호환성이 높을수록 신뢰도 증가
     if (colorAnalysis.compatibility > 0.8) confidence += 0.1;
     else if (colorAnalysis.compatibility > 0.6) confidence += 0.05;
     
     return Math.min(confidence, 1.0);
   }
 
-  /**
-   * 피부톤-색상 매칭 평가
-   */
   private evaluateSkinToneMatch(
     skinToneAnalysis: SkinToneAnalysis, 
     colorAnalysis: ColorAnalysis
   ): 'excellent' | 'good' | 'fair' | 'poor' {
-    // 피부톤과 추천 색상의 호환성 평가
     const userSkinType = skinToneAnalysis.type;
     const recommendedSkinTones = colorAnalysis.suitableSkinTones;
     
@@ -683,7 +531,6 @@ Generate a realistic photo with ONLY hair color changed, keeping everything else
   }
 }
 
-// React Hook for Color Try-On - 향상된 버전
 export const useColorTryOn = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<ColorTryOnResult | null>(null);
