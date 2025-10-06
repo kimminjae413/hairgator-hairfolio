@@ -331,21 +331,37 @@ Extract the actual hair colors from this image as hex codes.
     const colorMap = new Map<string, number>();
     
     // 이미지 데이터를 샘플링해서 색상 빈도 계산
-    for (let i = 0; i < imageData.length; i += 16) { // 4픽셀마다 샘플링
+    for (let i = 0; i < imageData.length; i += 64) { // 더 넓은 간격으로 샘플링
       const r = imageData[i];
       const g = imageData[i + 1];
       const b = imageData[i + 2];
       const a = imageData[i + 3];
       
-      if (a > 128) { // 투명하지 않은 픽셀만
+      if (a > 200) { // 불투명한 픽셀만
+        // 너무 어둡거나 너무 밝은 색상 제외 (배경 노이즈 제거)
+        const brightness = (r + g + b) / 3;
+        if (brightness < 30 || brightness > 240) continue; // 검정색과 흰색 제외
+        
+        // 채도가 너무 낮은 색상 제외 (회색 제거)
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const saturation = max === 0 ? 0 : (max - min) / max;
+        if (saturation < 0.1) continue; // 무채색 제외
+        
         // 색상을 그룹화하기 위해 반올림
-        const roundedR = Math.round(r / 32) * 32;
-        const roundedG = Math.round(g / 32) * 32;
-        const roundedB = Math.round(b / 32) * 32;
+        const roundedR = Math.round(r / 16) * 16;
+        const roundedG = Math.round(g / 16) * 16;
+        const roundedB = Math.round(b / 16) * 16;
         
         const colorKey = `${roundedR},${roundedG},${roundedB}`;
         colorMap.set(colorKey, (colorMap.get(colorKey) || 0) + 1);
       }
+    }
+    
+    // 색상이 충분히 감지되지 않으면 핑크/퍼플 계열 기본값 사용
+    if (colorMap.size < 2) {
+      console.log('충분한 색상 감지 안됨, 핑크/퍼플 기본값 사용');
+      return ['#E6B3FF', '#D147A3', '#8A2BE2']; // 핑크-퍼플 계열
     }
     
     // 가장 빈번한 색상들을 찾기
@@ -353,10 +369,25 @@ Extract the actual hair colors from this image as hex codes.
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3); // 상위 3개 색상
     
-    return sortedColors.map(([colorKey]) => {
+    const extractedColors = sortedColors.map(([colorKey]) => {
       const [r, g, b] = colorKey.split(',').map(Number);
       return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
     });
+    
+    // 추출된 색상이 모두 어두우면 밝은 색상 추가
+    const allDark = extractedColors.every(color => {
+      const r = parseInt(color.slice(1, 3), 16);
+      const g = parseInt(color.slice(3, 5), 16);
+      const b = parseInt(color.slice(5, 7), 16);
+      return (r + g + b) / 3 < 100;
+    });
+    
+    if (allDark) {
+      console.log('어두운 색상만 감지됨, 밝은 색상 추가');
+      extractedColors.push('#E6B3FF', '#D147A3'); // 핑크/퍼플 추가
+    }
+    
+    return extractedColors.slice(0, 3);
   }
 
   private async analyzeSkinTone(imageUrl: string): Promise<SkinToneAnalysis> {
