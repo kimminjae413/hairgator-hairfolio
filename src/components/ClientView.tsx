@@ -177,15 +177,21 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
     }
   }, [faceFile, designerName, t])
 
-  // Handle color try-on selection (Gemini processing)
+  // Handle color try-on selection (Gemini processing) - 개선된 버전
   const handleColorTryOn = useCallback((colorStyle: Hairstyle) => {
+    // 얼굴 사진이 업로드되지 않은 경우 안내
+    if (!faceFile) {
+      setError('먼저 얼굴 사진을 업로드해주세요.')
+      return
+    }
+
     console.log('염색 가상체험 선택:', colorStyle)
     setSelectedColorStyle(colorStyle)
     setShowColorModal(true)
     
     // Track color style view
     firebaseService.trackStyleView(designerName, colorStyle.url).catch(console.error)
-  }, [designerName])
+  }, [designerName, faceFile]) // faceFile 의존성 추가
 
   // Handle color try-on completion
   const handleColorTryOnComplete = useCallback((result: any) => {
@@ -553,10 +559,12 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
           />
         )}
 
-        {/* Gemini Color Try-On Modal */}
+        {/* Gemini Color Try-On Modal - 기존 얼굴사진 전달 */}
         {showColorModal && selectedColorStyle && (
           <ColorTryOnModal
             colorStyleImage={selectedColorStyle}
+            userFaceFile={faceFile}          // 기존 얼굴 사진 파일 전달
+            userFacePreview={facePreview}    // 기존 얼굴 사진 미리보기 전달
             onClose={handleColorModalClose}
             onComplete={handleColorTryOnComplete}
           />
