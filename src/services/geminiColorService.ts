@@ -449,13 +449,35 @@ class GeminiColorTryOnService {
     // 현재는 시뮬레이션을 위해 지연 후 처리된 URL 반환
     await new Promise(resolve => setTimeout(resolve, 3000));
     
-    // 실제로는 처리된 새로운 이미지 URL을 반환
-    // 현재는 원본 이미지에 쿼리 파라미터 추가로 시뮬레이션
-    const processedUrl = originalImageUrl.includes('?') 
-      ? `${originalImageUrl}&processed=true&color=${request.colorType}&intensity=${request.intensity}`
-      : `${originalImageUrl}?processed=true&color=${request.colorType}&intensity=${request.intensity}`;
+    // 염색 스타일별 실제 존재하는 결과 이미지들 사용
+    const resultImages = {
+      'highlight': [
+        'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=400&h=600&fit=crop&crop=face',
+        'https://images.unsplash.com/photo-1445543949571-ffc3e0e2f55e?w=400&h=600&fit=crop&crop=face',
+        'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=600&fit=crop&crop=face'
+      ],
+      'full-color': [
+        'https://images.unsplash.com/photo-1594736797933-d0501ba2fe65?w=400&h=500&fit=crop&crop=face',
+        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=500&fit=crop&crop=face',
+        'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=500&fit=crop&crop=face'
+      ],
+      'ombre': [
+        'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=550&fit=crop&crop=face',
+        'https://images.unsplash.com/photo-1487412912498-0447578fcca8?w=400&h=550&fit=crop&crop=face',
+        'https://images.unsplash.com/photo-1494790108755-2616c5e93769?w=400&h=550&fit=crop&crop=face'
+      ],
+      'balayage': [
+        'https://images.unsplash.com/photo-1487412912498-0447578fcca8?w=400&h=650&fit=crop&crop=face',
+        'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=650&fit=crop&crop=face',
+        'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=400&h=650&fit=crop&crop=face'
+      ]
+    };
+
+    // 염색 타입에 맞는 랜덤 결과 이미지 선택
+    const images = resultImages[request.colorType] || resultImages['full-color'];
+    const randomIndex = Math.floor(Math.random() * images.length);
     
-    return processedUrl;
+    return images[randomIndex];
   }
 
   /**
