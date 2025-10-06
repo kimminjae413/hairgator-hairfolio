@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     define: {
-      // Firebase 설정 (추가)
+      // Firebase 설정
       'import.meta.env.VITE_FIREBASE_API_KEY': JSON.stringify(env.VITE_FIREBASE_API_KEY || ''),
       'import.meta.env.VITE_FIREBASE_AUTH_DOMAIN': JSON.stringify(env.VITE_FIREBASE_AUTH_DOMAIN || ''),
       'import.meta.env.VITE_FIREBASE_PROJECT_ID': JSON.stringify(env.VITE_FIREBASE_PROJECT_ID || ''),
@@ -27,8 +27,11 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_FIREBASE_APP_ID': JSON.stringify(env.VITE_FIREBASE_APP_ID || ''),
       'import.meta.env.VITE_FIREBASE_MEASUREMENT_ID': JSON.stringify(env.VITE_FIREBASE_MEASUREMENT_ID || ''),
       
-      // VModel AI API Token (올바른 환경변수명)
+      // VModel AI API Token
       'import.meta.env.VITE_VMODEL_API_TOKEN': JSON.stringify(env.VITE_VMODEL_API_TOKEN || ''),
+      
+      // Gemini AI API Token (추가)
+      'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY || ''),
       
       // Cloudinary 설정
       'import.meta.env.VITE_CLOUDINARY_CLOUD_NAME': JSON.stringify(env.VITE_CLOUDINARY_CLOUD_NAME || ''),
@@ -52,6 +55,7 @@ export default defineConfig(({ mode }) => {
           manualChunks: {
             vendor: ['react', 'react-dom'],
             firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+            i18n: ['react-i18next', 'i18next', 'i18next-browser-languagedetector'],
           },
         },
       },
@@ -61,7 +65,16 @@ export default defineConfig(({ mode }) => {
       },
     },
     optimizeDeps: {
-      include: ['react', 'react-dom', 'firebase/app', 'firebase/auth', 'firebase/firestore'],
+      include: [
+        'react', 
+        'react-dom', 
+        'firebase/app', 
+        'firebase/auth', 
+        'firebase/firestore',
+        'react-i18next',
+        'i18next',
+        'i18next-browser-languagedetector'
+      ],
       esbuildOptions: {
         target: 'es2020',
       },
