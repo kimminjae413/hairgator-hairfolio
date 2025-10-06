@@ -45,7 +45,7 @@ interface SkinToneAnalysis {
   avoidColors: string[];
 }
 
-// Gemini Color Try-On Service - 최종 완성 버전
+// Gemini Color Try-On Service - JSON 파싱 오류 완전 해결 버전
 class GeminiColorTryOnService {
   private apiKey: string;
   // 안정적인 Gemini 2.5 Flash 모델 사용 (GA 버전)
@@ -57,6 +57,52 @@ class GeminiColorTryOnService {
     // API 키 검증 및 데모 모드 경고
     if (!this.apiKey || this.apiKey === 'your_gemini_api_key_here') {
       console.warn('VITE_GEMINI_API_KEY 환경변수가 설정되지 않았습니다. 데모 모드로 실행됩니다.');
+    }
+  }
+
+  /**
+   * JSON 응답에서 코드 블록을 제거하고 순수 JSON만 추출하는 핵심 함수
+   */
+  private extractJsonFromResponse(text: string): any {
+    try {
+      // 1. 먼저 그대로 JSON 파싱 시도
+      return JSON.parse(text);
+    } catch {
+      try {
+        // 2. ```json 코드 블록 제거 후 파싱 시도
+        let cleanText = text.trim();
+        
+        // ```json으로 시작하는 코드 블록 처리
+        const jsonBlockMatch = cleanText.match(/```json\s*([\s\S]*?)\s*```/);
+        if (jsonBlockMatch && jsonBlockMatch[1]) {
+          cleanText = jsonBlockMatch[1].trim();
+        } else {
+          // ```로 시작하는 일반 코드 블록 처리
+          const codeBlockMatch = cleanText.match(/```\s*([\s\S]*?)\s*```/);
+          if (codeBlockMatch && codeBlockMatch[1]) {
+            cleanText = codeBlockMatch[1].trim();
+            // 맨 앞에 'json'이라는 언어 지시자가 있으면 제거
+            cleanText = cleanText.replace(/^json\s*\n?/, '');
+          }
+        }
+
+        // 3. { 로 시작하는 JSON 객체 찾기
+        const jsonStart = cleanText.indexOf('{');
+        const jsonEnd = cleanText.lastIndexOf('}');
+        
+        if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+          cleanText = cleanText.substring(jsonStart, jsonEnd + 1);
+        }
+
+        // 4. 최종 JSON 파싱 시도
+        return JSON.parse(cleanText);
+        
+      } catch (parseError) {
+        console.error('JSON 파싱 실패:', parseError);
+        console.error('원본 텍스트:', text);
+        console.error('정제된 텍스트:', text.substring(0, 500) + '...');
+        throw new Error(`응답 파싱 실패: JSON 형식이 아닙니다`);
+      }
     }
   }
 
@@ -113,8 +159,8 @@ class GeminiColorTryOnService {
       console.error('Color try-on failed:', error);
       
       // 오류 발생 시 데모 결과 반환 (사용자 경험 유지)
-      if (error instanceof Error && error.message.includes('API')) {
-        console.warn('Gemini API 오류 발생, 데모 모드로 전환합니다.');
+      if (error instanceof Error && (error.message.includes('API') || error.message.includes('파싱'))) {
+        console.warn('AI 분석 오류 발생, 데모 모드로 전환합니다.');
         return this.createDemoResult(request, Date.now());
       }
       
@@ -191,26 +237,33 @@ class GeminiColorTryOnService {
    */
   private async analyzeHairRegion(imageUrl: string): Promise<HairAnalysis> {
     const prompt = `
-    이 이미지에서 머리카락을 분석해주세요. 다음 JSON 형태로 응답해주세요:
-    {
-      "currentColor": "현재 머리카락 색상 (예: 검은색, 갈색, 금발 등)",
-      "texture": "머리카락 질감 (예: 직모, 곱슬, 웨이브)",
-      "length": "머리카락 길이 (예: 짧음, 중간, 긺)",
-      "clarity": 0.8
-    }
-    
-    머리카락이 선명하고 분석하기 좋은 상태면 clarity를 높게, 흐리거나 가려져 있으면 낮게 설정해주세요.
+이 이미지에서 머리카락을 분석해주세요. 반드시 다음 JSON 형태로만 응답해주세요 (코드 블록이나 추가 설명 없이):
+
+{
+  "currentColor": "현재 머리카락 색상",
+  "texture": "머리카락 질감",
+  "length": "머리카락 길이",
+  "clarity": 0.8
+}
+
+예시:
+{
+  "currentColor": "자연스러운 갈색",
+  "texture": "직모",
+  "length": "중간",
+  "clarity": 0.8
+}
     `;
 
     try {
       const imageData = await this.fetchImageAsBase64(imageUrl);
       const response = await this.callGeminiAPI(prompt, imageData);
-      return JSON.parse(response);
+      return this.extractJsonFromResponse(response);
     } catch (error) {
       console.error('Hair analysis failed:', error);
       // 기본값 반환
       return {
-        currentColor: "갈색",
+        currentColor: "자연스러운 갈색",
         texture: "직모",
         length: "중간",
         clarity: 0.7
@@ -223,23 +276,22 @@ class GeminiColorTryOnService {
    */
   private async analyzeColorStyle(styleImageUrl: string): Promise<ColorAnalysis> {
     const prompt = `
-    이 염색 스타일 이미지를 분석해주세요. 다음 JSON 형태로 응답해주세요:
-    {
-      "dominantColors": ["#8B4513", "#D2691E"],
-      "technique": "발레아쥬",
-      "gradientPattern": "자연스러운 그라데이션",
-      "difficulty": "중급",
-      "suitableSkinTones": ["웜톤", "뉴트럴톤"],
-      "compatibility": 0.8
-    }
-    
-    주요 색상은 hex 코드로, 기법과 패턴은 한국어로 설명해주세요.
+이 염색 스타일 이미지를 분석해주세요. 반드시 다음 JSON 형태로만 응답해주세요 (코드 블록이나 추가 설명 없이):
+
+{
+  "dominantColors": ["#8B4513", "#D2691E"],
+  "technique": "발레아쥬",
+  "gradientPattern": "자연스러운 그라데이션",
+  "difficulty": "중급",
+  "suitableSkinTones": ["웜톤", "뉴트럴톤"],
+  "compatibility": 0.8
+}
     `;
 
     try {
       const imageData = await this.fetchImageAsBase64(styleImageUrl);
       const response = await this.callGeminiAPI(prompt, imageData);
-      return JSON.parse(response);
+      return this.extractJsonFromResponse(response);
     } catch (error) {
       console.error('Color style analysis failed:', error);
       // 기본값 반환
@@ -259,22 +311,21 @@ class GeminiColorTryOnService {
    */
   private async analyzeSkinTone(imageUrl: string): Promise<SkinToneAnalysis> {
     const prompt = `
-    이 사진에서 피부톤을 분석해주세요. 다음 JSON 형태로 응답해주세요:
-    {
-      "type": "웜톤",
-      "undertone": "황색 언더톤",
-      "rgbValue": "rgb(205, 170, 140)",
-      "suitableColors": ["갈색 계열", "골드 계열", "따뜻한 적갈색"],
-      "avoidColors": ["차가운 애쉬 계열", "실버 계열"]
-    }
-    
-    피부톤은 웜톤/쿨톤/뉴트럴톤으로 분류하고, 어울리는 헤어컬러를 추천해주세요.
+이 사진에서 피부톤을 분석해주세요. 반드시 다음 JSON 형태로만 응답해주세요 (코드 블록이나 추가 설명 없이):
+
+{
+  "type": "웜톤",
+  "undertone": "황색 언더톤",
+  "rgbValue": "rgb(205, 170, 140)",
+  "suitableColors": ["갈색 계열", "골드 계열"],
+  "avoidColors": ["애쉬 계열", "실버 계열"]
+}
     `;
 
     try {
       const imageData = await this.fetchImageAsBase64(imageUrl);
       const response = await this.callGeminiAPI(prompt, imageData);
-      return JSON.parse(response);
+      return this.extractJsonFromResponse(response);
     } catch (error) {
       console.error('Skin tone analysis failed:', error);
       // 기본값 반환
@@ -326,20 +377,20 @@ class GeminiColorTryOnService {
 
     if (!response.ok) {
       if (response.status === 401) {
-        throw new Error('Gemini API 키가 유효하지 않습니다. 환경변수를 확인해주세요.');
+        throw new Error('API 키가 유효하지 않습니다. 환경변수를 확인해주세요.');
       } else if (response.status === 429) {
         throw new Error('API 호출 한도를 초과했습니다. 잠시 후 다시 시도해주세요.');
       } else if (response.status === 400) {
         throw new Error('요청 형식이 올바르지 않습니다.');
       } else {
-        throw new Error(`Gemini API 요청 실패: ${response.status} ${response.statusText}`);
+        throw new Error(`API 요청 실패: ${response.status} ${response.statusText}`);
       }
     }
 
     const data = await response.json();
     
     if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
-      throw new Error('Gemini API 응답 형식이 올바르지 않습니다.');
+      throw new Error('API 응답 형식이 올바르지 않습니다.');
     }
 
     return data.candidates[0].content.parts[0].text;
@@ -416,23 +467,21 @@ class GeminiColorTryOnService {
     request: ColorTryOnRequest
   ): Promise<string[]> {
     const prompt = `
-    다음 정보를 바탕으로 염색에 대한 실용적인 조언을 3-5개 해주세요:
-    
-    피부톤: ${skinToneAnalysis.type} (${skinToneAnalysis.undertone})
-    염색 기법: ${colorAnalysis.technique}
-    색상: ${colorAnalysis.dominantColors.join(', ')}
-    염색 방식: ${request.colorType}
-    
-    다음 형태로 답변해주세요:
-    ["첫 번째 조언", "두 번째 조언", "세 번째 조언"]
-    
-    조언은 색상 조화, 관리 방법, 주의사항 등을 포함해주세요.
+다음 정보를 바탕으로 염색에 대한 실용적인 조언을 4개만 해주세요. 반드시 다음 JSON 배열 형태로만 응답해주세요:
+
+["첫 번째 조언", "두 번째 조언", "세 번째 조언", "네 번째 조언"]
+
+정보:
+- 피부톤: ${skinToneAnalysis.type}
+- 염색 기법: ${colorAnalysis.technique}
+- 색상: ${colorAnalysis.dominantColors.join(', ')}
+- 염색 방식: ${request.colorType}
     `;
 
     try {
       const response = await this.callGeminiAPI(prompt);
-      const recommendations = JSON.parse(response);
-      return Array.isArray(recommendations) ? recommendations.slice(0, 5) : [];
+      const recommendations = this.extractJsonFromResponse(response);
+      return Array.isArray(recommendations) ? recommendations.slice(0, 4) : [];
     } catch (error) {
       console.error('Recommendations generation failed:', error);
       // 기본 추천사항 반환
