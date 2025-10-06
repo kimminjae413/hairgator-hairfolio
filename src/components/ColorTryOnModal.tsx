@@ -125,7 +125,7 @@ const ColorTryOnModal: React.FC<ColorTryOnModalProps> = ({
               <svg className="w-6 h-6 text-purple-600" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 2L13.09 8.26L22 9L13.09 9.74L12 16L10.91 9.74L2 9L10.91 8.26L12 2Z"/>
               </svg>
-              염색 가상체험
+              스마트 염색 체험
             </h2>
             <p className="text-sm text-gray-600 mt-1">{colorStyleImage.name}</p>
           </div>
@@ -297,7 +297,7 @@ const ColorTryOnModal: React.FC<ColorTryOnModalProps> = ({
                     onClick={handleStartTryOn}
                     className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all duration-200 shadow-lg"
                   >
-                    가상 염색 시작하기
+                    스마트 염색 시작하기
                   </button>
 
                   {/* Info */}
@@ -326,9 +326,9 @@ const ColorTryOnModal: React.FC<ColorTryOnModalProps> = ({
                   </div>
                 </div>
                 
-                <h3 className="text-xl font-semibold mb-3">Gemini AI가 염색을 진행중입니다...</h3>
+                <h3 className="text-xl font-semibold mb-3">AI가 염색을 진행중입니다...</h3>
                 <p className="text-gray-600 mb-6">
-                  AI가 얼굴형, 피부톤, 헤어 스타일을 분석하여<br />
+                  고급 AI가 얼굴형, 피부톤, 헤어 스타일을 분석하여<br />
                   가장 어울리는 염색 결과를 만들고 있습니다.
                 </p>
 
@@ -384,7 +384,7 @@ const ColorTryOnModal: React.FC<ColorTryOnModalProps> = ({
                     <svg className="w-6 h-6 text-purple-600" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M12 2L13.09 8.26L22 9L13.09 9.74L12 16L10.91 9.74L2 9L10.91 8.26L12 2Z"/>
                     </svg>
-                    염색 체험 결과
+                    스마트 염색 체험 결과
                   </h3>
                   
                   <div className="grid md:grid-cols-2 gap-6 mb-6">
