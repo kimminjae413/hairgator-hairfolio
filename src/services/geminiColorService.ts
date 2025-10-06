@@ -504,9 +504,36 @@ Generate a realistic photo showing this person with the new hair color.
       const result = await response.json();
       console.log('Gemini 이미지 생성 응답:', result);
       
+      // === 디버깅 로그 추가 ===
+      console.log('candidates[0] 상세:', result.candidates[0]);
+      console.log('finishReason:', result.candidates[0]?.finishReason);
+      console.log('safetyRatings:', result.candidates[0]?.safetyRatings);
+      
+      if (result.candidates[0]?.content?.parts) {
+        console.log('parts 배열:', result.candidates[0].content.parts);
+        result.candidates[0].content.parts.forEach((part, index) => {
+          console.log(`Part ${index}:`, part);
+          if (part.inline_data) {
+            console.log(`Part ${index} - 이미지 데이터 발견! mime_type:`, part.inline_data.mime_type);
+            console.log(`Part ${index} - 데이터 길이:`, part.inline_data.data?.length);
+          }
+          if (part.text) {
+            console.log(`Part ${index} - 텍스트:`, part.text);
+          }
+        });
+      }
+      // === 디버깅 로그 끝 ===
+      
       // Gemini API 응답에서 생성된 이미지 추출
       if (result.candidates && result.candidates[0]) {
         const candidate = result.candidates[0];
+        
+        // 안전성 필터 체크
+        if (candidate.finishReason === 'SAFETY') {
+          console.warn('안전성 필터에 의해 이미지 생성이 차단되었습니다.');
+          console.log('안전성 등급:', candidate.safetyRatings);
+          return originalImageUrl;
+        }
         
         // content.parts에서 이미지 데이터 찾기
         if (candidate.content && candidate.content.parts) {
