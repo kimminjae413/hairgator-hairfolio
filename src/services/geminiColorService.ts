@@ -232,39 +232,89 @@ class GeminiColorTryOnService {
 
   private async analyzeColorStyle(styleImageUrl: string): Promise<ColorAnalysis> {
     try {
-      const filename = styleImageUrl.toLowerCase();
-      
-      let dominantColors = ["#8B4513", "#D2691E"];
-      let technique = "전체염색";
-      
-      if (filename.includes('blonde') || filename.includes('금발')) {
-        dominantColors = ["#F5DEB3", "#DAA520"];
-        technique = "하이라이트";
-      } else if (filename.includes('red') || filename.includes('빨강')) {
-        dominantColors = ["#8B0000", "#CD5C5C"];
-        technique = "전체염색";
-      } else if (filename.includes('black') || filename.includes('검정')) {
-        dominantColors = ["#000000", "#2F2F2F"];
-        technique = "전체염색";
-      } else if (filename.includes('brown') || filename.includes('갈색')) {
-        dominantColors = ["#8B4513", "#A0522D"];
-        technique = "발레아쥬";
-      } else if (filename.includes('silver') || filename.includes('회색')) {
-        dominantColors = ["#C0C0C0", "#808080"];
-        technique = "탈색후염색";
-      }
+      // 먼저 Gemini AI로 실제 이미지 분석 시도
+      const prompt = `
+Analyze this hair color image and respond with ONLY this JSON format:
 
-      return {
-        dominantColors,
-        technique,
-        gradientPattern: "자연스러운 그라데이션",
-        difficulty: "중급",
-        suitableSkinTones: ["웜톤", "뉴트럴톤"],
-        compatibility: 0.8
-      };
+{
+  "dominantColors": ["#colorhex1", "#colorhex2"],
+  "technique": "balayage",
+  "gradientPattern": "natural gradient",
+  "difficulty": "medium",
+  "suitableSkinTones": ["warm", "neutral"],
+  "compatibility": 0.8
+}
+
+Extract the actual hair colors from this image as hex codes.
+      `;
+
+      const imageData = await this.fetchImageAsBase64(styleImageUrl);
+      const response = await this.callGeminiAnalysisAPI(prompt, imageData);
+      const parsed = this.extractJsonFromResponse(response);
+      
+      // 유효한 hex 색상이 있는지 확인
+      if (parsed.dominantColors && Array.isArray(parsed.dominantColors) && parsed.dominantColors.length > 0) {
+        console.log('Gemini 색상 분석 성공:', parsed.dominantColors);
+        return parsed;
+      } else {
+        throw new Error('Invalid color analysis result');
+      }
       
     } catch (error) {
-      console.error('Color style analysis failed:', error);
+      console.error('Gemini 색상 분석 실패, 이미지 기반 분석 시도:', error);
+      
+      // Gemini 실패 시 이미지 자체에서 색상 추출 시도
+      return this.analyzeImageColors(styleImageUrl);
+    }
+  }
+
+  private async analyzeImageColors(imageUrl: string): Promise<ColorAnalysis> {
+    try {
+      // Canvas를 사용해 이미지에서 주요 색상 추출
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      
+      return new Promise((resolve) => {
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const colors = this.extractDominantColors(imageData.data);
+          
+          console.log('이미지에서 추출한 색상:', colors);
+          
+          resolve({
+            dominantColors: colors,
+            technique: "염색",
+            gradientPattern: "자연스러운 색상",
+            difficulty: "중급",
+            suitableSkinTones: ["웜톤", "뉴트럴톤"],
+            compatibility: 0.8
+          });
+        };
+        
+        img.onerror = () => {
+          console.error('이미지 로드 실패, 기본값 사용');
+          resolve({
+            dominantColors: ["#8B4513", "#D2691E"],
+            technique: "전체염색",
+            gradientPattern: "균일한 색상",
+            difficulty: "초급",
+            suitableSkinTones: ["모든 톤"],
+            compatibility: 0.7
+          });
+        };
+        
+        img.src = imageUrl;
+      });
+      
+    } catch (error) {
+      console.error('이미지 색상 분석 실패:', error);
       
       return {
         dominantColors: ["#8B4513", "#D2691E"],
@@ -275,6 +325,38 @@ class GeminiColorTryOnService {
         compatibility: 0.7
       };
     }
+  }
+
+  private extractDominantColors(imageData: Uint8ClampedArray): string[] {
+    const colorMap = new Map<string, number>();
+    
+    // 이미지 데이터를 샘플링해서 색상 빈도 계산
+    for (let i = 0; i < imageData.length; i += 16) { // 4픽셀마다 샘플링
+      const r = imageData[i];
+      const g = imageData[i + 1];
+      const b = imageData[i + 2];
+      const a = imageData[i + 3];
+      
+      if (a > 128) { // 투명하지 않은 픽셀만
+        // 색상을 그룹화하기 위해 반올림
+        const roundedR = Math.round(r / 32) * 32;
+        const roundedG = Math.round(g / 32) * 32;
+        const roundedB = Math.round(b / 32) * 32;
+        
+        const colorKey = `${roundedR},${roundedG},${roundedB}`;
+        colorMap.set(colorKey, (colorMap.get(colorKey) || 0) + 1);
+      }
+    }
+    
+    // 가장 빈번한 색상들을 찾기
+    const sortedColors = Array.from(colorMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3); // 상위 3개 색상
+    
+    return sortedColors.map(([colorKey]) => {
+      const [r, g, b] = colorKey.split(',').map(Number);
+      return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    });
   }
 
   private async analyzeSkinTone(imageUrl: string): Promise<SkinToneAnalysis> {
