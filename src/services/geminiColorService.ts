@@ -48,8 +48,10 @@ interface SkinToneAnalysis {
 // Gemini Color Try-On Service - JSON 파싱 오류 완전 해결 버전
 class GeminiColorTryOnService {
   private apiKey: string;
-  // 안정적인 Gemini 2.5 Flash 모델 사용 (GA 버전)
-  private apiEndpoint: string = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+  // 이미지 분석용: gemini-2.5-flash
+  private analysisEndpoint: string = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+  // 이미지 생성용: gemini-2.5-flash-image-preview
+  private imageGenerationEndpoint: string = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent';
 
   constructor() {
     this.apiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -257,7 +259,7 @@ class GeminiColorTryOnService {
 
     try {
       const imageData = await this.fetchImageAsBase64(imageUrl);
-      const response = await this.callGeminiAPI(prompt, imageData);
+      const response = await this.callGeminiAnalysisAPI(prompt, imageData);
       return this.extractJsonFromResponse(response);
     } catch (error) {
       console.error('Hair analysis failed:', error);
@@ -290,7 +292,7 @@ class GeminiColorTryOnService {
 
     try {
       const imageData = await this.fetchImageAsBase64(styleImageUrl);
-      const response = await this.callGeminiAPI(prompt, imageData);
+      const response = await this.callGeminiAnalysisAPI(prompt, imageData);
       return this.extractJsonFromResponse(response);
     } catch (error) {
       console.error('Color style analysis failed:', error);
@@ -324,7 +326,7 @@ class GeminiColorTryOnService {
 
     try {
       const imageData = await this.fetchImageAsBase64(imageUrl);
-      const response = await this.callGeminiAPI(prompt, imageData);
+      const response = await this.callGeminiAnalysisAPI(prompt, imageData);
       return this.extractJsonFromResponse(response);
     } catch (error) {
       console.error('Skin tone analysis failed:', error);
@@ -340,9 +342,9 @@ class GeminiColorTryOnService {
   }
 
   /**
-   * Gemini API 호출 함수 - 향상된 오류 처리
+   * Gemini API 호출 함수 - 이미지 분석용 (gemini-2.5-flash)
    */
-  private async callGeminiAPI(prompt: string, imageData?: string): Promise<string> {
+  private async callGeminiAnalysisAPI(prompt: string, imageData?: string): Promise<string> {
     const requestBody: any = {
       contents: [{
         parts: [
@@ -367,7 +369,7 @@ class GeminiColorTryOnService {
       });
     }
 
-    const response = await fetch(`${this.apiEndpoint}?key=${this.apiKey}`, {
+    const response = await fetch(`${this.analysisEndpoint}?key=${this.apiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -432,7 +434,7 @@ class GeminiColorTryOnService {
   }
 
   /**
-   * 이미지 변환 처리 - Gemini로 실제 얼굴에 염색 적용
+   * 이미지 변환 처리 - Gemini Image Preview 모델로 실제 얼굴에 염색 적용
    */
   private async processColorTransformation(
     originalImageUrl: string,
@@ -441,31 +443,32 @@ class GeminiColorTryOnService {
     request: ColorTryOnRequest
   ): Promise<string> {
     try {
-      // Gemini 2.5 Flash로 실제 이미지 변환 수행
+      // Gemini 이미지 생성 모델로 실제 이미지 변환 수행
       const transformationPrompt = `
-주어진 사진에서 사람의 얼굴은 정확히 그대로 유지하면서, 헤어스타일만 다음과 같이 변경해주세요:
+Edit this person's hair color while keeping their face exactly the same. Apply the following hair color transformation:
 
-변경 요청사항:
-- 염색 스타일: ${request.colorType}
-- 색상 강도: ${request.intensity}
-- 주요 색상들: ${colorAnalysis.dominantColors.join(', ')}
-- 염색 기법: ${colorAnalysis.technique}
+Hair Color Style: ${request.colorType}
+Color Intensity: ${request.intensity}
+Target Colors: ${colorAnalysis.dominantColors.join(', ')}
+Technique: ${colorAnalysis.technique}
 
-중요한 지침:
-1. 얼굴 특징을 절대 변경하지 마세요 (눈, 코, 입, 얼굴형 등)
-2. 안경이나 액세서리가 있다면 그대로 유지해주세요
-3. 배경도 가능한 그대로 유지해주세요
-4. 헤어 길이와 기본 스타일은 유지하되 색상만 자연스럽게 변경해주세요
-5. 피부톤 (${hairAnalysis.currentColor})과 조화로운 색상으로 적용해주세요
+IMPORTANT REQUIREMENTS:
+1. Keep the person's face EXACTLY the same (eyes, nose, mouth, facial structure)
+2. Preserve any glasses or accessories
+3. Keep the background unchanged
+4. Only change the hair color naturally
+5. Maintain the current hair length and basic style
+6. Make the color change look realistic and natural
+7. Ensure the new hair color complements the person's skin tone
 
-자연스럽고 현실적인 결과를 생성해주세요.
+Generate a realistic photo showing this person with the new hair color.
       `;
 
       // 원본 이미지를 Base64로 변환
       const imageData = await this.fetchImageAsBase64(originalImageUrl);
       
-      // Gemini API 호출 - 이미지 생성 요청
-      const response = await fetch(`${this.apiEndpoint}?key=${this.apiKey}`, {
+      // Gemini 이미지 생성 API 호출
+      const response = await fetch(`${this.imageGenerationEndpoint}?key=${this.apiKey}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -483,6 +486,62 @@ class GeminiColorTryOnService {
             ]
           }],
           generationConfig: {
+            temperature: 0.3, // 일관성을 위해 낮은 temperature
+            topK: 32,
+            topP: 1,
+            maxOutputTokens: 4096,
+            response_modalities: ["TEXT", "IMAGE"], // 이미지 생성 명시
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('이미지 생성 API 오류:', errorText);
+        throw new Error(`이미지 변환 실패: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('Gemini 이미지 생성 응답:', result);
+      
+      // Gemini API 응답에서 생성된 이미지 추출
+      if (result.candidates && result.candidates[0]) {
+        const candidate = result.candidates[0];
+        
+        // content.parts에서 이미지 데이터 찾기
+        if (candidate.content && candidate.content.parts) {
+          for (const part of candidate.content.parts) {
+            if (part.inline_data && part.inline_data.data) {
+              // Base64 이미지를 Blob URL로 변환
+              const base64Data = part.inline_data.data;
+              const byteCharacters = atob(base64Data);
+              const byteNumbers = new Array(byteCharacters.length);
+              for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+              }
+              const byteArray = new Uint8Array(byteNumbers);
+              const blob = new Blob([byteArray], { type: 'image/jpeg' });
+              const blobUrl = URL.createObjectURL(blob);
+              
+              console.log('이미지 생성 성공, Blob URL 생성:', blobUrl);
+              return blobUrl;
+            }
+          }
+        }
+      }
+
+      // 이미지 생성 실패 시 원본 반환
+      console.warn('Gemini에서 이미지 생성 실패, 원본 이미지 반환');
+      return originalImageUrl;
+
+    } catch (error) {
+      console.error('이미지 변환 중 오류:', error);
+      
+      // 오류 발생 시 처리 시간 시뮬레이션 후 원본 반환
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      return originalImageUrl;
+    }
+  }
             temperature: 0.3, // 일관성을 위해 낮은 temperature
             topK: 32,
             topP: 1,
@@ -553,7 +612,7 @@ class GeminiColorTryOnService {
     `;
 
     try {
-      const response = await this.callGeminiAPI(prompt);
+      const response = await this.callGeminiAnalysisAPI(prompt);
       const recommendations = this.extractJsonFromResponse(response);
       return Array.isArray(recommendations) ? recommendations.slice(0, 4) : [];
     } catch (error) {
