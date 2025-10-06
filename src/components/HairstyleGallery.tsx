@@ -40,6 +40,7 @@ interface Hairstyle {
 interface HairstyleGalleryProps {
   images: Hairstyle[];
   onSelect: (hairstyle: Hairstyle) => void;
+  onColorTryOn?: (hairstyle: Hairstyle) => void; // 염색 가상체험 콜백 추가
   selectedUrl: string | null;
   disabled: boolean;
   onAddImage?: () => void;
@@ -52,6 +53,7 @@ interface HairstyleGalleryProps {
 const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({ 
   images, 
   onSelect, 
+  onColorTryOn,
   selectedUrl, 
   disabled, 
   onAddImage, 
@@ -87,9 +89,15 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
     }
   };
 
-  // Handle image load
-  const handleImageLoad = (imageUrl: string) => {
-    setLoadedImages(prev => new Set([...prev, imageUrl]));
+  // 스타일 선택 처리 - 서비스 카테고리별 분기
+  const handleStyleSelect = (image: Hairstyle) => {
+    if (image.serviceCategory === 'color' && onColorTryOn) {
+      // 염색 카테고리: Gemini 가상체험
+      onColorTryOn(image);
+    } else {
+      // 기타 카테고리: 기존 VModel 선택
+      onSelect(image);
+    }
   };
 
   // Filter images by gender, service category, and search term
@@ -285,7 +293,7 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                     className="relative group mb-2 break-inside-avoid"
                   >
                     <button
-                      onClick={() => onSelect(image)}
+                      onClick={() => handleStyleSelect(image)}
                       disabled={disabled}
                       className={`w-full ${randomHeight} block rounded-xl overflow-hidden transition-all duration-300 ${
                         selectedUrl === image.url
