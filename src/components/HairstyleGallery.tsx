@@ -1,11 +1,36 @@
 import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-// 타입 정의
+// 서비스 카테고리 타입 정의
+type ServiceCategory = 'cut' | 'color' | 'perm' | 'styling' | 'treatment';
+
+// 서비스 카테고리 라벨 매핑
+const SERVICE_CATEGORY_LABELS: Record<ServiceCategory, string> = {
+  cut: '커트',
+  color: '염색',
+  perm: '펌',
+  styling: '스타일링',
+  treatment: '트리트먼트'
+};
+
+// 서비스 카테고리별 색상 테마
+const SERVICE_CATEGORY_COLORS: Record<ServiceCategory, string> = {
+  cut: 'bg-blue-100 text-blue-800 border-blue-200',
+  color: 'bg-purple-100 text-purple-800 border-purple-200',
+  perm: 'bg-green-100 text-green-800 border-green-200',
+  styling: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  treatment: 'bg-pink-100 text-pink-800 border-pink-200'
+};
+
+// 업데이트된 타입 정의
 interface Hairstyle {
   name: string;
   url: string;
   gender: 'Female' | 'Male';
+  // 새로운 서비스 카테고리 필드
+  serviceCategory?: ServiceCategory;
+  serviceSubCategory?: string;
+  // 레거시 필드들 (하위 호환성)
   majorCategory?: string;
   minorCategory?: string;
   description?: string;
@@ -38,17 +63,9 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'Female' | 'Male'>('Female');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedServiceCategory, setSelectedServiceCategory] = useState<ServiceCategory | 'all'>('all');
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
-  
-  // Debug logging - 단순히 props 값만 사용
-  console.log('=== GALLERY DEBUG ===');
-  console.log('isDesignerView:', isDesignerView);
-  console.log('onAddImage exists:', !!onAddImage);
-  console.log('Should show button:', isDesignerView && onAddImage);
-  console.log('images length:', images.length);
-  console.log('disabled:', disabled);
-  console.log('=== END GALLERY DEBUG ===');
 
   // Fallback image with translation
   const fallbackImageSvg = `data:image/svg+xml,${encodeURIComponent(`
@@ -75,28 +92,39 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
     setLoadedImages(prev => new Set([...prev, imageUrl]));
   };
 
-  // Filter images
+  // Filter images by gender, service category, and search term
   const filteredImages = useMemo(() => {
     let filtered = images.filter(img => img.gender === activeTab);
     
+    // 서비스 카테고리 필터링
+    if (selectedServiceCategory !== 'all') {
+      filtered = filtered.filter(image => image.serviceCategory === selectedServiceCategory);
+    }
+    
+    // 검색어 필터링
     if (searchTerm) {
       const lowercaseSearch = searchTerm.toLowerCase();
       filtered = filtered.filter(image => 
         image.name.toLowerCase().includes(lowercaseSearch) ||
         image.description?.toLowerCase().includes(lowercaseSearch) ||
+        image.serviceSubCategory?.toLowerCase().includes(lowercaseSearch) ||
         image.tags?.some(tag => tag.toLowerCase().includes(lowercaseSearch))
       );
     }
     
     return filtered;
-  }, [images, activeTab, searchTerm]);
+  }, [images, activeTab, selectedServiceCategory, searchTerm]);
 
-  // Group by category
+  // Group by service category
   const groupedImages = useMemo(() => {
     if (!showCategories) return { [t('gallery.allStyles', 'All Styles')]: filteredImages };
     
     return filteredImages.reduce((acc, image) => {
-      const category = image.majorCategory || t('gallery.uncategorized', 'Uncategorized');
+      // 서비스 카테고리 우선, 없으면 레거시 majorCategory 사용
+      const category = image.serviceCategory 
+        ? SERVICE_CATEGORY_LABELS[image.serviceCategory]
+        : image.majorCategory || t('gallery.uncategorized', 'Uncategorized');
+      
       if (!acc[category]) {
         acc[category] = [];
       }
@@ -105,12 +133,33 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
     }, {} as Record<string, Hairstyle[]>);
   }, [filteredImages, showCategories, t]);
 
+  // 서비스 카테고리별 정렬 (커트 > 염색 > 펌 > 스타일링 > 트리트먼트 순)
+  const categoryOrder = ['커트', '염색', '펌', '스타일링', '트리트먼트'];
   const sortedCategories = Object.entries(groupedImages).sort(([a], [b]) => {
     const uncategorized = t('gallery.uncategorized', 'Uncategorized');
     if (a === uncategorized) return 1;
     if (b === uncategorized) return -1;
+    
+    const aIndex = categoryOrder.indexOf(a);
+    const bIndex = categoryOrder.indexOf(b);
+    
+    if (aIndex !== -1 && bIndex !== -1) {
+      return aIndex - bIndex;
+    }
+    if (aIndex !== -1) return -1;
+    if (bIndex !== -1) return 1;
+    
     return a.localeCompare(b);
   });
+
+  // 사용 가능한 서비스 카테고리들 추출
+  const availableServiceCategories = useMemo(() => {
+    const categories = new Set<ServiceCategory>();
+    images
+      .filter(img => img.gender === activeTab && img.serviceCategory)
+      .forEach(img => categories.add(img.serviceCategory!));
+    return Array.from(categories);
+  }, [images, activeTab]);
 
   const tabStyle = "flex-1 py-3 text-center font-semibold rounded-md transition-all duration-200 focus:outline-none";
   const activeTabStyle = "bg-indigo-600 text-white shadow-lg";
@@ -171,8 +220,39 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
         </button>
       </div>
 
+      {/* Service Category Filter */}
+      {availableServiceCategories.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setSelectedServiceCategory('all')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+              selectedServiceCategory === 'all'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+            disabled={disabled}
+          >
+            전체
+          </button>
+          {availableServiceCategories.map(category => (
+            <button
+              key={category}
+              onClick={() => setSelectedServiceCategory(category)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
+                selectedServiceCategory === category
+                  ? SERVICE_CATEGORY_COLORS[category]
+                  : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+              }`}
+              disabled={disabled}
+            >
+              {SERVICE_CATEGORY_LABELS[category]}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Results Count */}
-      {searchTerm && (
+      {(searchTerm || selectedServiceCategory !== 'all') && (
         <div className="text-sm text-gray-600">
           {t('gallery.searchResults', '검색 결과: {{count}}개', { count: filteredImages.length })}
         </div>
@@ -194,7 +274,6 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
               
               {/* True Masonry Grid with CSS Columns */}
               <div className="columns-2 gap-2">
-                {/* Hairstyle Images */}
                 {hairstyles.map((image, index) => {
                   // Pinterest style: vary heights for zigzag effect
                   const heightVariants = ['h-48', 'h-56', 'h-64', 'h-52', 'h-60'];
@@ -233,9 +312,21 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                         loading="lazy"
                       />
                       
+                      {/* Service Category Badge */}
+                      {image.serviceCategory && (
+                        <div className="absolute top-2 left-2">
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${SERVICE_CATEGORY_COLORS[image.serviceCategory]}`}>
+                            {SERVICE_CATEGORY_LABELS[image.serviceCategory]}
+                          </span>
+                        </div>
+                      )}
+                      
                       {/* Overlay on hover */}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
                         <p className="text-white font-bold text-sm mb-1">{image.name}</p>
+                        {image.serviceSubCategory && (
+                          <p className="text-gray-200 text-xs mb-1">{image.serviceSubCategory}</p>
+                        )}
                         {image.description && (
                           <p className="text-gray-200 text-xs line-clamp-2">{image.description}</p>
                         )}
@@ -252,7 +343,7 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                       
                       {/* Tags */}
                       {image.tags && image.tags.length > 0 && (
-                        <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                           <div className="flex flex-wrap gap-1">
                             {image.tags.slice(0, 2).map((tag, idx) => (
                               <span key={idx} className="px-2 py-1 bg-black/60 text-white text-xs rounded-full backdrop-blur-sm">
@@ -308,18 +399,18 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
         ) : (
           /* Empty State */
           <div className="py-16 text-center">
-            {searchTerm ? (
+            {searchTerm || selectedServiceCategory !== 'all' ? (
               <div>
                 <div className="text-4xl mb-4">🔍</div>
                 <h3 className="text-lg font-semibold text-gray-700 mb-2">{t('gallery.noSearchResults', '검색 결과가 없습니다')}</h3>
                 <p className="text-gray-500 mb-4">
-                  {t('gallery.noSearchResultsDesc', '{{searchTerm}}에 대한 {{activeTab}} 스타일을 찾을 수 없습니다.', { 
-                    searchTerm, 
-                    activeTab: activeTab === 'Female' ? t('gallery.female', '여성') : t('gallery.male', '남성')
-                  })}
+                  조건에 맞는 {activeTab === 'Female' ? '여성' : '남성'} 스타일을 찾을 수 없습니다.
                 </p>
                 <button
-                  onClick={() => setSearchTerm('')}
+                  onClick={() => {
+                    setSearchTerm('');
+                    setSelectedServiceCategory('all');
+                  }}
                   className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
                 >
                   {t('gallery.showAll', '전체 보기')}
@@ -332,9 +423,7 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                     <div className="text-4xl">💇‍♀️</div>
                     <h3 className="text-lg font-semibold text-gray-700">{t('gallery.noStylesYet', '아직 등록된 스타일이 없습니다')}</h3>
                     <p className="text-gray-500 mb-6">
-                      {t('gallery.addFirstStyle', '첫 번째 {{activeTab}} 스타일을 추가해보세요!', { 
-                        activeTab: activeTab === 'Female' ? t('gallery.female', '여성') : t('gallery.male', '남성')
-                      })}
+                      첫 번째 {activeTab === 'Female' ? '여성' : '남성'} 스타일을 추가해보세요!
                     </p>
                     <div className="flex justify-center">
                       <button
@@ -357,9 +446,7 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                   <div>
                     <div className="text-4xl mb-4">😊</div>
                     <p className="text-gray-500">
-                      {t('gallery.noCategoryStyles', '{{activeTab}} 카테고리에 스타일이 없습니다.', { 
-                        activeTab: activeTab === 'Female' ? t('gallery.female', '여성') : t('gallery.male', '남성')
-                      })}
+                      {activeTab === 'Female' ? '여성' : '남성'} 카테고리에 스타일이 없습니다.
                     </p>
                   </div>
                 )}
@@ -374,59 +461,65 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
 
 export default HairstyleGallery;
 
-// Demo with sample data
+// Demo with sample data - 서비스 카테고리 포함
 const MasonryDemo = () => {
   const { t } = useTranslation();
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
   
   const sampleImages: Hairstyle[] = [
     {
-      name: t('gallery.demo.waveBoB', '웨이브 보브'),
+      name: '레이어드 보브 컷',
       url: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=400&h=600&fit=crop',
       gender: 'Female',
-      majorCategory: 'B length',
-      description: t('gallery.demo.naturalWave', '자연스러운 웨이브'),
-      tags: [t('gallery.demo.wave', '웨이브'), t('gallery.demo.bob', '보브')]
+      serviceCategory: 'cut',
+      serviceSubCategory: '레이어드 컷',
+      description: '자연스러운 레이어가 들어간 보브 스타일',
+      tags: ['레이어드', '보브', '커트']
     },
     {
-      name: t('gallery.demo.longStraight', '롱 스트레이트'),
+      name: '발레아쥬 염색',
       url: 'https://images.unsplash.com/photo-1594736797933-d0501ba2fe65?w=400&h=500&fit=crop',
       gender: 'Female',
-      majorCategory: 'G length',
-      description: t('gallery.demo.longHair', '긴 생머리'),
-      tags: [t('gallery.demo.longHairTag', '롱헤어'), t('gallery.demo.straight', '스트레이트')]
+      serviceCategory: 'color',
+      serviceSubCategory: '발레아쥬',
+      description: '자연스러운 그라데이션 염색',
+      tags: ['발레아쥬', '염색', '그라데이션']
     },
     {
-      name: t('gallery.demo.pixieCut', '픽시 컷'),
+      name: '볼륨 웨이브 펌',
       url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=550&fit=crop',
       gender: 'Female',
-      majorCategory: 'A length',
-      description: t('gallery.demo.shortPixie', '짧은 픽시'),
-      tags: [t('gallery.demo.pixie', '픽시'), t('gallery.demo.shortHair', '짧은머리')]
+      serviceCategory: 'perm',
+      serviceSubCategory: '볼륨 펌',
+      description: '자연스러운 볼륨감을 주는 웨이브 펌',
+      tags: ['웨이브', '펌', '볼륨']
     },
     {
-      name: t('gallery.demo.curlyMedium', '컬리 미디움'),
+      name: '업스타일 세팅',
       url: 'https://images.unsplash.com/photo-1487412912498-0447578fcca8?w=400&h=650&fit=crop',
       gender: 'Female',
-      majorCategory: 'D length',
-      description: t('gallery.demo.naturalCurl', '자연스러운 컬'),
-      tags: [t('gallery.demo.curl', '컬'), t('gallery.demo.medium', '미디움')]
+      serviceCategory: 'styling',
+      serviceSubCategory: '업스타일',
+      description: '특별한 날을 위한 우아한 업스타일',
+      tags: ['업스타일', '세팅', '파티']
     },
     {
-      name: t('gallery.demo.layeredCut', '레이어드 컷'),
+      name: '케라틴 트리트먼트',
       url: 'https://images.unsplash.com/photo-1524502397800-2eeaad7c3fe5?w=400&h=500&fit=crop',
       gender: 'Female',
-      majorCategory: 'C length',
-      description: t('gallery.demo.layered', '층진 레이어'),
-      tags: [t('gallery.demo.layer', '레이어'), t('gallery.demo.volume', '볼륨')]
+      serviceCategory: 'treatment',
+      serviceSubCategory: '케라틴',
+      description: '손상된 모발을 건강하게 관리',
+      tags: ['케라틴', '트리트먼트', '케어']
     },
     {
-      name: t('gallery.demo.bangsBob', '앞머리 보브'),
-      url: 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=400&h=600&fit=crop',
-      gender: 'Female',
-      majorCategory: 'B length',
-      description: t('gallery.demo.cuteBangs', '귀여운 앞머리'),
-      tags: [t('gallery.demo.bob', '보브'), t('gallery.demo.bangs', '앞머리')]
+      name: '페이드 커트',
+      url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=600&fit=crop',
+      gender: 'Male',
+      serviceCategory: 'cut',
+      serviceSubCategory: '페이드 컷',
+      description: '깔끔한 페이드 커트',
+      tags: ['페이드', '커트', '남성']
     }
   ];
 
@@ -444,7 +537,7 @@ const MasonryDemo = () => {
         {selectedUrl && (
           <div className="mt-6 p-4 bg-white rounded-xl shadow-md text-center">
             <p className="text-gray-700 text-sm font-medium">
-              {t('gallery.demo.selected', '선택됨')}: {sampleImages.find(img => img.url === selectedUrl)?.name}
+              선택됨: {sampleImages.find(img => img.url === selectedUrl)?.name}
             </p>
           </div>
         )}
