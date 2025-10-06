@@ -490,7 +490,7 @@ Generate a realistic photo showing this person with the new hair color.
             topK: 32,
             topP: 1,
             maxOutputTokens: 4096,
-            response_modalities: ["TEXT", "IMAGE"], // 이미지 생성 명시
+            response_modalities: ["TEXT", "IMAGE"] // 이미지 생성 명시
           }
         })
       });
