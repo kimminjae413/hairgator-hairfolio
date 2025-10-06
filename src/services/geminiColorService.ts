@@ -292,10 +292,19 @@ class GeminiColorTryOnService {
 
     try {
       const imageData = await this.fetchImageAsBase64(styleImageUrl);
+      console.log('스타일 이미지 Base64 변환 성공');
+      
       const response = await this.callGeminiAnalysisAPI(prompt, imageData);
-      return this.extractJsonFromResponse(response);
+      console.log('Gemini 스타일 분석 응답:', response);
+      
+      const parsed = this.extractJsonFromResponse(response);
+      console.log('파싱된 스타일 분석:', parsed);
+      
+      return parsed;
     } catch (error) {
       console.error('Color style analysis failed:', error);
+      console.log('기본 스타일 분석값 사용');
+      
       // 기본값 반환
       return {
         dominantColors: ["#8B4513", "#D2691E"],
