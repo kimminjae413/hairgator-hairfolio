@@ -1,16 +1,19 @@
 [build]
   publish = "dist"
-  command = "npm install && npm run build"
+  command = "npm ci && npm run build"
 
 [build.environment]
   NODE_VERSION = "18.18.2"
   NODE_OPTIONS = "--max-old-space-size=4096"
+  NPM_FLAGS = "--production=false"
 
+# SPA 라우팅을 위한 리다이렉트
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
+# 보안 및 성능 헤더
 [[headers]]
   for = "/*"
   [headers.values]
@@ -18,8 +21,41 @@
     X-XSS-Protection = "1; mode=block"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
 
+# 정적 자산 캐싱
 [[headers]]
   for = "/assets/*"
+  [headers.values]
+    Cache-Control = "max-age=31536000, immutable"
+
+[[headers]]
+  for = "*.js"
+  [headers.values]
+    Cache-Control = "max-age=31536000, immutable"
+
+[[headers]]
+  for = "*.css"
+  [headers.values]
+    Cache-Control = "max-age=31536000, immutable"
+
+# 이미지 최적화
+[[headers]]
+  for = "*.png"
+  [headers.values]
+    Cache-Control = "max-age=31536000, immutable"
+
+[[headers]]
+  for = "*.jpg"
+  [headers.values]
+    Cache-Control = "max-age=31536000, immutable"
+
+[[headers]]
+  for = "*.jpeg"
+  [headers.values]
+    Cache-Control = "max-age=31536000, immutable"
+
+[[headers]]
+  for = "*.webp"
   [headers.values]
     Cache-Control = "max-age=31536000, immutable"
