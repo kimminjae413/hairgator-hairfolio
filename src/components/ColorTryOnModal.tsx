@@ -9,21 +9,31 @@ interface ColorTryOnModalProps {
     serviceSubCategory?: string;
     description?: string;
   };
+  userFaceFile?: File | null; // 기존 얼굴 사진 파일
+  userFacePreview?: string | null; // 기존 얼굴 사진 미리보기
   onClose: () => void;
   onComplete: (result: any) => void;
 }
 
 const ColorTryOnModal: React.FC<ColorTryOnModalProps> = ({
   colorStyleImage,
+  userFaceFile: initialFaceFile,
+  userFacePreview: initialFacePreview,
   onClose,
   onComplete
 }) => {
   const { t } = useTranslation();
-  const [userPhoto, setUserPhoto] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  
+  // 얼굴 사진 상태 - 초기값으로 전달받은 파일 사용
+  const [userPhoto, setUserPhoto] = useState<File | null>(initialFaceFile || null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(initialFacePreview || null);
+  
   const [colorType, setColorType] = useState<'highlight' | 'full-color' | 'ombre' | 'balayage'>('full-color');
   const [intensity, setIntensity] = useState<'light' | 'medium' | 'bold'>('medium');
-  const [currentStep, setCurrentStep] = useState<'upload' | 'options' | 'processing' | 'result'>('upload');
+  const [currentStep, setCurrentStep] = useState<'upload' | 'options' | 'processing' | 'result'>(
+    // 이미 얼굴 사진이 있으면 옵션 단계로 바로 이동
+    initialFaceFile ? 'options' : 'upload'
+  );
   
   const { isProcessing, result, error, tryOnColor } = useColorTryOn();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -45,6 +55,10 @@ const ColorTryOnModal: React.FC<ColorTryOnModalProps> = ({
       }
 
       setUserPhoto(file);
+      // 기존 미리보기 URL 정리
+      if (previewUrl && previewUrl !== initialFacePreview) {
+        URL.revokeObjectURL(previewUrl);
+      }
       setPreviewUrl(URL.createObjectURL(file));
       setCurrentStep('options');
     }
@@ -55,8 +69,8 @@ const ColorTryOnModal: React.FC<ColorTryOnModalProps> = ({
 
     setCurrentStep('processing');
 
-    // 사용자 사진을 임시 URL로 변환 (실제로는 서버 업로드 필요)
-    const userPhotoUrl = URL.createObjectURL(userPhoto);
+    // 사용자 사진을 URL로 변환 (File일 경우)
+    const userPhotoUrl = previewUrl || URL.createObjectURL(userPhoto);
 
     const request: ColorTryOnRequest = {
       userPhotoUrl,
@@ -107,7 +121,12 @@ const ColorTryOnModal: React.FC<ColorTryOnModalProps> = ({
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">염색 가상체험</h2>
+            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+              <svg className="w-6 h-6 text-purple-600" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2L13.09 8.26L22 9L13.09 9.74L12 16L10.91 9.74L2 9L10.91 8.26L12 2Z"/>
+              </svg>
+              염색 가상체험
+            </h2>
             <p className="text-sm text-gray-600 mt-1">{colorStyleImage.name}</p>
           </div>
           <button
@@ -123,7 +142,7 @@ const ColorTryOnModal: React.FC<ColorTryOnModalProps> = ({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          {/* Step 1: Upload Photo */}
+          {/* Step 1: Upload Photo (기존 사진이 없을 때만 표시) */}
           {currentStep === 'upload' && (
             <div className="p-6">
               <div className="text-center mb-6">
@@ -197,7 +216,16 @@ const ColorTryOnModal: React.FC<ColorTryOnModalProps> = ({
               <div className="grid md:grid-cols-2 gap-6">
                 {/* Preview */}
                 <div>
-                  <h3 className="font-semibold mb-3">업로드된 사진</h3>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold">
+                      {initialFaceFile ? '업로드된 사진' : '선택된 사진'}
+                    </h3>
+                    {initialFaceFile && (
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                        기존 사진 사용
+                      </span>
+                    )}
+                  </div>
                   {previewUrl && (
                     <img 
                       src={previewUrl} 
@@ -298,9 +326,9 @@ const ColorTryOnModal: React.FC<ColorTryOnModalProps> = ({
                   </div>
                 </div>
                 
-                <h3 className="text-xl font-semibold mb-3">AI가 염색을 진행중입니다...</h3>
+                <h3 className="text-xl font-semibold mb-3">Gemini AI가 염색을 진행중입니다...</h3>
                 <p className="text-gray-600 mb-6">
-                  Gemini AI가 얼굴형, 피부톤, 헤어 스타일을 분석하여<br />
+                  AI가 얼굴형, 피부톤, 헤어 스타일을 분석하여<br />
                   가장 어울리는 염색 결과를 만들고 있습니다.
                 </p>
 
@@ -352,7 +380,12 @@ const ColorTryOnModal: React.FC<ColorTryOnModalProps> = ({
                 </div>
               ) : result ? (
                 <div>
-                  <h3 className="text-xl font-semibold mb-4 text-center">염색 체험 결과</h3>
+                  <h3 className="text-xl font-semibold mb-4 text-center flex items-center justify-center gap-2">
+                    <svg className="w-6 h-6 text-purple-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2L13.09 8.26L22 9L13.09 9.74L12 16L10.91 9.74L2 9L10.91 8.26L12 2Z"/>
+                    </svg>
+                    염색 체험 결과
+                  </h3>
                   
                   <div className="grid md:grid-cols-2 gap-6 mb-6">
                     {/* Before */}
