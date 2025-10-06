@@ -516,6 +516,9 @@ Generate a realistic photo showing this person with the new hair color.
           if (part.inline_data) {
             console.log(`Part ${index} - 이미지 데이터 발견! mime_type:`, part.inline_data.mime_type);
             console.log(`Part ${index} - 데이터 길이:`, part.inline_data.data?.length);
+          } else if (part.inlineData) {
+            console.log(`Part ${index} - 이미지 데이터 발견! mime_type:`, part.inlineData.mimeType);
+            console.log(`Part ${index} - 데이터 길이:`, part.inlineData.data?.length);
           }
           if (part.text) {
             console.log(`Part ${index} - 텍스트:`, part.text);
@@ -538,9 +541,9 @@ Generate a realistic photo showing this person with the new hair color.
         // content.parts에서 이미지 데이터 찾기
         if (candidate.content && candidate.content.parts) {
           for (const part of candidate.content.parts) {
-            if (part.inline_data && part.inline_data.data) {
+            if ((part.inline_data && part.inline_data.data) || (part.inlineData && part.inlineData.data)) {
               // Base64 이미지를 Blob URL로 변환
-              const base64Data = part.inline_data.data;
+              const base64Data = part.inline_data?.data || part.inlineData?.data;
               const byteCharacters = atob(base64Data);
               const byteNumbers = new Array(byteCharacters.length);
               for (let i = 0; i < byteCharacters.length; i++) {
