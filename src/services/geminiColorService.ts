@@ -14,6 +14,7 @@ export interface ColorTryOnResult {
   resultImageUrl: string;
   confidence: number;
   processingTime: number;
+  apiCallsUsed: number; // ✅ 추가: API 호출 횟수 추적
   colorAnalysis: {
     dominantColors: string[];
     skinToneMatch: 'excellent' | 'good' | 'fair' | 'poor';
@@ -45,11 +46,18 @@ interface SkinToneAnalysis {
   avoidColors: string[];
 }
 
-// Gemini Color Try-On Service
+// Gemini Color Try-On Service (최적화 버전)
 class GeminiColorTryOnService {
   private apiKey: string;
   private analysisEndpoint: string = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
   private imageGenerationEndpoint: string = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent';
+  
+  // ✅ 캐시 시스템
+  private colorCache = new Map<string, string[]>();
+  
+  // ✅ Rate Limiter
+  private callTimestamps: number[] = [];
+  private maxCallsPerMinute = 10;
 
   constructor() {
     this.apiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -57,6 +65,30 @@ class GeminiColorTryOnService {
     if (!this.apiKey || this.apiKey === 'your_gemini_api_key_here') {
       console.warn('VITE_GEMINI_API_KEY 환경변수가 설정되지 않았습니다. 데모 모드로 실행됩니다.');
     }
+  }
+
+  // ✅ Rate Limiter 함수
+  private async waitForAvailableSlot(): Promise<void> {
+    const now = Date.now();
+    const oneMinuteAgo = now - 60000;
+
+    // 1분 이내 호출 기록만 유지
+    this.callTimestamps = this.callTimestamps.filter(t => t > oneMinuteAgo);
+
+    if (this.callTimestamps.length >= this.maxCallsPerMinute) {
+      const oldestCall = this.callTimestamps[0];
+      const waitTime = 60000 - (now - oldestCall) + 1000; // +1초 여유
+      
+      console.log(`⏳ API 호출 제한: ${Math.ceil(waitTime / 1000)}초 대기`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+
+    this.callTimestamps.push(now);
+  }
+
+  // ✅ 이미지 해시 함수 (캐시 키 생성)
+  private hashImage(base64OrUrl: string): string {
+    return base64OrUrl.slice(0, 100);
   }
 
   private extractJsonFromResponse(text: string): any {
@@ -93,7 +125,10 @@ class GeminiColorTryOnService {
     }
   }
 
+  // ✅ 최적화된 메인 함수 (API 호출 75% 감소)
   async tryOnHairColor(request: ColorTryOnRequest): Promise<ColorTryOnResult> {
+    let apiCallsUsed = 0;
+    
     try {
       const startTime = Date.now();
 
@@ -101,18 +136,36 @@ class GeminiColorTryOnService {
         return this.createDemoResult(request, startTime);
       }
 
-      const hairAnalysis = await this.analyzeHairRegion(request.userPhotoUrl);
+      // ✅ STEP 1: Canvas로 색상 추출 (API 호출 0회)
       const colorAnalysis = await this.analyzeColorStyle(request.colorStyleUrl);
-      const skinToneAnalysis = await this.analyzeSkinTone(request.userPhotoUrl);
       
+      // ✅ STEP 2: 기본값 사용 (API 호출 생략)
+      const hairAnalysis: HairAnalysis = {
+        currentColor: "자연스러운 갈색",
+        texture: "직모",
+        length: "중간",
+        clarity: 0.75
+      };
+
+      const skinToneAnalysis: SkinToneAnalysis = {
+        type: "뉴트럴톤",
+        undertone: "중성 언더톤",
+        rgbValue: "rgb(200, 170, 145)",
+        suitableColors: ["갈색 계열", "자연스러운 색상"],
+        avoidColors: ["극단적인 색상"]
+      };
+      
+      // ✅ STEP 3: 이미지 생성 (API 호출 1회만)
+      await this.waitForAvailableSlot();
       const resultImageUrl = await this.processColorTransformation(
         request.userPhotoUrl,
         hairAnalysis,
         colorAnalysis,
         request
       );
+      apiCallsUsed = 1;
 
-      const recommendations = await this.generateRecommendations(
+      const recommendations = this.generateRecommendations(
         skinToneAnalysis,
         colorAnalysis,
         request
@@ -120,10 +173,13 @@ class GeminiColorTryOnService {
 
       const processingTime = Date.now() - startTime;
 
+      console.log(`✅ 염색 체험 완료! API 호출: ${apiCallsUsed}회`);
+
       return {
         resultImageUrl,
         confidence: this.calculateConfidence(hairAnalysis, colorAnalysis),
         processingTime,
+        apiCallsUsed,
         colorAnalysis: {
           dominantColors: colorAnalysis.dominantColors,
           skinToneMatch: this.evaluateSkinToneMatch(skinToneAnalysis, colorAnalysis),
@@ -136,7 +192,7 @@ class GeminiColorTryOnService {
       
       if (error instanceof Error && (error.message.includes('API') || error.message.includes('파싱'))) {
         console.warn('AI 분석 오류 발생, 데모 모드로 전환합니다.');
-        return this.createDemoResult(request, Date.now());
+        return { ...this.createDemoResult(request, Date.now()), apiCallsUsed };
       }
       
       throw new Error('염색 가상체험 처리 중 오류가 발생했습니다: ' + (error as Error).message);
@@ -195,6 +251,7 @@ class GeminiColorTryOnService {
       resultImageUrl: demo.resultImageUrl,
       confidence: 0.85,
       processingTime,
+      apiCallsUsed: 0,
       colorAnalysis: {
         dominantColors: demo.dominantColors,
         skinToneMatch: demo.skinToneMatch,
@@ -203,74 +260,48 @@ class GeminiColorTryOnService {
     };
   }
 
-  private async analyzeHairRegion(imageUrl: string): Promise<HairAnalysis> {
-    const prompt = `
-이 이미지에서 머리카락을 분석해주세요. 반드시 다음 JSON 형태로만 응답해주세요:
-
-{
-  "currentColor": "자연스러운 갈색",
-  "texture": "직모",
-  "length": "중간",
-  "clarity": 0.8
-}
-    `;
-
-    try {
-      const imageData = await this.fetchImageAsBase64(imageUrl);
-      const response = await this.callGeminiAnalysisAPI(prompt, imageData);
-      return this.extractJsonFromResponse(response);
-    } catch (error) {
-      console.error('Hair analysis failed:', error);
+  // ✅ 최적화: Canvas 기반 색상 추출 (API 사용 안함)
+  private async analyzeColorStyle(styleImageUrl: string): Promise<ColorAnalysis> {
+    // 캐시 확인
+    const cacheKey = this.hashImage(styleImageUrl);
+    if (this.colorCache.has(cacheKey)) {
+      console.log('💾 캐시된 색상 사용');
+      const cachedColors = this.colorCache.get(cacheKey)!;
       return {
-        currentColor: "자연스러운 갈색",
-        texture: "직모",
-        length: "중간",
-        clarity: 0.7
+        dominantColors: cachedColors,
+        technique: "염색",
+        gradientPattern: "자연스러운 색상",
+        difficulty: "중급",
+        suitableSkinTones: ["웜톤", "뉴트럴톤"],
+        compatibility: 0.8
       };
     }
-  }
 
-  private async analyzeColorStyle(styleImageUrl: string): Promise<ColorAnalysis> {
     try {
-      // 먼저 Gemini AI로 실제 이미지 분석 시도
-      const prompt = `
-Analyze this hair color image and respond with ONLY this JSON format:
-
-{
-  "dominantColors": ["#colorhex1", "#colorhex2"],
-  "technique": "balayage",
-  "gradientPattern": "natural gradient",
-  "difficulty": "medium",
-  "suitableSkinTones": ["warm", "neutral"],
-  "compatibility": 0.8
-}
-
-Extract the actual hair colors from this image as hex codes.
-      `;
-
-      const imageData = await this.fetchImageAsBase64(styleImageUrl);
-      const response = await this.callGeminiAnalysisAPI(prompt, imageData);
-      const parsed = this.extractJsonFromResponse(response);
+      // Canvas로 색상 추출
+      const colors = await this.analyzeImageColors(styleImageUrl);
       
-      // 유효한 hex 색상이 있는지 확인
-      if (parsed.dominantColors && Array.isArray(parsed.dominantColors) && parsed.dominantColors.length > 0) {
-        console.log('Gemini 색상 분석 성공:', parsed.dominantColors);
-        return parsed;
-      } else {
-        throw new Error('Invalid color analysis result');
-      }
+      // 캐시 저장
+      this.colorCache.set(cacheKey, colors.dominantColors);
+      
+      return colors;
       
     } catch (error) {
-      console.error('Gemini 색상 분석 실패, 이미지 기반 분석 시도:', error);
+      console.error('색상 분석 실패, 기본값 사용:', error);
       
-      // Gemini 실패 시 이미지 자체에서 색상 추출 시도
-      return this.analyzeImageColors(styleImageUrl);
+      return {
+        dominantColors: ["#8B4513", "#D2691E"],
+        technique: "전체염색",
+        gradientPattern: "균일한 색상",
+        difficulty: "초급",
+        suitableSkinTones: ["모든 톤"],
+        compatibility: 0.7
+      };
     }
   }
 
   private async analyzeImageColors(imageUrl: string): Promise<ColorAnalysis> {
     try {
-      // Canvas를 사용해 이미지에서 주요 색상 추출
       const img = new Image();
       img.crossOrigin = 'anonymous';
       
@@ -286,7 +317,7 @@ Extract the actual hair colors from this image as hex codes.
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
           const colors = this.extractDominantColors(imageData.data);
           
-          console.log('이미지에서 추출한 색상:', colors);
+          console.log('📊 이미지에서 추출한 색상:', colors);
           
           resolve({
             dominantColors: colors,
@@ -331,22 +362,22 @@ Extract the actual hair colors from this image as hex codes.
     const colorMap = new Map<string, number>();
     
     // 이미지 데이터를 샘플링해서 색상 빈도 계산
-    for (let i = 0; i < imageData.length; i += 64) { // 더 넓은 간격으로 샘플링
+    for (let i = 0; i < imageData.length; i += 64) {
       const r = imageData[i];
       const g = imageData[i + 1];
       const b = imageData[i + 2];
       const a = imageData[i + 3];
       
-      if (a > 200) { // 불투명한 픽셀만
-        // 너무 어둡거나 너무 밝은 색상 제외 (배경 노이즈 제거)
+      if (a > 200) {
+        // 너무 어둡거나 너무 밝은 색상 제외
         const brightness = (r + g + b) / 3;
-        if (brightness < 30 || brightness > 240) continue; // 검정색과 흰색 제외
+        if (brightness < 30 || brightness > 240) continue;
         
         // 채도가 너무 낮은 색상 제외 (회색 제거)
         const max = Math.max(r, g, b);
         const min = Math.min(r, g, b);
         const saturation = max === 0 ? 0 : (max - min) / max;
-        if (saturation < 0.1) continue; // 무채색 제외
+        if (saturation < 0.1) continue;
         
         // 색상을 그룹화하기 위해 반올림
         const roundedR = Math.round(r / 16) * 16;
@@ -358,16 +389,16 @@ Extract the actual hair colors from this image as hex codes.
       }
     }
     
-    // 색상이 충분히 감지되지 않으면 핑크/퍼플 계열 기본값 사용
+    // 색상이 충분히 감지되지 않으면 기본값
     if (colorMap.size < 2) {
-      console.log('충분한 색상 감지 안됨, 핑크/퍼플 기본값 사용');
-      return ['#E6B3FF', '#D147A3', '#8A2BE2']; // 핑크-퍼플 계열
+      console.log('충분한 색상 감지 안됨, 기본값 사용');
+      return ['#E6B3FF', '#D147A3', '#8A2BE2'];
     }
     
     // 가장 빈번한 색상들을 찾기
     const sortedColors = Array.from(colorMap.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 3); // 상위 3개 색상
+      .slice(0, 3);
     
     const extractedColors = sortedColors.map(([colorKey]) => {
       const [r, g, b] = colorKey.split(',').map(Number);
@@ -384,91 +415,10 @@ Extract the actual hair colors from this image as hex codes.
     
     if (allDark) {
       console.log('어두운 색상만 감지됨, 밝은 색상 추가');
-      extractedColors.push('#E6B3FF', '#D147A3'); // 핑크/퍼플 추가
+      extractedColors.push('#E6B3FF', '#D147A3');
     }
     
     return extractedColors.slice(0, 3);
-  }
-
-  private async analyzeSkinTone(imageUrl: string): Promise<SkinToneAnalysis> {
-    const prompt = `
-이 사진에서 피부톤을 분석해주세요. 반드시 다음 JSON 형태로만 응답해주세요:
-
-{
-  "type": "웜톤",
-  "undertone": "황색 언더톤",
-  "rgbValue": "rgb(205, 170, 140)",
-  "suitableColors": ["갈색 계열", "골드 계열"],
-  "avoidColors": ["애쉬 계열", "실버 계열"]
-}
-    `;
-
-    try {
-      const imageData = await this.fetchImageAsBase64(imageUrl);
-      const response = await this.callGeminiAnalysisAPI(prompt, imageData);
-      return this.extractJsonFromResponse(response);
-    } catch (error) {
-      console.error('Skin tone analysis failed:', error);
-      return {
-        type: "뉴트럴톤",
-        undertone: "중성 언더톤",
-        rgbValue: "rgb(200, 170, 145)",
-        suitableColors: ["갈색 계열", "자연스러운 색상"],
-        avoidColors: ["극단적인 색상"]
-      };
-    }
-  }
-
-  private async callGeminiAnalysisAPI(prompt: string, imageData?: string): Promise<string> {
-    const requestBody: any = {
-      contents: [{
-        parts: [
-          { text: prompt }
-        ]
-      }],
-      generationConfig: {
-        temperature: 0.1,
-        topK: 32,
-        topP: 1,
-        maxOutputTokens: 2048
-      }
-    };
-
-    if (imageData) {
-      requestBody.contents[0].parts.push({
-        inline_data: {
-          mime_type: "image/jpeg",
-          data: imageData
-        }
-      });
-    }
-
-    const response = await fetch(`${this.analysisEndpoint}?key=${this.apiKey}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody)
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error('API 키가 유효하지 않습니다.');
-      } else if (response.status === 429) {
-        throw new Error('API 호출 한도를 초과했습니다.');
-      } else {
-        throw new Error(`API 요청 실패: ${response.status}`);
-      }
-    }
-
-    const data = await response.json();
-    
-    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0]) {
-      console.error('API 응답 형식 오류:', data);
-      throw new Error('API 응답 형식이 올바르지 않습니다.');
-    }
-
-    return data.candidates[0].content.parts[0].text;
   }
 
   private async fetchImageAsBase64(imageUrl: string): Promise<string> {
@@ -499,6 +449,7 @@ Extract the actual hair colors from this image as hex codes.
     }
   }
 
+  // ✅ 이미지 생성 (Rate Limiter 적용됨)
   private async processColorTransformation(
     originalImageUrl: string,
     hairAnalysis: HairAnalysis,
@@ -585,7 +536,7 @@ Transform ONLY the color - keep everything else identical to the original photo.
               const blob = new Blob([byteArray], { type: 'image/jpeg' });
               const blobUrl = URL.createObjectURL(blob);
               
-              console.log('이미지 생성 성공');
+              console.log('✅ 이미지 생성 성공');
               return blobUrl;
             }
           }
@@ -602,11 +553,11 @@ Transform ONLY the color - keep everything else identical to the original photo.
     }
   }
 
-  private async generateRecommendations(
+  private generateRecommendations(
     skinToneAnalysis: SkinToneAnalysis,
     colorAnalysis: ColorAnalysis,
     request: ColorTryOnRequest
-  ): Promise<string[]> {
+  ): string[] {
     return [
       "염색 후 컬러 전용 샴푸를 사용하여 색상을 오래 유지하세요",
       "염색 후 2-3일은 머리를 감지 않는 것이 좋습니다",
@@ -660,6 +611,9 @@ export const useColorTryOn = () => {
       const service = new GeminiColorTryOnService();
       const colorResult = await service.tryOnHairColor(request);
       setResult(colorResult);
+      
+      // ✅ API 호출 횟수 로그
+      console.log(`📊 API 호출 횟수: ${colorResult.apiCallsUsed}회`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.';
       setError(errorMessage);
