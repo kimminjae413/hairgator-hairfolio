@@ -507,28 +507,23 @@ Extract the actual hair colors from this image as hex codes.
   ): Promise<string> {
     try {
       const transformationPrompt = `
-Apply this EXACT hair color gradient/ombre effect to this person:
+Apply ONLY the hair colors from the reference style to this person's existing hairstyle.
 
-GRADIENT PATTERN:
-- Root area (top 20%): Keep natural dark brown/black roots
-- Middle section (40%): Apply platinum blonde/silver color
-- Lower section (40%): Apply ${colorAnalysis.dominantColors.join(' to ')} gradient
+EXTRACT these colors from reference: ${colorAnalysis.dominantColors.join(', ')}
+Color Technique: ${colorAnalysis.technique}
+Intensity: ${request.intensity}
 
-Hair Color Style: ${request.colorType}
-Color Intensity: ${request.intensity}
-Colors to use: ${colorAnalysis.dominantColors.join(', ')}
-Technique: ${colorAnalysis.technique}
-
-CRITICAL REQUIREMENTS:
+CRITICAL RULES:
 1. Keep the person's face EXACTLY the same
-2. Keep the current hairstyle EXACTLY the same (length, waves, cut)
-3. Create a GRADIENT/OMBRE effect, not solid color
-4. Apply multiple colors in layers: dark roots → light middle → colored ends
-5. Make the color transition smooth and natural
-6. Preserve hair texture and styling
-7. Use ALL the detected colors in the gradient, not just one
+2. Keep their ORIGINAL hairstyle (length, cut, waves, texture) EXACTLY the same
+3. Do NOT copy the reference hairstyle - only use its COLORS
+4. Apply the extracted colors to their existing hair structure
+5. Maintain their natural hair flow and volume
+6. Do NOT change hair length, layers, or styling
+7. Only change the hair color using the reference colors
+8. Preserve their original hair texture and movement
 
-Create a realistic multi-tonal hair color transformation with smooth color transitions.
+Transform ONLY the color - keep everything else identical to the original photo.
       `;
 
       const imageData = await this.fetchImageAsBase64(originalImageUrl);
