@@ -693,6 +693,51 @@ export const trackTrialResult = async (
   }
 };
 
+// Clean up invalid blob URLs from trial results
+export const cleanupInvalidTrialResults = async (designerName: string): Promise<void> => {
+  try {
+    if (!isFirebaseAvailable()) {
+      console.log('⚠️ Firebase not available, skipping cleanup');
+      return;
+    }
+
+    const currentData = await getDesignerData(designerName);
+    const trialResults = currentData.stats?.trialResults || [];
+    
+    // Blob URL이나 유효하지 않은 URL 제거
+    const validTrialResults = trialResults.filter(trial => {
+      const isValid = !trial.resultUrl.startsWith('blob:') && 
+                     (trial.resultUrl.startsWith('http') || trial.resultUrl.startsWith('https'));
+      
+      if (!isValid) {
+        console.log('🧹 Invalid trial result removed:', {
+          styleName: trial.styleName,
+          timestamp: trial.timestamp,
+          url: trial.resultUrl.substring(0, 50) + '...'
+        });
+      }
+      
+      return isValid;
+    });
+    
+    if (validTrialResults.length !== trialResults.length) {
+      const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
+      await updateDoc(designerRef, {
+        'stats.trialResults': validTrialResults,
+        'stats.lastUpdated': new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      
+      console.log(`✅ Cleaned up ${trialResults.length - validTrialResults.length} invalid trial results`);
+    } else {
+      console.log('✅ No invalid trial results found');
+    }
+    
+  } catch (error) {
+    console.error('❌ Error cleaning up trial results:', error);
+  }
+};
+
 // Reset analytics data
 export const resetAnalytics = async (designerName: string): Promise<boolean> => {
   try {
