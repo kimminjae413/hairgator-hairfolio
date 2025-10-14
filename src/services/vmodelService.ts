@@ -57,6 +57,53 @@ const uploadImageToCloudinary = async (file: File): Promise<string> => {
   }
 };
 
+// VModel 결과 이미지를 Cloudinary로 영구 저장하는 함수
+const reuploadToCloudinary = async (externalUrl: string): Promise<string> => {
+  try {
+    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+
+    if (!cloudName || !uploadPreset) {
+      throw new Error('Cloudinary 설정이 없습니다.');
+    }
+
+    console.log('🔄 VModel 결과를 Cloudinary로 영구 저장 중...');
+
+    // Cloudinary는 외부 URL을 직접 업로드할 수 있음
+    const formData = new FormData();
+    formData.append('file', externalUrl);
+    formData.append('upload_preset', uploadPreset);
+    formData.append('folder', 'hairfolio/results'); // 결과물은 별도 폴더에 저장
+    formData.append('tags', 'hairfolio,vmodel-result,trial');
+
+    const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+    
+    const response = await fetch(uploadUrl, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Cloudinary 업로드 실패: ${errorData.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    
+    // 최적화된 URL 반환
+    const optimizedUrl = result.secure_url.replace(
+      '/upload/',
+      '/upload/f_auto,q_auto,w_800,h_800,c_fill/'
+    );
+    
+    console.log('✅ Cloudinary 영구 URL 생성 완료:', optimizedUrl);
+    return optimizedUrl;
+  } catch (error) {
+    console.error('❌ Cloudinary 재업로드 에러:', error);
+    throw error;
+  }
+};
+
 // Task 상태를 폴링하여 완료까지 기다리는 함수
 const pollTaskStatus = async (taskId: string): Promise<VModelTask> => {
   const maxAttempts = 60; // 최대 5분 대기 (5초 간격)
@@ -156,18 +203,18 @@ export const applyHairstyle = async (
       });
     }
 
-    console.log('VModel API 요청 시작...');
+    console.log('🚀 VModel API 요청 시작...');
 
     // 1단계: 이미지를 Cloudinary에 업로드하여 URL 획득
     const targetImageUrl = await uploadImageToCloudinary(faceFile);
-    console.log('얼굴 이미지 업로드 완료:', targetImageUrl);
+    console.log('✅ 얼굴 이미지 업로드 완료:', targetImageUrl);
 
     let sourceImageUrl: string;
     if (typeof hairstyleFile === 'string') {
       sourceImageUrl = hairstyleFile; // 이미 URL인 경우
     } else {
       sourceImageUrl = await uploadImageToCloudinary(hairstyleFile);
-      console.log('헤어스타일 이미지 업로드 완료:', sourceImageUrl);
+      console.log('✅ 헤어스타일 이미지 업로드 완료:', sourceImageUrl);
     }
 
     // 2단계: VModel Task 생성
@@ -189,7 +236,7 @@ export const applyHairstyle = async (
 
     if (!createResponse.ok) {
       const errorText = await createResponse.text();
-      console.error('VModel Task 생성 실패:', errorText);
+      console.error('❌ VModel Task 생성 실패:', errorText);
       
       if (createResponse.status === 401) {
         throw new Error('API 키가 유효하지 않습니다. VModel 계정을 확인해주세요.');
@@ -209,10 +256,10 @@ export const applyHairstyle = async (
     }
 
     const taskId = createData.result.task_id;
-    console.log('VModel Task 생성됨:', taskId, '비용:', createData.result.task_cost);
+    console.log('📋 VModel Task 생성됨:', taskId, '비용:', createData.result.task_cost);
 
     // 3단계: Task 완료까지 폴링
-    console.log('VModel 처리 대기 중...');
+    console.log('⏳ VModel 처리 대기 중...');
     const completedTask = await pollTaskStatus(taskId);
 
     // 4단계: 결과 이미지 URL 반환
@@ -220,13 +267,22 @@ export const applyHairstyle = async (
       throw new Error('VModel에서 결과 이미지를 생성하지 못했습니다.');
     }
 
-    const resultImageUrl = completedTask.output[0];
-    console.log('VModel 처리 완료:', resultImageUrl);
+    const vmodelResultUrl = completedTask.output[0];
+    console.log('✅ VModel 처리 완료:', vmodelResultUrl);
     
-    return resultImageUrl;
+    // 5단계: VModel 임시 URL을 Cloudinary로 영구 보관
+    try {
+      const permanentUrl = await reuploadToCloudinary(vmodelResultUrl);
+      console.log('💾 최종 결과 URL (영구):', permanentUrl);
+      return permanentUrl;
+    } catch (reuploadError) {
+      console.error('⚠️ Cloudinary 재업로드 실패, VModel 임시 URL 반환:', reuploadError);
+      // 재업로드 실패 시 원본 URL 반환 (fallback)
+      return vmodelResultUrl;
+    }
 
   } catch (error) {
-    console.error('VModel API Error:', error);
+    console.error('❌ VModel API Error:', error);
     
     if (error instanceof Error) {
       throw error;
