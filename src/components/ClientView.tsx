@@ -157,6 +157,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
       // Track trial result - 성공한 경우에만 저장
       if (finalImage) {
         try {
+          // VModel 결과는 이미 영구 URL이므로 바로 저장
           await firebaseService.trackTrialResult(designerName, {
             styleUrl: hairstyle.url,
             resultUrl: finalImage,
