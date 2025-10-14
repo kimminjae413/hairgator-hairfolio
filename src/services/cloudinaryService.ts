@@ -241,6 +241,41 @@ export const deleteFromCloudinary = async (publicId: string): Promise<boolean> =
   return false;
 };
 
+// Blob URL을 Cloudinary에 업로드하는 함수
+export const uploadBlobToCloudinary = async (
+  blobUrl: string,
+  fileName: string = 'trial-result'
+): Promise<string> => {
+  try {
+    console.log('Blob URL을 Cloudinary에 업로드 시작:', blobUrl);
+    
+    // Blob URL을 File 객체로 변환
+    const response = await fetch(blobUrl);
+    const blob = await response.blob();
+    const file = new File([blob], `${fileName}-${Date.now()}.jpg`, { type: 'image/jpeg' });
+    
+    // Cloudinary에 업로드
+    const result = await uploadToCloudinary(file, {
+      folder: 'trial-results',
+      public_id: `trial_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      transformation: [
+        { width: 800, height: 800, crop: 'limit', quality: 'auto:good' }
+      ]
+    });
+    
+    console.log('✅ Blob URL이 Cloudinary에 성공적으로 업로드됨:', result.secure_url);
+    
+    // 원본 blob URL 정리
+    URL.revokeObjectURL(blobUrl);
+    
+    return result.secure_url;
+    
+  } catch (error) {
+    console.error('❌ Blob URL 업로드 실패:', error);
+    throw new Error('이미지 저장에 실패했습니다.');
+  }
+};
+
 // 이미지 변환 URL 생성 헬퍼
 export const getTransformedUrl = (
   originalUrl: string,

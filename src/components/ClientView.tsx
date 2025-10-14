@@ -157,6 +157,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
       // Track trial result - 성공한 경우에만 저장
       if (finalImage) {
         try {
+          // VModel 결과는 이미 영구 URL이므로 바로 저장
           await firebaseService.trackTrialResult(designerName, {
             styleUrl: hairstyle.url,
             resultUrl: finalImage,
@@ -194,18 +195,37 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
   }, [designerName, faceFile])
 
   // Handle color try-on completion
-  const handleColorTryOnComplete = useCallback((result: any) => {
+  const handleColorTryOnComplete = useCallback(async (result: any) => {
     console.log('염색 가상체험 결과:', result)
     setColorTryOnResult(result)
     
-    // Track color trial result
+    // Track color trial result with permanent URL
     if (result && selectedColorStyle) {
-      firebaseService.trackTrialResult(designerName, {
-        styleUrl: selectedColorStyle.url,
-        resultUrl: result.resultImageUrl,
-        styleName: selectedColorStyle.name,
-        type: 'color'
-      }).catch(console.error)
+      try {
+        let permanentUrl = result.resultImageUrl;
+        
+        // Blob URL인 경우 Cloudinary에 업로드
+        if (result.resultImageUrl.startsWith('blob:')) {
+          console.log('Blob URL 감지, Cloudinary에 업로드 중...');
+          const { uploadBlobToCloudinary } = await import('../services/cloudinaryService');
+          permanentUrl = await uploadBlobToCloudinary(
+            result.resultImageUrl, 
+            `color-trial-${selectedColorStyle.name}`
+          );
+          console.log('✅ 색상 트라이온 결과가 Cloudinary에 업로드됨:', permanentUrl);
+        }
+        
+        await firebaseService.trackTrialResult(designerName, {
+          styleUrl: selectedColorStyle.url,
+          resultUrl: permanentUrl,
+          styleName: selectedColorStyle.name
+        });
+        
+        console.log('✅ 색상 트라이온 결과가 통계에 저장됨');
+      } catch (trackError) {
+        console.error('❌ 색상 트라이온 결과 저장 실패:', trackError);
+        // 추적 실패는 사용자 경험에 영향을 주지 않음
+      }
     }
   }, [designerName, selectedColorStyle])
 

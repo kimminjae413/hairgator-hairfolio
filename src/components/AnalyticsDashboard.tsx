@@ -79,7 +79,20 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
     
     return stats.trialResults.filter(trial => {
       const trialDate = new Date(trial.timestamp);
-      return trialDate >= dateRange.startDate && trialDate <= dateRange.endDate;
+      const isInDateRange = trialDate >= dateRange.startDate && trialDate <= dateRange.endDate;
+      
+      // Blob URL은 제외 (이미 만료됨)
+      const isValidUrl = !trial.resultUrl.startsWith('blob:');
+      
+      if (!isValidUrl) {
+        console.warn('⚠️ Blob URL 발견 (제외됨):', {
+          styleName: trial.styleName,
+          timestamp: trial.timestamp,
+          url: trial.resultUrl
+        });
+      }
+      
+      return isInDateRange && isValidUrl;
     });
   }, [stats.trialResults, dateRange]);
 
@@ -272,7 +285,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
         </StatCard>
       )}
 
-      {hasData && totalStyleViews > 0 && (
+      {hasData && (
         <StatCard title={`Recent Client Try-ons (${datePreset === 'all' ? '전체' : '선택 기간'})`}>
           {filteredTrialResults && filteredTrialResults.length > 0 ? (
             <>
@@ -288,6 +301,19 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
                         alt={`Client try-on: ${trial.styleName || 'Unknown style'}`}
                         className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
                         loading="lazy"
+                        onError={(e) => {
+                          console.error('❌ 트라이온 이미지 로드 실패:', {
+                            url: trial.resultUrl,
+                            styleName: trial.styleName,
+                            timestamp: trial.timestamp,
+                            isBlob: trial.resultUrl.startsWith('blob:'),
+                            isCloudinary: trial.resultUrl.includes('cloudinary.com')
+                          });
+                          // 에러 시 기본 이미지로 대체
+                          const target = e.target as HTMLImageElement;
+                          target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik02MCA2MEgxNDBWMTQwSDYwVjYwWiIgZmlsbD0iI0Q1RDlERCIvPgo8cGF0aCBkPSJNODAgODBIMTIwVjEyMEg4MFY4MFoiIGZpbGw9IiNCQkJGQzQiLz4KPHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeD0iODgiIHk9Ijg4Ij4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMSA5TDEzLjA5IDE1Ljc0TDEyIDIyTDEwLjkxIDE1Ljc0TDMgOUwxMC45MSA4LjI2TDEyIDJaIiBmaWxsPSIjOUNBM0FGIi8+Cjwvc3ZnPgo8L3N2Zz4K';
+                          target.alt = '이미지를 불러올 수 없습니다';
+                        }}
                       />
                       
                       <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity duration-200 rounded-lg flex items-center justify-center">
@@ -330,7 +356,22 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, portfoli
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
               <p>선택한 기간에 체험 결과가 없습니다</p>
-              <p className="text-xs mt-1">다른 기간을 선택해보세요</p>
+              <p className="text-xs mt-1">
+                {stats.trialResults && stats.trialResults.length > 0 
+                  ? '다른 기간을 선택해보세요' 
+                  : '고객이 헤어스타일을 체험하면 여기에 표시됩니다'
+                }
+              </p>
+              {stats.trialResults && stats.trialResults.some(trial => trial.resultUrl.startsWith('blob:')) && (
+                <div className="mt-3 p-3 bg-yellow-50 rounded-lg text-sm">
+                  <p className="text-yellow-700">
+                    ⚠️ 일부 이전 체험 결과가 만료되어 표시되지 않습니다.
+                  </p>
+                  <p className="text-yellow-600 text-xs mt-1">
+                    새로운 체험 결과는 정상적으로 저장됩니다.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </StatCard>

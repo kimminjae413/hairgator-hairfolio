@@ -43,6 +43,10 @@ const DesignerView: React.FC<DesignerViewProps> = ({ designerName, onLogout }) =
     const loadDesignerData = async () => {
       try {
         setIsLoading(true);
+        
+        // 먼저 잘못된 트라이온 결과 정리
+        await firebaseService.cleanupInvalidTrialResults(designerName);
+        
         const data = await firebaseService.getDesignerData(designerName);
         setPortfolio(data.portfolio);
         setReservationUrl(data.reservationUrl || '');
