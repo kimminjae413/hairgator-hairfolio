@@ -107,7 +107,7 @@ const FaceAnalysisModal: React.FC<FaceAnalysisModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
           {/* 이미지 + SVG 오버레이 */}
           <div className="relative mb-6">
             <div className="relative w-full rounded-xl overflow-hidden shadow-lg">
