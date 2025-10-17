@@ -120,8 +120,21 @@ const findFaceRegion = (
   }
   
   if (skinPixelCount < 100) {
-    // 피부톤 픽셀이 너무 적으면 얼굴 없음
-    return null;
+    // 피부톤 픽셀이 너무 적으면 → 중앙 영역을 기본값으로 사용
+    console.warn('⚠️ 피부톤 픽셀 부족, 중앙 영역 사용');
+    
+    // 이미지 중앙을 얼굴로 가정
+    const centerX = width / 2;
+    const centerY = height / 2.2; // 약간 위쪽
+    const assumedWidth = width * 0.4;
+    const assumedHeight = height * 0.5;
+    
+    return { 
+      centerX, 
+      centerY, 
+      width: assumedWidth, 
+      height: assumedHeight 
+    };
   }
   
   // 얼굴 영역 계산
@@ -130,35 +143,50 @@ const findFaceRegion = (
   const centerX = totalX / skinPixelCount;
   const centerY = totalY / skinPixelCount;
   
-  // 유효성 검사: 비율이 이상하면 얼굴 아님
+  // 유효성 검사: 비율이 이상하면 중앙 영역 사용
   const aspectRatio = faceHeight / faceWidth;
-  if (aspectRatio < 0.8 || aspectRatio > 2.0) {
-    return null;
+  if (aspectRatio < 0.6 || aspectRatio > 2.5) {
+    console.warn('⚠️ 비정상적인 얼굴 비율, 중앙 영역 사용');
+    
+    // 이미지 중앙을 얼굴로 가정
+    const centerX = width / 2;
+    const centerY = height / 2.2;
+    const assumedWidth = width * 0.4;
+    const assumedHeight = height * 0.5;
+    
+    return { 
+      centerX, 
+      centerY, 
+      width: assumedWidth, 
+      height: assumedHeight 
+    };
   }
   
   return { centerX, centerY, width: faceWidth, height: faceHeight };
 };
 
 /**
- * 피부톤 판별 함수
+ * 피부톤 판별 함수 (개선: 더 넓은 범위)
  */
 const isSkinTone = (r: number, g: number, b: number): boolean => {
-  // 다양한 피부톤 커버 (RGB 범위)
-  // 매우 밝은 피부 ~ 어두운 피부
+  // 매우 다양한 피부톤 커버 (밝은 피부 ~ 어두운 피부)
   
-  // 기본 조건: 붉은기가 있어야 함
-  if (r < 60 || g < 40 || b < 20) return false;
+  // 너무 어두운 색 제외
+  if (r < 50 || g < 30 || b < 15) return false;
   
-  // RGB 비율 체크
+  // 너무 밝은 색 제외 (흰색 배경)
+  if (r > 250 && g > 250 && b > 250) return false;
+  
+  // RGB 비율 체크 (더 관대하게)
   const rgRatio = r / (g + 1);
   const rbRatio = r / (b + 1);
   
-  // 피부톤 범위
+  // 피부톤 범위 (훨씬 넓게)
   return (
-    rgRatio > 1.0 && rgRatio < 2.5 &&
-    rbRatio > 1.0 && rbRatio < 3.0 &&
-    r > g && g > b &&
-    (r - g) >= 10
+    rgRatio > 0.8 && rgRatio < 3.0 &&
+    rbRatio > 0.9 && rbRatio < 3.5 &&
+    r >= g - 20 && // r이 g보다 약간 작아도 OK
+    g >= b - 30    // g가 b보다 약간 작아도 OK
   );
 };
 
