@@ -126,8 +126,8 @@ const findFaceRegion = (
     // 이미지 중앙을 얼굴로 가정
     const centerX = width / 2;
     const centerY = height / 2.2; // 약간 위쪽
-    const assumedWidth = width * 0.4;
-    const assumedHeight = height * 0.5;
+    const assumedWidth = width * 0.35;
+    const assumedHeight = height * 0.45;
     
     return { 
       centerX, 
@@ -143,16 +143,23 @@ const findFaceRegion = (
   const centerX = totalX / skinPixelCount;
   const centerY = totalY / skinPixelCount;
   
-  // 유효성 검사: 비율이 이상하면 중앙 영역 사용
+  // 유효성 검사: 비율이 이상하거나 너무 크면 중앙 영역 사용
   const aspectRatio = faceHeight / faceWidth;
-  if (aspectRatio < 0.6 || aspectRatio > 2.5) {
-    console.warn('⚠️ 비정상적인 얼굴 비율, 중앙 영역 사용');
+  const widthRatio = faceWidth / width;
+  const heightRatio = faceHeight / height;
+  
+  if (aspectRatio < 0.6 || aspectRatio > 2.5 || widthRatio > 0.8 || heightRatio > 0.8) {
+    console.warn('⚠️ 비정상적인 얼굴 영역, 중앙 영역 사용', {
+      aspectRatio: aspectRatio.toFixed(2),
+      widthRatio: widthRatio.toFixed(2),
+      heightRatio: heightRatio.toFixed(2)
+    });
     
     // 이미지 중앙을 얼굴로 가정
     const centerX = width / 2;
     const centerY = height / 2.2;
-    const assumedWidth = width * 0.4;
-    const assumedHeight = height * 0.5;
+    const assumedWidth = width * 0.35;
+    const assumedHeight = height * 0.45;
     
     return { 
       centerX, 
@@ -162,31 +169,41 @@ const findFaceRegion = (
     };
   }
   
+  console.log('✅ 얼굴 영역 감지 성공:', {
+    중심: { x: centerX.toFixed(0), y: centerY.toFixed(0) },
+    크기: { width: faceWidth.toFixed(0), height: faceHeight.toFixed(0) },
+    비율: aspectRatio.toFixed(2)
+  });
+  
   return { centerX, centerY, width: faceWidth, height: faceHeight };
 };
 
 /**
- * 피부톤 판별 함수 (개선: 더 넓은 범위 + 디버깅)
+ * 피부톤 판별 함수 (엄격한 조건으로 얼굴만 정확히 감지)
  */
 const isSkinTone = (r: number, g: number, b: number): boolean => {
-  // 매우 다양한 피부톤 커버 (밝은 피부 ~ 어두운 피부)
+  // 1. 너무 어두운 색 제외 (그림자, 머리카락)
+  if (r < 80 || g < 50 || b < 30) return false;
   
-  // 너무 어두운 색 제외
-  if (r < 50 || g < 30 || b < 15) return false;
+  // 2. 너무 밝은 색 제외 (흰색 배경, 밝은 옷)
+  if (r > 240 || g > 235 || b > 230) return false;
+  if (r + g + b > 680) return false; // 전체 밝기 제한
   
-  // 너무 밝은 색 제외 (흰색 배경)
-  if (r > 250 && g > 250 && b > 250) return false;
+  // 3. 회색톤 제외 (배경, 옷)
+  const maxDiff = Math.max(Math.abs(r - g), Math.abs(g - b), Math.abs(r - b));
+  if (maxDiff < 15) return false; // 너무 균일한 색상 제외
   
-  // RGB 비율 체크 (더 관대하게)
+  // 4. RGB 비율 체크 (실제 피부톤만)
   const rgRatio = r / (g + 1);
   const rbRatio = r / (b + 1);
   
-  // 피부톤 범위 (훨씬 넓게)
+  // 피부톤은 R > G > B 관계를 가짐
   const result = (
-    rgRatio > 0.8 && rgRatio < 3.0 &&
-    rbRatio > 0.9 && rbRatio < 3.5 &&
-    r >= g - 20 && // r이 g보다 약간 작아도 OK
-    g >= b - 30    // g가 b보다 약간 작아도 OK
+    r > g && g > b &&  // 기본 관계
+    rgRatio > 1.05 && rgRatio < 1.6 &&  // R/G 비율
+    rbRatio > 1.15 && rbRatio < 2.0 &&  // R/B 비율
+    r - g > 5 && r - g < 80 &&  // R-G 차이
+    g - b > 3 && g - b < 50     // G-B 차이
   );
   
   // 샘플 데이터 출력 (처음 5개만)
@@ -213,13 +230,18 @@ const generateRealisticLandmarks = (
 ): FaceLandmark[] => {
   const landmarks: FaceLandmark[] = [];
   
-  console.log('🎯 랜드마크 생성 입력값:', { centerX, centerY, faceWidth, faceHeight });
+  console.log('🎯 랜드마크 생성 기준:', {
+    정규화중심X: centerX.toFixed(2),
+    정규화중심Y: centerY.toFixed(2),
+    정규화너비: faceWidth.toFixed(2),
+    정규화높이: faceHeight.toFixed(2)
+  });
   
   // 실제 얼굴 크기에 맞춰 조정
   const scaleX = faceWidth * 0.45;  // 얼굴 너비의 45%
   const scaleY = faceHeight * 0.45; // 얼굴 높이의 45%
   
-  console.log('📏 스케일 값:', { scaleX, scaleY });
+  console.log('📏 스케일 값:', { scaleX: scaleX.toFixed(3), scaleY: scaleY.toFixed(3) });
   
   // 1. 얼굴 윤곽선 (0-16): 턱선
   for (let i = 0; i <= 16; i++) {
@@ -344,11 +366,11 @@ const generateRealisticLandmarks = (
   landmarks[172] = { x: centerX - scaleX * 1.3, y: centerY + scaleY * 1.2, z: -0.02 }; // 왼쪽 턱선
   landmarks[397] = { x: centerX + scaleX * 1.3, y: centerY + scaleY * 1.2, z: -0.02 }; // 오른쪽 턱선
   
-  console.log('✅ 주요 랜드마크 좌표 샘플:', {
-    이마: { x: landmarks[10].x.toFixed(3), y: landmarks[10].y.toFixed(3) },
-    턱: { x: landmarks[152].x.toFixed(3), y: landmarks[152].y.toFixed(3) },
-    왼쪽관자놀이: { x: landmarks[234].x.toFixed(3), y: landmarks[234].y.toFixed(3) }
-  });
+  console.log('✅ 생성된 랜드마크 샘플 (첫 5개):', landmarks.slice(0, 5).map((lm, i) => ({
+    index: i,
+    x: lm.x.toFixed(3),
+    y: lm.y.toFixed(3)
+  })));
   
   return landmarks;
 };
