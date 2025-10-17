@@ -213,9 +213,13 @@ const generateRealisticLandmarks = (
 ): FaceLandmark[] => {
   const landmarks: FaceLandmark[] = [];
   
+  console.log('🎯 랜드마크 생성 입력값:', { centerX, centerY, faceWidth, faceHeight });
+  
   // 실제 얼굴 크기에 맞춰 조정
-  const scaleX = faceWidth * 0.9;
-  const scaleY = faceHeight * 0.9;
+  const scaleX = faceWidth * 0.45;  // 얼굴 너비의 45%
+  const scaleY = faceHeight * 0.45; // 얼굴 높이의 45%
+  
+  console.log('📏 스케일 값:', { scaleX, scaleY });
   
   // 1. 얼굴 윤곽선 (0-16): 턱선
   for (let i = 0; i <= 16; i++) {
@@ -333,12 +337,18 @@ const generateRealisticLandmarks = (
   }
   
   // 주요 포인트 보정
-  landmarks[10] = { x: centerX, y: centerY - scaleY * 0.5, z: 0.01 }; // 이마
-  landmarks[152] = { x: centerX, y: centerY + scaleY * 0.65, z: 0 }; // 턱
-  landmarks[234] = { x: centerX - scaleX * 0.75, y: centerY - scaleY * 0.2, z: -0.03 }; // 왼쪽 관자놀이
-  landmarks[454] = { x: centerX + scaleX * 0.75, y: centerY - scaleY * 0.2, z: -0.03 }; // 오른쪽 관자놀이
-  landmarks[172] = { x: centerX - scaleX * 0.65, y: centerY + scaleY * 0.55, z: -0.02 }; // 왼쪽 턱선
-  landmarks[397] = { x: centerX + scaleX * 0.65, y: centerY + scaleY * 0.55, z: -0.02 }; // 오른쪽 턱선
+  landmarks[10] = { x: centerX, y: centerY - scaleY * 1.2, z: 0.01 }; // 이마
+  landmarks[152] = { x: centerX, y: centerY + scaleY * 1.5, z: 0 }; // 턱
+  landmarks[234] = { x: centerX - scaleX * 1.5, y: centerY - scaleY * 0.4, z: -0.03 }; // 왼쪽 관자놀이
+  landmarks[454] = { x: centerX + scaleX * 1.5, y: centerY - scaleY * 0.4, z: -0.03 }; // 오른쪽 관자놀이
+  landmarks[172] = { x: centerX - scaleX * 1.3, y: centerY + scaleY * 1.2, z: -0.02 }; // 왼쪽 턱선
+  landmarks[397] = { x: centerX + scaleX * 1.3, y: centerY + scaleY * 1.2, z: -0.02 }; // 오른쪽 턱선
+  
+  console.log('✅ 주요 랜드마크 좌표 샘플:', {
+    이마: { x: landmarks[10].x.toFixed(3), y: landmarks[10].y.toFixed(3) },
+    턱: { x: landmarks[152].x.toFixed(3), y: landmarks[152].y.toFixed(3) },
+    왼쪽관자놀이: { x: landmarks[234].x.toFixed(3), y: landmarks[234].y.toFixed(3) }
+  });
   
   return landmarks;
 };
