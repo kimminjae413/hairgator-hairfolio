@@ -1,69 +1,40 @@
 import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-
-// 서비스 카테고리 타입 정의
-type ServiceCategory = 'cut' | 'color' | 'perm' | 'styling' | 'treatment';
-
-const SERVICE_CATEGORY_LABELS = {
-  cut: '커트',
-  color: '염색',
-  perm: '펌', 
-  styling: '스타일링',
-  treatment: '트리트먼트'
-};
+import { 
+  Hairstyle, 
+  HairstyleGalleryProps,
+  FaceAnalysis,
+  ServiceMajorCategory,
+  getRecommendationScore,
+  isSuitableForFaceShape,
+  isSuitableForPersonalColor,
+  SERVICE_CATEGORY_LABELS
+} from '../types';
 
 // 서비스 카테고리별 색상 테마
-const SERVICE_CATEGORY_COLORS: Record<ServiceCategory, string> = {
+const SERVICE_CATEGORY_COLORS: Record<ServiceMajorCategory, string> = {
   cut: 'bg-blue-100 text-blue-800 border-blue-200',
   color: 'bg-purple-100 text-purple-800 border-purple-200',
   perm: 'bg-green-100 text-green-800 border-green-200',
   styling: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  treatment: 'bg-pink-100 text-pink-800 border-pink-200'
+  treatment: 'bg-pink-100 text-pink-800 border-pink-200',
+  other: 'bg-gray-100 text-gray-800 border-gray-200'
 };
-
-// 타입 정의
-interface Hairstyle {
-  name: string;
-  url: string;
-  gender: 'Female' | 'Male';
-  serviceCategory?: ServiceCategory;
-  serviceSubCategory?: string;
-  // 레거시 필드들 (하위 호환성)
-  majorCategory?: string;
-  minorCategory?: string;
-  description?: string;
-  tags?: string[];
-}
-
-interface HairstyleGalleryProps {
-  images: Hairstyle[];
-  onSelect: (hairstyle: Hairstyle) => void;
-  onColorTryOn?: (hairstyle: Hairstyle) => void; // 염색 가상체험 콜백 추가
-  selectedUrl: string | null;
-  disabled: boolean;
-  onAddImage?: () => void;
-  showCategories?: boolean;
-  onDeleteImage?: (hairstyle: Hairstyle) => void;
-  onEditImage?: (hairstyle: Hairstyle) => void;
-  isDesignerView?: boolean;
-}
 
 const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({ 
   images, 
   onSelect, 
-  onColorTryOn,
   selectedUrl, 
   disabled, 
   onAddImage, 
   showCategories = true,
-  onDeleteImage,
-  onEditImage,
-  isDesignerView = false
+  faceAnalysis, // 🆕 얼굴 분석 정보
+  allowMultipleSelection = false
 }) => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'Female' | 'Male'>('Female');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedServiceCategory, setSelectedServiceCategory] = useState<ServiceCategory | 'all'>('all');
+  const [selectedServiceCategory, setSelectedServiceCategory] = useState<ServiceMajorCategory | 'all' | 'recommended'>('all');
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 
@@ -92,23 +63,33 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
     setLoadedImages(prev => new Set([...prev, imageUrl]));
   };
 
-  // 스타일 선택 처리 - 서비스 카테고리별 분기 (핵심 기능)
-  const handleStyleSelect = (image: Hairstyle) => {
-    if (image.serviceCategory === 'color' && onColorTryOn) {
-      // 염색 카테고리: 고급 AI 가상체험
-      onColorTryOn(image);
-    } else {
-      // 기타 카테고리: 기존 VModel 선택
-      onSelect(image);
+  // 🆕 AI 추천 여부 확인
+  const isRecommended = (image: Hairstyle): boolean => {
+    if (!faceAnalysis) return false;
+    
+    // 커트 스타일
+    if (image.serviceCategory === 'cut' && faceAnalysis.faceShape) {
+      return isSuitableForFaceShape(image, faceAnalysis.faceShape, 'good'); // good 이상만
     }
+    
+    // 염색 스타일
+    if (image.serviceCategory === 'color' && faceAnalysis.personalColor) {
+      return isSuitableForPersonalColor(image, faceAnalysis.personalColor, 'good'); // good 이상만
+    }
+    
+    return false;
   };
 
-  // Filter images by gender, service category, and search term
+  // Filter images by gender, service category, search term, and recommendations
   const filteredImages = useMemo(() => {
     let filtered = images.filter(img => img.gender === activeTab);
     
+    // 🆕 추천 필터링
+    if (selectedServiceCategory === 'recommended') {
+      filtered = filtered.filter(image => isRecommended(image));
+    }
     // 서비스 카테고리 필터링
-    if (selectedServiceCategory !== 'all') {
+    else if (selectedServiceCategory !== 'all') {
       filtered = filtered.filter(image => image.serviceCategory === selectedServiceCategory);
     }
     
@@ -123,15 +104,29 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
       );
     }
     
+    // 🆕 추천 스타일 우선 정렬
+    if (faceAnalysis && selectedServiceCategory === 'all') {
+      filtered.sort((a, b) => {
+        const scoreA = getRecommendationScore(a, faceAnalysis);
+        const scoreB = getRecommendationScore(b, faceAnalysis);
+        return scoreB - scoreA; // 높은 점수가 먼저
+      });
+    }
+    
     return filtered;
-  }, [images, activeTab, selectedServiceCategory, searchTerm]);
+  }, [images, activeTab, selectedServiceCategory, searchTerm, faceAnalysis]);
+
+  // 🆕 추천 스타일 개수 계산
+  const recommendedCount = useMemo(() => {
+    if (!faceAnalysis) return 0;
+    return images.filter(img => img.gender === activeTab && isRecommended(img)).length;
+  }, [images, activeTab, faceAnalysis]);
 
   // Group by service category
   const groupedImages = useMemo(() => {
     if (!showCategories) return { [t('gallery.allStyles', 'All Styles')]: filteredImages };
     
     return filteredImages.reduce((acc, image) => {
-      // 서비스 카테고리 우선, 없으면 레거시 majorCategory 사용
       const category = image.serviceCategory 
         ? SERVICE_CATEGORY_LABELS[image.serviceCategory]
         : image.majorCategory || t('gallery.uncategorized', 'Uncategorized');
@@ -144,8 +139,8 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
     }, {} as Record<string, Hairstyle[]>);
   }, [filteredImages, showCategories, t]);
 
-  // 서비스 카테고리별 정렬 (커트 > 염색 > 펌 > 스타일링 > 트리트먼트 순)
-  const categoryOrder = ['커트', '염색', '펌', '스타일링', '트리트먼트'];
+  // 서비스 카테고리별 정렬
+  const categoryOrder = ['Cut', 'Color', 'Perm', 'Styling', 'Treatment'];
   const sortedCategories = Object.entries(groupedImages).sort(([a], [b]) => {
     const uncategorized = t('gallery.uncategorized', 'Uncategorized');
     if (a === uncategorized) return 1;
@@ -165,7 +160,7 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
 
   // 사용 가능한 서비스 카테고리들 추출
   const availableServiceCategories = useMemo(() => {
-    const categories = new Set<ServiceCategory>();
+    const categories = new Set<ServiceMajorCategory>();
     images
       .filter(img => img.gender === activeTab && img.serviceCategory)
       .forEach(img => categories.add(img.serviceCategory!));
@@ -178,8 +173,8 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
 
   return (
     <div className={`${disabled ? 'opacity-50' : ''} space-y-4`}>
-      {/* Add Style Button - Fixed at top for designer view */}
-      {isDesignerView && onAddImage && (
+      {/* Add Style Button */}
+      {onAddImage && (
         <div className="mb-4">
           <button
             onClick={onAddImage}
@@ -193,6 +188,37 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
             </svg>
             <span className="font-semibold">{t('gallery.addStyle', '스타일 추가')}</span>
           </button>
+        </div>
+      )}
+
+      {/* 🆕 얼굴 분석 결과 요약 배너 */}
+      {faceAnalysis && faceAnalysis.detected && recommendedCount > 0 && (
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center mr-3">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-800">
+                  당신에게 추천하는 스타일 {recommendedCount}개
+                </h3>
+                <p className="text-sm text-gray-600">
+                  {faceAnalysis.faceShape && <span className="font-medium">{faceAnalysis.faceShape}</span>}
+                  {faceAnalysis.faceShape && faceAnalysis.personalColor && ' • '}
+                  {faceAnalysis.personalColor && <span className="font-medium">{faceAnalysis.personalColor}</span>}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setSelectedServiceCategory('recommended')}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
+            >
+              추천 보기
+            </button>
+          </div>
         </div>
       )}
 
@@ -231,8 +257,8 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
         </button>
       </div>
 
-      {/* Service Category Filter */}
-      {availableServiceCategories.length > 0 && (
+      {/* Service Category Filter with Recommended Tab */}
+      {(availableServiceCategories.length > 0 || recommendedCount > 0) && (
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setSelectedServiceCategory('all')}
@@ -245,6 +271,25 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
           >
             전체
           </button>
+          
+          {/* 🆕 내게 추천 탭 */}
+          {recommendedCount > 0 && (
+            <button
+              onClick={() => setSelectedServiceCategory('recommended')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors flex items-center gap-1 ${
+                selectedServiceCategory === 'recommended'
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
+                  : 'bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 hover:from-indigo-200 hover:to-purple-200'
+              }`}
+              disabled={disabled}
+            >
+              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2L13.09 8.26L22 9L13.09 9.74L12 16L10.91 9.74L2 9L10.91 8.26L12 2Z"/>
+              </svg>
+              내게 추천 ({recommendedCount})
+            </button>
+          )}
+          
           {availableServiceCategories.map(category => (
             <button
               key={category}
@@ -272,7 +317,7 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
       {/* Masonry Gallery */}
       <div className="relative max-h-[70vh] overflow-y-auto p-2">
         {sortedCategories.length > 0 ? (
-          sortedCategories.map(([category, hairstyles], categoryIndex) => (
+          sortedCategories.map(([category, hairstyles]) => (
             <div key={category} className="mb-6 last:mb-0">
               {/* Category Header */}
               {showCategories && (
@@ -286,152 +331,124 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
               {/* True Masonry Grid with CSS Columns */}
               <div className="columns-2 gap-2">
                 {hairstyles.map((image, index) => {
-                  // Pinterest style: vary heights for zigzag effect
                   const heightVariants = ['h-48', 'h-56', 'h-64', 'h-52', 'h-60'];
                   const randomHeight = heightVariants[index % heightVariants.length];
+                  const recommended = isRecommended(image);
                   
                   return (
-                  <div
-                    key={image.url}
-                    className="relative group mb-2 break-inside-avoid"
-                  >
-                    <button
-                      onClick={() => handleStyleSelect(image)}
-                      disabled={disabled}
-                      className={`w-full ${randomHeight} block rounded-xl overflow-hidden transition-all duration-300 ${
-                        selectedUrl === image.url
-                          ? 'ring-4 ring-indigo-500 shadow-xl'
-                          : 'ring-2 ring-transparent hover:ring-indigo-300'
-                      } ${
-                        disabled 
-                          ? 'cursor-not-allowed' 
-                          : 'hover:scale-[1.02] cursor-pointer'
-                      }`}
+                    <div
+                      key={image.url}
+                      className="relative group mb-2 break-inside-avoid"
                     >
-                      {/* Loading skeleton */}
-                      {!loadedImages.has(image.url) && (
-                        <div className="absolute inset-0 bg-gray-200 animate-pulse" />
-                      )}
-                      
-                      {/* Image covering the fixed height */}
-                      <img 
-                        src={imageErrors.has(image.url) ? fallbackImageSvg : image.url}
-                        alt={image.name}
-                        onError={(e) => handleImageError(image.url, e)}
-                        onLoad={() => handleImageLoad(image.url)}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                      
-                      {/* Service Category Badge */}
-                      {image.serviceCategory && (
-                        <div className="absolute top-2 left-2">
-                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${SERVICE_CATEGORY_COLORS[image.serviceCategory]}`}>
-                            {SERVICE_CATEGORY_LABELS[image.serviceCategory]}
-                          </span>
-                        </div>
-                      )}
-                      
-                      {/* Special Color Badge for color category - 스마트 AI 표시 */}
-                      {image.serviceCategory === 'color' && (
-                        <div className="absolute top-2 right-2">
-                          <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-2 py-1 rounded-full text-xs font-bold shadow-lg flex items-center gap-1">
-                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M12 2L13.09 8.26L22 9L13.09 9.74L12 16L10.91 9.74L2 9L10.91 8.26L12 2Z"/>
-                            </svg>
-                            스마트 체험
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Overlay on hover */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
-                        <p className="text-white font-bold text-sm mb-1">{image.name}</p>
-                        {image.serviceSubCategory && (
-                          <p className="text-gray-200 text-xs mb-1">{image.serviceSubCategory}</p>
+                      <button
+                        onClick={() => onSelect(image)}
+                        disabled={disabled}
+                        className={`w-full ${randomHeight} block rounded-xl overflow-hidden transition-all duration-300 ${
+                          selectedUrl === image.url
+                            ? 'ring-4 ring-indigo-500 shadow-xl'
+                            : recommended
+                            ? 'ring-2 ring-indigo-300 hover:ring-indigo-400'
+                            : 'ring-2 ring-transparent hover:ring-indigo-300'
+                        } ${
+                          disabled 
+                            ? 'cursor-not-allowed' 
+                            : 'hover:scale-[1.02] cursor-pointer'
+                        }`}
+                      >
+                        {/* Loading skeleton */}
+                        {!loadedImages.has(image.url) && (
+                          <div className="absolute inset-0 bg-gray-200 animate-pulse" />
                         )}
-                        {image.description && (
-                          <p className="text-gray-200 text-xs line-clamp-2">{image.description}</p>
-                        )}
-                        {/* Color category special message */}
-                        {image.serviceCategory === 'color' && (
-                          <div className="mt-2 bg-purple-600/80 rounded-lg px-2 py-1">
-                            <p className="text-white text-xs font-medium flex items-center gap-1">
+                        
+                        {/* Image */}
+                        <img 
+                          src={imageErrors.has(image.url) ? fallbackImageSvg : image.url}
+                          alt={image.name}
+                          onError={(e) => handleImageError(image.url, e)}
+                          onLoad={() => handleImageLoad(image.url)}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                        
+                        {/* 🆕 AI 추천 배지 */}
+                        {recommended && (
+                          <div className="absolute top-2 left-2">
+                            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-2.5 py-1 rounded-full text-xs font-bold shadow-lg flex items-center gap-1">
                               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M9.5 14.25l-5.584 2.718L5 13.25C5.001 6.52 7.51 4 9.5 4S14 6.52 14 13.25L15.084 16.968 9.5 14.25z"/>
+                                <path d="M12 2L13.09 8.26L22 9L13.09 9.74L12 16L10.91 9.74L2 9L10.91 8.26L12 2Z"/>
                               </svg>
-                              고급 AI 분석 체험
-                            </p>
+                              내게 딱!
+                            </div>
                           </div>
                         )}
-                      </div>
-                      
-                      {/* Selected indicator */}
-                      {selectedUrl === image.url && (
-                        <div className="absolute top-2 right-2 w-7 h-7 bg-indigo-600 rounded-full flex items-center justify-center shadow-lg">
-                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                      )}
-                      
-                      {/* Tags */}
-                      {image.tags && image.tags.length > 0 && (
-                        <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                          <div className="flex flex-wrap gap-1">
-                            {image.tags.slice(0, 2).map((tag, idx) => (
-                              <span key={idx} className="px-2 py-1 bg-black/60 text-white text-xs rounded-full backdrop-blur-sm">
-                                #{tag}
-                              </span>
-                            ))}
+                        
+                        {/* Service Category Badge */}
+                        {image.serviceCategory && !recommended && (
+                          <div className="absolute top-2 left-2">
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${SERVICE_CATEGORY_COLORS[image.serviceCategory]}`}>
+                              {SERVICE_CATEGORY_LABELS[image.serviceCategory]}
+                            </span>
                           </div>
+                        )}
+                        
+                        {/* Overlay on hover */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
+                          <p className="text-white font-bold text-sm mb-1">{image.name}</p>
+                          {image.serviceSubCategory && (
+                            <p className="text-gray-200 text-xs mb-1">{image.serviceSubCategory}</p>
+                          )}
+                          {image.description && (
+                            <p className="text-gray-200 text-xs line-clamp-2">{image.description}</p>
+                          )}
+                          
+                          {/* 🆕 추천 이유 표시 */}
+                          {recommended && faceAnalysis && (
+                            <div className="mt-2 bg-indigo-600/90 rounded-lg px-2 py-1.5">
+                              <p className="text-white text-xs font-medium flex items-center gap-1">
+                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                                </svg>
+                                {image.serviceCategory === 'cut' && faceAnalysis.faceShape && 
+                                  `${faceAnalysis.faceShape}에 추천`
+                                }
+                                {image.serviceCategory === 'color' && faceAnalysis.personalColor && 
+                                  `${faceAnalysis.personalColor}에 추천`
+                                }
+                              </p>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </button>
-
-                    {/* Action Buttons - Designer View */}
-                    {isDesignerView && (
-                      <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 z-10">
-                        {onEditImage && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onEditImage(image);
-                            }}
-                            className="w-7 h-7 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg transition-all duration-200 flex items-center justify-center"
-                            title={t('gallery.edit', '편집')}
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        
+                        {/* Selected indicator */}
+                        {selectedUrl === image.url && (
+                          <div className="absolute top-2 right-2 w-7 h-7 bg-indigo-600 rounded-full flex items-center justify-center shadow-lg">
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                             </svg>
-                          </button>
+                          </div>
                         )}
-                        {onDeleteImage && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (window.confirm(t('gallery.deleteConfirm', '이 스타일을 삭제하시겠습니까?'))) {
-                                onDeleteImage(image);
-                              }
-                            }}
-                            className="w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-all duration-200 flex items-center justify-center"
-                            title={t('gallery.delete', '삭제')}
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
+                        
+                        {/* Tags */}
+                        {image.tags && image.tags.length > 0 && (
+                          <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <div className="flex flex-wrap gap-1">
+                              {image.tags.slice(0, 2).map((tag, idx) => (
+                                <span key={idx} className="px-2 py-1 bg-black/60 text-white text-xs rounded-full backdrop-blur-sm">
+                                  #{tag}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
                         )}
-                      </div>
-                    )}
-                  </div>
+                      </button>
+                    </div>
                   );
                 })}
               </div>
             </div>
           ))
         ) : (
-          /* Empty State */
+          /* Empty State */}
           <div className="py-16 text-center">
             {searchTerm || selectedServiceCategory !== 'all' ? (
               <div>
@@ -452,7 +469,7 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
               </div>
             ) : (
               <div>
-                {onAddImage && isDesignerView ? (
+                {onAddImage ? (
                   <div className="space-y-4">
                     <div className="text-4xl">💇‍♀️</div>
                     <h3 className="text-lg font-semibold text-gray-700">{t('gallery.noStylesYet', '아직 등록된 스타일이 없습니다')}</h3>
