@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FaceAnalysis } from '../services/faceAnalysisService';
 
 interface FaceAnalysisModalProps {
@@ -8,6 +8,18 @@ interface FaceAnalysisModalProps {
   onClose: () => void;
 }
 
+// MediaPipe Face Mesh 연결선 (턱선, 눈, 코, 입)
+const FACE_OUTLINE = [
+  [10, 338], [338, 297], [297, 332], [332, 284], [284, 251], [251, 389], [389, 356],
+  [356, 454], [454, 323], [323, 361], [361, 288], [288, 397], [397, 365], [365, 379],
+  [379, 378], [378, 400], [400, 377], [377, 152]
+];
+
+const LEFT_EYE = [33, 160, 158, 133, 153, 144, 33];
+const RIGHT_EYE = [263, 387, 385, 362, 380, 373, 263];
+const NOSE = [168, 6, 197, 195, 5, 4, 1, 2, 98, 327, 168];
+const MOUTH = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 61];
+
 const FaceAnalysisModal: React.FC<FaceAnalysisModalProps> = ({
   imageUrl,
   analysis,
@@ -16,8 +28,6 @@ const FaceAnalysisModal: React.FC<FaceAnalysisModalProps> = ({
 }) => {
   const [landmarkProgress, setLandmarkProgress] = useState(0);
   const [currentPhase, setCurrentPhase] = useState<'detecting' | 'analyzing' | 'complete'>('detecting');
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const imageRef = useRef<HTMLImageElement>(null);
 
   // 468개 랜드마크 감지 애니메이션
   useEffect(() => {
@@ -30,7 +40,6 @@ const FaceAnalysisModal: React.FC<FaceAnalysisModalProps> = ({
     setLandmarkProgress(0);
     setCurrentPhase('detecting');
 
-    // Phase 1: 랜드마크 감지 (0-468)
     const landmarkInterval = setInterval(() => {
       setLandmarkProgress(prev => {
         if (prev >= 468) {
@@ -38,198 +47,34 @@ const FaceAnalysisModal: React.FC<FaceAnalysisModalProps> = ({
           setCurrentPhase('analyzing');
           return 468;
         }
-        return prev + Math.floor(Math.random() * 30) + 15; // 15-45개씩 증가
+        return prev + Math.floor(Math.random() * 30) + 15;
       });
     }, 80);
 
     return () => clearInterval(landmarkInterval);
   }, [isAnalyzing]);
 
-  // Canvas에 랜드마크 그리기 (실제 시각화)
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const img = imageRef.current;
-
-    if (!canvas || !img || !analysis?.landmarks || !img.complete) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Canvas 크기를 이미지 원본 크기에 맞춤
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
-
-    console.log('🎨 Canvas 그리기:', {
-      canvasSize: { width: canvas.width, height: canvas.height },
-      imageSize: { width: img.naturalWidth, height: img.naturalHeight },
-      landmarkCount: analysis.landmarks.length,
-      샘플랜드마크: analysis.landmarks.slice(0, 3).map(lm => ({
-        x: lm.x.toFixed(3),
-        y: lm.y.toFixed(3)
-      }))
-    });
-
-    // 이미지를 Canvas 배경으로 그리기
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-    // 애니메이션 진행에 따라 랜드마크 그리기
-    const visibleLandmarks = analysis.landmarks.slice(0, Math.min(landmarkProgress, 468));
-
-    // 1. 연결선 먼저 그리기 (얼굴 윤곽)
-    ctx.strokeStyle = 'rgba(78, 205, 196, 0.6)';
-    ctx.lineWidth = 2;
-
-    // 턱선 연결 (0-16)
-    ctx.beginPath();
-    for (let i = 0; i < Math.min(17, visibleLandmarks.length); i++) {
-      const lm = visibleLandmarks[i];
-      const x = lm.x * canvas.width;
-      const y = lm.y * canvas.height;
-      if (i === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
-    }
-    ctx.stroke();
-
-    // 왼쪽 눈썹 (17-21)
-    if (visibleLandmarks.length > 21) {
-      ctx.beginPath();
-      for (let i = 17; i <= 21; i++) {
-        const lm = visibleLandmarks[i];
-        const x = lm.x * canvas.width;
-        const y = lm.y * canvas.height;
-        if (i === 17) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-    }
-
-    // 오른쪽 눈썹 (22-26)
-    if (visibleLandmarks.length > 26) {
-      ctx.beginPath();
-      for (let i = 22; i <= 26; i++) {
-        const lm = visibleLandmarks[i];
-        const x = lm.x * canvas.width;
-        const y = lm.y * canvas.height;
-        if (i === 22) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-    }
-
-    // 코 (27-35)
-    if (visibleLandmarks.length > 35) {
-      ctx.beginPath();
-      for (let i = 27; i <= 35; i++) {
-        const lm = visibleLandmarks[i];
-        const x = lm.x * canvas.width;
-        const y = lm.y * canvas.height;
-        if (i === 27) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-    }
-
-    // 왼쪽 눈 (36-41)
-    if (visibleLandmarks.length > 41) {
-      ctx.beginPath();
-      for (let i = 36; i <= 41; i++) {
-        const lm = visibleLandmarks[i];
-        const x = lm.x * canvas.width;
-        const y = lm.y * canvas.height;
-        if (i === 36) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.closePath();
-      ctx.stroke();
-    }
-
-    // 오른쪽 눈 (42-47)
-    if (visibleLandmarks.length > 47) {
-      ctx.beginPath();
-      for (let i = 42; i <= 47; i++) {
-        const lm = visibleLandmarks[i];
-        const x = lm.x * canvas.width;
-        const y = lm.y * canvas.height;
-        if (i === 42) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.closePath();
-      ctx.stroke();
-    }
-
-    // 입술 외곽 (48-59)
-    if (visibleLandmarks.length > 59) {
-      ctx.beginPath();
-      for (let i = 48; i <= 59; i++) {
-        const lm = visibleLandmarks[i];
-        const x = lm.x * canvas.width;
-        const y = lm.y * canvas.height;
-        if (i === 48) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.closePath();
-      ctx.stroke();
-    }
-
-    // 2. 랜드마크 점 그리기
-    visibleLandmarks.forEach((landmark, index) => {
-      const x = landmark.x * canvas.width;
-      const y = landmark.y * canvas.height;
-
-      // 주요 포인트 (이마, 턱, 관자놀이)는 크고 빨간색으로
-      const isKeyPoint = [10, 152, 234, 454, 172, 397].includes(index);
-      
-      if (isKeyPoint) {
-        // 주요 포인트: 빨간색 그라데이션
-        const gradient = ctx.createRadialGradient(x, y, 0, x, y, 4);
-        gradient.addColorStop(0, '#FF6B6B');
-        gradient.addColorStop(1, '#FF0000');
-        
-        ctx.beginPath();
-        ctx.arc(x, y, 4, 0, 2 * Math.PI);
-        ctx.fillStyle = gradient;
-        ctx.fill();
-        
-        // 흰색 테두리
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      } else {
-        // 일반 포인트: 초록색 그라데이션
-        const gradient = ctx.createRadialGradient(x, y, 0, x, y, 2);
-        gradient.addColorStop(0, '#4ECDC4');
-        gradient.addColorStop(1, '#2C9A93');
-        
-        ctx.beginPath();
-        ctx.arc(x, y, 1.5, 0, 2 * Math.PI);
-        ctx.fillStyle = gradient;
-        ctx.fill();
-      }
-    });
-
-    // 3. Canvas 왼쪽 상단에 진행률 표시
-    if (landmarkProgress < 468) {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.fillRect(10, 10, 180, 40);
-      
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = '16px sans-serif';
-      ctx.fillText(`랜드마크: ${landmarkProgress}/468`, 20, 35);
-    }
-
-  }, [analysis, landmarkProgress]);
-
-  // 이미지 로드 완료 시 Canvas 업데이트 트리거
-  const handleImageLoad = () => {
-    if (analysis?.landmarks) {
-      // 강제로 리렌더링
-      setLandmarkProgress(prev => prev);
-    }
+  // SVG Path 생성 함수
+  const createPath = (indices: number[]) => {
+    if (!analysis?.landmarks) return '';
+    const points = indices.map(i => analysis.landmarks![i]).filter(Boolean);
+    if (points.length < 2) return '';
+    return `M ${points[0].x} ${points[0].y} ` + points.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
   };
+
+  // 연결선 Path 생성
+  const createConnectionPath = (connections: number[][]) => {
+    if (!analysis?.landmarks) return '';
+    return connections.map(([start, end]) => {
+      const startPt = analysis.landmarks![start];
+      const endPt = analysis.landmarks![end];
+      if (!startPt || !endPt) return '';
+      return `M ${startPt.x} ${startPt.y} L ${endPt.x} ${endPt.y}`;
+    }).join(' ');
+  };
+
+  // 주요 포인트 인덱스
+  const keyPoints = [10, 152, 234, 454, 172, 397];
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50 animate-fade-in">
@@ -263,52 +108,120 @@ const FaceAnalysisModal: React.FC<FaceAnalysisModalProps> = ({
 
         {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-          {/* 이미지 및 랜드마크 Canvas */}
+          {/* 이미지 + SVG 오버레이 */}
           <div className="relative mb-6">
-            {/* 원본 이미지 (숨김 - Canvas 그리기용) */}
-            <img
-              ref={imageRef}
-              src={imageUrl}
-              alt="Face Analysis"
-              onLoad={handleImageLoad}
-              style={{ display: 'none' }}
-            />
-            
-            {/* Canvas (랜드마크 시각화) */}
-            <canvas
-              ref={canvasRef}
-              className="w-full rounded-lg shadow-lg"
-              style={{ display: analysis?.landmarks ? 'block' : 'none' }}
-            />
-            
-            {/* 랜드마크 없을 때 원본 이미지 표시 */}
-            {!analysis?.landmarks && (
-              <img
-                src={imageUrl}
-                alt="Face Analysis"
-                className="w-full rounded-lg shadow-lg"
-              />
-            )}
-            
-            {/* 분석 중 오버레이 */}
-            {isAnalyzing && (
-              <div className="absolute inset-0 bg-black bg-opacity-40 rounded-lg flex items-center justify-center">
-                <div className="text-center text-white">
-                  <div className="mb-4">
-                    <div className="w-16 h-16 mx-auto border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-                  </div>
-                  <p className="text-lg font-semibold mb-2">
-                    {currentPhase === 'detecting' && '얼굴 감지 중...'}
-                    {currentPhase === 'analyzing' && '데이터 분석 중...'}
-                  </p>
-                  {currentPhase === 'detecting' && (
-                    <p className="text-sm text-gray-200">
-                      랜드마크: {Math.min(landmarkProgress, 468)} / 468
-                    </p>
+            <div className="relative w-full rounded-xl overflow-hidden shadow-lg">
+              <img src={imageUrl} alt="Face Analysis" className="w-full h-auto" />
+              
+              {/* SVG 오버레이 (랜드마크 시각화) */}
+              {analysis?.landmarks && (
+                <svg 
+                  className="absolute inset-0 w-full h-full" 
+                  viewBox="0 0 1 1" 
+                  preserveAspectRatio="none"
+                  style={{ pointerEvents: 'none' }}
+                >
+                  {/* 얼굴 윤곽선 */}
+                  <path
+                    d={createConnectionPath(FACE_OUTLINE)}
+                    fill="none"
+                    stroke="rgba(78, 205, 196, 0.6)"
+                    strokeWidth="0.002"
+                  />
+
+                  {/* 왼쪽 눈 */}
+                  <path
+                    d={createPath(LEFT_EYE)}
+                    fill="none"
+                    stroke="rgba(167, 243, 208, 0.9)"
+                    strokeWidth="0.003"
+                  />
+
+                  {/* 오른쪽 눈 */}
+                  <path
+                    d={createPath(RIGHT_EYE)}
+                    fill="none"
+                    stroke="rgba(167, 243, 208, 0.9)"
+                    strokeWidth="0.003"
+                  />
+
+                  {/* 코 */}
+                  <path
+                    d={createPath(NOSE)}
+                    fill="none"
+                    stroke="rgba(167, 243, 208, 0.9)"
+                    strokeWidth="0.0025"
+                  />
+
+                  {/* 입 */}
+                  <path
+                    d={createPath(MOUTH)}
+                    fill="none"
+                    stroke="rgba(167, 243, 208, 0.9)"
+                    strokeWidth="0.003"
+                  />
+
+                  {/* 468개 랜드마크 점들 */}
+                  {analysis.landmarks.slice(0, Math.min(landmarkProgress, 468)).map((lm, index) => (
+                    <circle
+                      key={index}
+                      cx={lm.x}
+                      cy={lm.y}
+                      r={keyPoints.includes(index) ? "0.005" : "0.0015"}
+                      fill={keyPoints.includes(index) ? "rgba(255, 107, 107, 0.9)" : "rgba(78, 205, 196, 0.8)"}
+                    />
+                  ))}
+
+                  {/* 주요 포인트 펄스 효과 */}
+                  {keyPoints.map(index => {
+                    const pt = analysis.landmarks![index];
+                    if (!pt) return null;
+                    return (
+                      <circle
+                        key={`pulse-${index}`}
+                        cx={pt.x}
+                        cy={pt.y}
+                        r="0.008"
+                        fill="none"
+                        stroke="rgba(255, 107, 107, 0.5)"
+                        strokeWidth="0.001"
+                        className="animate-pulse"
+                      />
+                    );
+                  })}
+
+                  {/* 진행률 표시 */}
+                  {landmarkProgress < 468 && (
+                    <g>
+                      <rect x="0.02" y="0.02" width="0.25" height="0.06" fill="rgba(0, 0, 0, 0.7)" rx="0.01" />
+                      <text x="0.145" y="0.055" fontSize="0.03" fill="white" textAnchor="middle" fontFamily="sans-serif">
+                        {landmarkProgress}/468
+                      </text>
+                    </g>
                   )}
+                </svg>
+              )}
+
+              {/* 분석 중 오버레이 */}
+              {isAnalyzing && (
+                <div className="absolute inset-0 bg-black bg-opacity-40 rounded-lg flex items-center justify-center">
+                  <div className="text-center text-white">
+                    <div className="mb-4">
+                      <div className="w-16 h-16 mx-auto border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                    <p className="text-lg font-semibold mb-2">
+                      {currentPhase === 'detecting' && '얼굴 감지 중...'}
+                      {currentPhase === 'analyzing' && '데이터 분석 중...'}
+                    </p>
+                    {currentPhase === 'detecting' && (
+                      <p className="text-sm text-gray-200">
+                        랜드마크: {Math.min(landmarkProgress, 468)} / 468
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* 분석 진행 상태 */}
