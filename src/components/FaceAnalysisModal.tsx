@@ -18,10 +18,19 @@ const FaceAnalysisModal: React.FC<FaceAnalysisModalProps> = ({
   const [currentPhase, setCurrentPhase] = useState<'detecting' | 'analyzing' | 'complete'>('detecting');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
   // 468개 랜드마크 감지 애니메이션
   useEffect(() => {
-    if (!isAnalyzing) return;
+    if (!isAnalyzing) {
+      // 분석 완료 상태로 설정
+      setCurrentPhase('complete');
+      return;
+    }
+
+    // 초기화
+    setLandmarkProgress(0);
+    setCurrentPhase('detecting');
 
     // Phase 1: 랜드마크 감지 (0-468)
     const landmarkInterval = setInterval(() => {
@@ -29,60 +38,217 @@ const FaceAnalysisModal: React.FC<FaceAnalysisModalProps> = ({
         if (prev >= 468) {
           clearInterval(landmarkInterval);
           setCurrentPhase('analyzing');
+          
+          // 1.5초 후 분석 완료
+          setTimeout(() => {
+            setCurrentPhase('complete');
+          }, 1500);
+          
           return 468;
         }
-        return prev + Math.floor(Math.random() * 30) + 10; // 10-40개씩 증가
+        return prev + Math.floor(Math.random() * 30) + 15; // 15-45개씩 빠르게 증가
       });
-    }, 100);
+    }, 80);
 
-    return () => clearInterval(landmarkInterval);
+    return () => {
+      clearInterval(landmarkInterval);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
   }, [isAnalyzing]);
 
-  // Canvas에 랜드마크 그리기
+  // Canvas에 랜드마크 그리기 - 개선된 버전
   useEffect(() => {
-    if (!canvasRef.current || !imageRef.current || !analysis?.landmarks) return;
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    const img = imageRef.current;
-
-    if (!ctx || !img.complete) return;
-
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
-
-    // 이미지 그리기
-    ctx.drawImage(img, 0, 0);
-
-    // 랜드마크 그리기
-    const landmarks = analysis.landmarks.slice(0, landmarkProgress);
-    
-    landmarks.forEach((landmark, index) => {
-      const x = landmark.x * canvas.width;
-      const y = landmark.y * canvas.height;
-
-      // 주요 윤곽선 포인트는 크게 표시
-      const isKeyPoint = [10, 152, 234, 454, 172, 397].includes(index);
-      const radius = isKeyPoint ? 3 : 1.5;
-      const color = isKeyPoint ? '#FF6B6B' : '#4ECDC4';
-
-      ctx.beginPath();
-      ctx.arc(x, y, radius, 0, 2 * Math.PI);
-      ctx.fillStyle = color;
-      ctx.fill();
-
-      // 연결선 그리기 (얼굴 윤곽)
-      if (index > 0 && index < 17) {
-        const prevLandmark = landmarks[index - 1];
-        ctx.beginPath();
-        ctx.moveTo(prevLandmark.x * canvas.width, prevLandmark.y * canvas.height);
-        ctx.lineTo(x, y);
-        ctx.strokeStyle = 'rgba(78, 205, 196, 0.5)';
-        ctx.lineWidth = 2;
-        ctx.stroke();
+    const drawLandmarks = () => {
+      if (!canvasRef.current || !imageRef.current || !analysis?.landmarks) {
+        return;
       }
-    });
-  }, [landmarkProgress, analysis]);
+
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      const img = imageRef.current;
+
+      // 이미지가 로드되지 않았으면 대기
+      if (!ctx || !img.complete || img.naturalWidth === 0) {
+        return;
+      }
+
+      // Canvas 크기를 이미지에 맞춤
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+
+      // 배경에 이미지 그리기
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // 표시할 랜드마크 개수 (애니메이션)
+      const visibleCount = Math.min(landmarkProgress, 468);
+      const visibleLandmarks = analysis.landmarks.slice(0, visibleCount);
+
+      if (visibleLandmarks.length === 0) return;
+
+      // 주요 얼굴 윤곽선 정의 (MediaPipe Face Mesh 표준)
+      const facialContours = [
+        // 얼굴 윤곽 (턱선) - 17개 포인트
+        Array.from({ length: 17 }, (_, i) => i),
+        // 왼쪽 눈썹
+        [17, 18, 19, 20, 21],
+        // 오른쪽 눈썹
+        [22, 23, 24, 25, 26],
+        // 코 브릿지
+        [27, 28, 29, 30],
+        // 코 하단
+        [31, 32, 33, 34, 35],
+        // 왼쪽 눈 (36-41)
+        [36, 37, 38, 39, 40, 41, 36],
+        // 오른쪽 눈 (42-47)
+        [42, 43, 44, 45, 46, 47, 42],
+        // 입술 외곽 (48-59)
+        [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 48],
+        // 입술 내곽 (60-67)
+        [60, 61, 62, 63, 64, 65, 66, 67, 60]
+      ];
+
+      // 윤곽선 그리기
+      ctx.strokeStyle = 'rgba(99, 102, 241, 0.7)'; // 인디고
+      ctx.lineWidth = 2;
+
+      facialContours.forEach(contour => {
+        // 모든 포인트가 보이는 경우만 그리기
+        if (contour[contour.length - 1] >= visibleCount) return;
+
+        ctx.beginPath();
+        let started = false;
+        
+        contour.forEach((index) => {
+          if (index >= analysis.landmarks!.length) return;
+          
+          const landmark = analysis.landmarks![index];
+          const x = landmark.x * canvas.width;
+          const y = landmark.y * canvas.height;
+
+          if (!started) {
+            ctx.moveTo(x, y);
+            started = true;
+          } else {
+            ctx.lineTo(x, y);
+          }
+        });
+        
+        ctx.stroke();
+      });
+
+      // MediaPipe Face Mesh의 연결선 그리기 (더 정교한 메쉬)
+      const connections = [
+        // 얼굴 윤곽선 연결
+        ...Array.from({ length: 16 }, (_, i) => [i, i + 1]),
+        // 눈썹 연결
+        [17, 18], [18, 19], [19, 20], [20, 21],
+        [22, 23], [23, 24], [24, 25], [25, 26],
+        // 코 연결
+        [27, 28], [28, 29], [29, 30],
+        [31, 32], [32, 33], [33, 34], [34, 35],
+        // 더 많은 연결선들 (얼굴 중심부)
+        [1, 36], [16, 45], [27, 30], [30, 33]
+      ];
+
+      ctx.strokeStyle = 'rgba(167, 139, 250, 0.4)'; // 연보라
+      ctx.lineWidth = 1;
+
+      connections.forEach(([start, end]) => {
+        if (start >= analysis.landmarks!.length || end >= analysis.landmarks!.length) return;
+        if (start >= visibleCount || end >= visibleCount) return;
+
+        const startLandmark = analysis.landmarks![start];
+        const endLandmark = analysis.landmarks![end];
+
+        ctx.beginPath();
+        ctx.moveTo(startLandmark.x * canvas.width, startLandmark.y * canvas.height);
+        ctx.lineTo(endLandmark.x * canvas.width, endLandmark.y * canvas.height);
+        ctx.stroke();
+      });
+
+      // 모든 랜드마크 점 그리기
+      visibleLandmarks.forEach((landmark, index) => {
+        const x = landmark.x * canvas.width;
+        const y = landmark.y * canvas.height;
+
+        // 주요 포인트 정의 (얼굴 특징점)
+        const keyPoints = [
+          10, 152, // 이마 중앙, 턱 끝
+          234, 454, // 왼쪽/오른쪽 관자놀이
+          33, 263, // 눈 중심
+          61, 291, // 입 양쪽
+          1, 4, 5 // 코
+        ];
+
+        const isKeyPoint = keyPoints.includes(index);
+        const radius = isKeyPoint ? 4 : 1.5;
+
+        // 그라데이션 효과
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+        
+        if (isKeyPoint) {
+          gradient.addColorStop(0, '#EF4444'); // 빨강
+          gradient.addColorStop(1, '#DC2626');
+        } else {
+          gradient.addColorStop(0, '#10B981'); // 초록
+          gradient.addColorStop(1, '#059669');
+        }
+
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // 주요 포인트에 테두리
+        if (isKeyPoint) {
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+      });
+
+      // 진행률 표시 (디버깅용 - 선택사항)
+      if (isAnalyzing && visibleCount < 468) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(10, 10, 150, 40);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 14px sans-serif';
+        ctx.fillText(`랜드마크: ${visibleCount}/468`, 20, 35);
+      }
+    };
+
+    // 초기 그리기
+    drawLandmarks();
+
+    // 애니메이션이 진행 중일 때만 계속 업데이트
+    if (isAnalyzing && landmarkProgress < 468) {
+      animationFrameRef.current = requestAnimationFrame(() => {
+        setTimeout(drawLandmarks, 50);
+      });
+    }
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [landmarkProgress, analysis, isAnalyzing]);
+
+  // 이미지 로드 완료 후 Canvas 업데이트
+  const handleImageLoad = () => {
+    if (canvasRef.current && analysis?.landmarks && !isAnalyzing) {
+      // 이미지 로드 후 강제 리렌더링
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (ctx && imageRef.current) {
+        canvas.width = imageRef.current.naturalWidth;
+        canvas.height = imageRef.current.naturalHeight;
+      }
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50 animate-fade-in">
@@ -122,6 +288,7 @@ const FaceAnalysisModal: React.FC<FaceAnalysisModalProps> = ({
               ref={imageRef}
               src={imageUrl}
               alt="Face Analysis"
+              onLoad={handleImageLoad}
               className="w-full rounded-lg shadow-lg"
               style={{ display: analysis?.landmarks ? 'none' : 'block' }}
             />
