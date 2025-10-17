@@ -8,6 +8,17 @@ import {
   SERVICE_MAJOR_CATEGORIES,
   SERVICE_CATEGORY_LABELS,
   SERVICE_SUBCATEGORY_SUGGESTIONS,
+  // AI Recommendations
+  AIRecommendations,
+  FaceShapeType,
+  PersonalColorType,
+  SuitabilityLevel,
+  ColorTemperature,
+  ColorBrightness,
+  FACE_SHAPES,
+  PERSONAL_COLORS,
+  SUITABILITY_STARS,
+  SUITABILITY_LABELS,
   // Legacy imports for backward compatibility
   FemaleMajorCategory,
   MaleMajorCategory,
@@ -34,6 +45,18 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
   // NEW: Service-based categories (primary system)
   const [serviceCategory, setServiceCategory] = useState<ServiceMajorCategory>('cut');
   const [serviceSubCategory, setServiceSubCategory] = useState<ServiceMinorCategory>('');
+  
+  // 🆕 AI 추천 시스템 상태
+  const [enableAIRecommendations, setEnableAIRecommendations] = useState(false);
+  
+  // 커트 스타일 AI 추천
+  const [selectedFaceShapes, setSelectedFaceShapes] = useState<Map<FaceShapeType, SuitabilityLevel>>(new Map());
+  
+  // 염색 스타일 AI 추천
+  const [selectedPersonalColors, setSelectedPersonalColors] = useState<Map<Exclude<PersonalColorType, null>, SuitabilityLevel>>(new Map());
+  const [colorTemperature, setColorTemperature] = useState<ColorTemperature>('neutral');
+  const [colorBrightness, setColorBrightness] = useState<ColorBrightness>('medium');
+  const [isVibrant, setIsVibrant] = useState(false);
   
   // LEGACY: Keep for backward compatibility (hidden from UI)
   const [majorCategory] = useState<FemaleMajorCategory | MaleMajorCategory>(FEMALE_MAJOR_CATEGORIES[0]);
@@ -64,21 +87,21 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
   // 의미없는 파일명인지 확인하는 함수
   const isMeaninglessFileName = (fileName: string): boolean => {
     const meaninglessPatterns = [
-      /^IMG_\d+$/i,           // IMG_1234
-      /^DSC\d+$/i,            // DSC1234  
-      /^Photo_\d+$/i,         // Photo_123
-      /^KakaoTalk_\d+$/i,     // KakaoTalk_20250924
-      /^\d{8}_\d{6}$/,        // 20250924_123456
-      /^Screenshot_/i,        // Screenshot_xxx
-      /^image_?\d*$/i,        // image1, image
-      /^photo_?\d*$/i,        // photo1, photo
-      /^스크린샷/i,           // 스크린샷
-      /^캡처$/i,              // 캡처
-      /^사진\d*$/i,           // 사진1, 사진
-      /^이미지\d*$/i,         // 이미지1, 이미지
-      /^\d+$/,                // 순수 숫자만
-      /^IMG-\d+$/i,           // IMG-20250924
-      /^PXL_\d+$/i,           // PXL_20250924 (Google Pixel)
+      /^IMG_\d+$/i,
+      /^DSC\d+$/i,
+      /^Photo_\d+$/i,
+      /^KakaoTalk_\d+$/i,
+      /^\d{8}_\d{6}$/,
+      /^Screenshot_/i,
+      /^image_?\d*$/i,
+      /^photo_?\d*$/i,
+      /^스크린샷/i,
+      /^캡처$/i,
+      /^사진\d*$/i,
+      /^이미지\d*$/i,
+      /^\d+$/,
+      /^IMG-\d+$/i,
+      /^PXL_\d+$/i,
     ];
     
     return meaninglessPatterns.some(pattern => pattern.test(fileName));
@@ -91,13 +114,12 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
       return t('upload.newStyle');
     }
     
-    // 성별에 따라 적절한 스타일 선택
     const genderAppropriate = suggestions.filter(style => {
       if (gender === 'Male') {
         const maleStyles = ['Buzz Cut', 'Fade Cut', 'Undercut', 'Crew Cut', 'Pompadour'];
         return maleStyles.some(maleStyle => style.includes(maleStyle.split(' ')[0]));
       }
-      return true; // Female에는 모든 스타일 허용
+      return true;
     });
     
     const targetSuggestions = genderAppropriate.length > 0 ? genderAppropriate : suggestions;
@@ -118,15 +140,10 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
       setFile(selectedFile);
       setPreviewUrl(URL.createObjectURL(selectedFile));
       
-      // 파일명에서 확장자 제거
       const nameWithoutExt = selectedFile.name.split('.').slice(0, -1).join('.') || '';
       
-      // 의미없는 파일명인지 확인
       if (isMeaninglessFileName(nameWithoutExt)) {
-        // 의미없는 파일명인 경우 빈 값으로 설정
         setStyleName('');
-        
-        // placeholder에 추천 스타일명 표시를 위해 input 요소 업데이트
         setTimeout(() => {
           const inputElement = document.getElementById('style-name') as HTMLInputElement;
           if (inputElement) {
@@ -135,10 +152,9 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
           }
         }, 100);
       } else {
-        // 의미있는 파일명인 경우 첫글자 대문자로 정리해서 사용
         const cleanedName = nameWithoutExt
-          .replace(/[-_]/g, ' ') // 하이픈, 언더스코어를 공백으로
-          .replace(/\s+/g, ' ')  // 여러 공백을 하나로
+          .replace(/[-_]/g, ' ')
+          .replace(/\s+/g, ' ')
           .trim();
         
         const capitalizedName = cleanedName
@@ -151,6 +167,66 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
     }
   };
 
+  // 🆕 얼굴형 선택/해제 토글
+  const toggleFaceShape = (shape: FaceShapeType, level: SuitabilityLevel) => {
+    setSelectedFaceShapes(prev => {
+      const newMap = new Map(prev);
+      if (newMap.get(shape) === level) {
+        newMap.delete(shape); // 같은 레벨 클릭 시 해제
+      } else {
+        newMap.set(shape, level); // 새 레벨 설정
+      }
+      return newMap;
+    });
+  };
+
+  // 🆕 퍼스널 컬러 선택/해제 토글
+  const togglePersonalColor = (color: Exclude<PersonalColorType, null>, level: SuitabilityLevel) => {
+    setSelectedPersonalColors(prev => {
+      const newMap = new Map(prev);
+      if (newMap.get(color) === level) {
+        newMap.delete(color);
+      } else {
+        newMap.set(color, level);
+      }
+      return newMap;
+    });
+  };
+
+  // 🆕 AI 추천 데이터 생성
+  const buildAIRecommendations = (): AIRecommendations | undefined => {
+    if (!enableAIRecommendations) return undefined;
+
+    const recommendations: AIRecommendations = {};
+
+    // 커트 스타일 추천
+    if (serviceCategory === 'cut' && selectedFaceShapes.size > 0) {
+      recommendations.cut = {
+        faceShapes: Array.from(selectedFaceShapes.entries()).map(([shape, suitability]) => ({
+          shape,
+          suitability
+        }))
+      };
+    }
+
+    // 염색 스타일 추천
+    if (serviceCategory === 'color' && selectedPersonalColors.size > 0) {
+      recommendations.color = {
+        personalColors: Array.from(selectedPersonalColors.entries()).map(([color, suitability]) => ({
+          color,
+          suitability
+        })),
+        colorProperties: {
+          temperature: colorTemperature,
+          brightness: colorBrightness,
+          vibrant: isVibrant
+        }
+      };
+    }
+
+    return Object.keys(recommendations).length > 0 ? recommendations : undefined;
+  };
+
   const handleUpload = async () => {
     if (!file || !styleName.trim()) return;
 
@@ -159,7 +235,6 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
     setError(null);
 
     try {
-      // Cloudinary에 이미지 업로드
       const cloudinaryUrl = await uploadWithProgress(
         file,
         (progress) => setUploadProgress(progress),
@@ -174,18 +249,20 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
         .map(tag => tag.trim())
         .filter(tag => tag.length > 0);
 
+      const aiRecommendations = buildAIRecommendations();
+
       const uploadData = {
         file,
         name: styleName.trim(),
         gender,
         serviceCategory,
         serviceSubCategory: serviceSubCategory.trim() || undefined,
-        // Include legacy fields for backward compatibility
+        aiRecommendations, // 🆕 AI 추천 정보 포함
         majorCategory,
         minorCategory,
         description: description.trim() || undefined,
         tags: tagsArray.length > 0 ? tagsArray : undefined,
-        cloudinaryUrl // Cloudinary URL 추가
+        cloudinaryUrl
       };
 
       onUpload(uploadData);
@@ -198,9 +275,12 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
     }
   };
 
-  // 서비스 카테고리가 변경될 때 서브 카테고리 초기화
+  // 서비스 카테고리가 변경될 때 초기화
   useEffect(() => {
     setServiceSubCategory('');
+    setEnableAIRecommendations(false);
+    setSelectedFaceShapes(new Map());
+    setSelectedPersonalColors(new Map());
   }, [serviceCategory]);
 
   const handleModalClick = (e: React.MouseEvent) => {
@@ -268,7 +348,6 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
                   </div>
                 )}
                 
-                {/* Upload Progress Overlay */}
                 {isUploading && (
                   <div className="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center">
                     <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -389,6 +468,177 @@ const UploadStyleModal: React.FC<UploadStyleModalProps> = ({ onUpload, onClose }
                 </div>
               </div>
             </div>
+
+            {/* 🆕 AI 추천 시스템 섹션 */}
+            {(serviceCategory === 'cut' || serviceCategory === 'color') && (
+              <div className="border border-indigo-200 rounded-lg p-4 bg-gradient-to-br from-indigo-50 to-purple-50">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    <h3 className="font-semibold text-gray-800">AI 스마트 추천 설정</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEnableAIRecommendations(!enableAIRecommendations)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      enableAIRecommendations ? 'bg-indigo-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      enableAIRecommendations ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
+                
+                <p className="text-xs text-gray-600 mb-3">
+                  {serviceCategory === 'cut' 
+                    ? '어떤 얼굴형에 잘 어울리는 스타일인지 설정하면 고객에게 자동으로 추천됩니다'
+                    : '어떤 퍼스널 컬러에 잘 어울리는 색상인지 설정하면 고객에게 자동으로 추천됩니다'
+                  }
+                </p>
+
+                {enableAIRecommendations && (
+                  <div className="space-y-4 mt-4">
+                    {/* 커트 스타일 - 얼굴형 선택 */}
+                    {serviceCategory === 'cut' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          추천 얼굴형 선택
+                        </label>
+                        <div className="space-y-2">
+                          {FACE_SHAPES.filter(shape => shape !== '알 수 없음').map(shape => (
+                            <div key={shape} className="bg-white rounded-lg p-3 border border-gray-200">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="font-medium text-gray-800">{shape}</span>
+                              </div>
+                              <div className="flex gap-2">
+                                {(['excellent', 'good', 'fair'] as SuitabilityLevel[]).map(level => (
+                                  <button
+                                    key={level}
+                                    type="button"
+                                    onClick={() => toggleFaceShape(shape, level)}
+                                    className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all ${
+                                      selectedFaceShapes.get(shape) === level
+                                        ? 'bg-indigo-600 text-white shadow-md'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
+                                  >
+                                    <div>{SUITABILITY_STARS[level]}</div>
+                                    <div className="mt-1">{SUITABILITY_LABELS[level]}</div>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {selectedFaceShapes.size === 0 && (
+                          <p className="text-xs text-amber-600 mt-2">최소 1개 이상의 얼굴형을 선택해주세요</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 염색 스타일 - 퍼스널 컬러 선택 */}
+                    {serviceCategory === 'color' && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            추천 퍼스널 컬러 선택
+                          </label>
+                          <div className="space-y-2">
+                            {PERSONAL_COLORS.map(color => (
+                              <div key={color} className="bg-white rounded-lg p-3 border border-gray-200">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="font-medium text-gray-800">{color}</span>
+                                </div>
+                                <div className="flex gap-2">
+                                  {(['excellent', 'good', 'fair'] as SuitabilityLevel[]).map(level => (
+                                    <button
+                                      key={level}
+                                      type="button"
+                                      onClick={() => togglePersonalColor(color, level)}
+                                      className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all ${
+                                        selectedPersonalColors.get(color) === level
+                                          ? 'bg-indigo-600 text-white shadow-md'
+                                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                      }`}
+                                    >
+                                      <div>{SUITABILITY_STARS[level]}</div>
+                                      <div className="mt-1">{SUITABILITY_LABELS[level]}</div>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          {selectedPersonalColors.size === 0 && (
+                            <p className="text-xs text-amber-600 mt-2">최소 1개 이상의 퍼스널 컬러를 선택해주세요</p>
+                          )}
+                        </div>
+
+                        {/* 색상 속성 */}
+                        <div className="bg-white rounded-lg p-3 border border-gray-200 space-y-3">
+                          <h4 className="font-medium text-gray-800 text-sm">색상 속성 (선택사항)</h4>
+                          
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">색상 온도</label>
+                            <div className="flex gap-2">
+                              {(['warm', 'neutral', 'cool'] as ColorTemperature[]).map(temp => (
+                                <button
+                                  key={temp}
+                                  type="button"
+                                  onClick={() => setColorTemperature(temp)}
+                                  className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all ${
+                                    colorTemperature === temp
+                                      ? 'bg-indigo-600 text-white'
+                                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                  }`}
+                                >
+                                  {temp === 'warm' ? '🔥 웜톤' : temp === 'cool' ? '❄️ 쿨톤' : '⚖️ 중성'}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">색상 명도</label>
+                            <div className="flex gap-2">
+                              {(['light', 'medium', 'dark'] as ColorBrightness[]).map(bright => (
+                                <button
+                                  key={bright}
+                                  type="button"
+                                  onClick={() => setColorBrightness(bright)}
+                                  className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all ${
+                                    colorBrightness === bright
+                                      ? 'bg-indigo-600 text-white'
+                                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                  }`}
+                                >
+                                  {bright === 'light' ? '☀️ 밝음' : bright === 'medium' ? '🌤️ 중간' : '🌙 어두움'}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isVibrant}
+                                onChange={(e) => setIsVibrant(e.target.checked)}
+                                className="w-4 h-4 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500"
+                              />
+                              <span className="ml-2 text-xs text-gray-700">✨ 선명하고 비비드한 색상</span>
+                            </label>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Description */}
             <div>
