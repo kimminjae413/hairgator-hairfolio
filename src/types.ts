@@ -115,9 +115,72 @@ export type FaceAnalysisState =
   | 'complete'      // 완료
   | 'error';        // 오류
 
+// ===== AI RECOMMENDATIONS SYSTEM =====
+
+/**
+ * 적합도 레벨 (3단계)
+ */
+export type SuitabilityLevel = 
+  | 'excellent'  // ⭐⭐⭐ 매우 잘 어울림
+  | 'good'       // ⭐⭐ 잘 어울림
+  | 'fair';      // ⭐ 어울림
+
+/**
+ * 색상 온도 (염색용)
+ */
+export type ColorTemperature = 
+  | 'warm'      // 웜톤
+  | 'cool'      // 쿨톤
+  | 'neutral';  // 중성톤
+
+/**
+ * 색상 명도 (염색용)
+ */
+export type ColorBrightness = 
+  | 'light'     // 밝은 색
+  | 'medium'    // 중간 톤
+  | 'dark';     // 어두운 색
+
+/**
+ * 커트 스타일 AI 추천 정보
+ */
+export interface CutRecommendations {
+  faceShapes: Array<{
+    shape: FaceShapeType;
+    suitability: SuitabilityLevel;
+    reason?: string;  // 추천 이유 (선택사항)
+  }>;
+}
+
+/**
+ * 염색 스타일 AI 추천 정보
+ */
+export interface ColorRecommendations {
+  personalColors: Array<{
+    color: Exclude<PersonalColorType, null>;
+    suitability: SuitabilityLevel;
+    reason?: string;  // 추천 이유 (선택사항)
+  }>;
+  colorProperties?: {
+    temperature: ColorTemperature;    // 색상 온도
+    brightness: ColorBrightness;      // 명도
+    vibrant?: boolean;                // 선명한 색상 여부
+  };
+}
+
+/**
+ * AI 추천 시스템 - 통합 인터페이스
+ * 서비스 카테고리에 따라 cut 또는 color 정보를 포함
+ */
+export interface AIRecommendations {
+  cut?: CutRecommendations;      // 커트 스타일일 때
+  color?: ColorRecommendations;  // 염색 스타일일 때
+  updatedAt?: string;            // 추천 정보 업데이트 시각
+}
+
 // ===== HAIRSTYLE & DESIGNER DATA TYPES =====
 
-// Hairstyle data structure - Updated with new service categories
+// Hairstyle data structure - Updated with AI recommendations
 export interface Hairstyle {
   id?: string;                                          // Unique identifier
   name: string;                                         // Display name
@@ -128,6 +191,9 @@ export interface Hairstyle {
   // NEW: Service-based categorization (preferred)
   serviceCategory?: ServiceMajorCategory;              // Primary service categorization
   serviceSubCategory?: ServiceMinorCategory;           // Secondary service categorization (user input)
+  
+  // 🆕 AI 추천 시스템
+  aiRecommendations?: AIRecommendations;               // AI-based recommendations
   
   // LEGACY: Length/style-based categorization (deprecated but maintained for compatibility)
   majorCategory?: FemaleMajorCategory | MaleMajorCategory; // Primary categorization
@@ -202,7 +268,7 @@ export interface DesignerData {
   updatedAt?: string;                                 // ISO date string
 }
 
-// Form data types - Updated to support both new and legacy systems
+// Form data types - Updated to support AI recommendations
 export interface UploadStyleFormData {
   file: File;
   name: string;
@@ -211,6 +277,9 @@ export interface UploadStyleFormData {
   // NEW: Service-based categories (preferred)
   serviceCategory?: ServiceMajorCategory;
   serviceSubCategory?: ServiceMinorCategory;
+  
+  // 🆕 AI 추천 정보
+  aiRecommendations?: AIRecommendations;
   
   // LEGACY: For backward compatibility (deprecated)
   majorCategory?: FemaleMajorCategory | MaleMajorCategory;
@@ -230,6 +299,7 @@ export interface HairstyleGalleryProps {
   onAddImage?: () => void;
   showCategories?: boolean;
   allowMultipleSelection?: boolean;
+  faceAnalysis?: FaceAnalysis | null;  // 🆕 얼굴 분석 기반 필터링용
 }
 
 export interface ImageUploaderProps {
@@ -255,7 +325,7 @@ export interface ColorTryOnModalProps {
   };
   userFaceFile?: File | null;
   userFacePreview?: string | null;
-  faceAnalysis?: FaceAnalysis | null;  // 🆕 얼굴 분석 정보 추가
+  faceAnalysis?: FaceAnalysis | null;  // 얼굴 분석 정보 추가
   onClose: () => void;
   onComplete: (result: any) => void;
 }
@@ -285,7 +355,7 @@ export interface VModelRequest {
   faceImage: string;
   styleImage: string;
   styleDescription: string;
-  faceShape?: FaceShapeType;  // 🆕 얼굴형 정보 추가
+  faceShape?: FaceShapeType;  // 얼굴형 정보 추가
   options?: {
     quality?: 'high' | 'medium' | 'low';
     preserveFaceFeatures?: boolean;
@@ -496,7 +566,133 @@ export const PERSONAL_COLOR_RECOMMENDATIONS: Record<string, ColorRecommendation>
   }
 };
 
+// ===== AI RECOMMENDATIONS CONSTANTS =====
+
+/**
+ * 적합도 레벨 표시 (별 개수)
+ */
+export const SUITABILITY_STARS: Record<SuitabilityLevel, string> = {
+  excellent: '⭐⭐⭐',
+  good: '⭐⭐',
+  fair: '⭐'
+};
+
+/**
+ * 적합도 레벨 라벨
+ */
+export const SUITABILITY_LABELS: Record<SuitabilityLevel, string> = {
+  excellent: '매우 잘 어울림',
+  good: '잘 어울림',
+  fair: '어울림'
+};
+
+/**
+ * 색상 온도 라벨
+ */
+export const COLOR_TEMPERATURE_LABELS: Record<ColorTemperature, string> = {
+  warm: '웜톤',
+  cool: '쿨톤',
+  neutral: '중성톤'
+};
+
+/**
+ * 색상 명도 라벨
+ */
+export const COLOR_BRIGHTNESS_LABELS: Record<ColorBrightness, string> = {
+  light: '밝은 톤',
+  medium: '중간 톤',
+  dark: '어두운 톤'
+};
+
 // ===== UTILITY FUNCTIONS =====
+
+/**
+ * 얼굴형에 맞는 헤어스타일인지 확인
+ */
+export const isSuitableForFaceShape = (
+  hairstyle: Hairstyle, 
+  faceShape: FaceShapeType | null,
+  minLevel: SuitabilityLevel = 'fair'
+): boolean => {
+  if (!faceShape || !hairstyle.aiRecommendations?.cut) return false;
+  
+  const recommendation = hairstyle.aiRecommendations.cut.faceShapes.find(
+    fs => fs.shape === faceShape
+  );
+  
+  if (!recommendation) return false;
+  
+  const levels: SuitabilityLevel[] = ['fair', 'good', 'excellent'];
+  const minIndex = levels.indexOf(minLevel);
+  const recIndex = levels.indexOf(recommendation.suitability);
+  
+  return recIndex >= minIndex;
+};
+
+/**
+ * 퍼스널 컬러에 맞는 염색 스타일인지 확인
+ */
+export const isSuitableForPersonalColor = (
+  hairstyle: Hairstyle,
+  personalColor: PersonalColorType,
+  minLevel: SuitabilityLevel = 'fair'
+): boolean => {
+  if (!personalColor || !hairstyle.aiRecommendations?.color) return false;
+  
+  const recommendation = hairstyle.aiRecommendations.color.personalColors.find(
+    pc => pc.color === personalColor
+  );
+  
+  if (!recommendation) return false;
+  
+  const levels: SuitabilityLevel[] = ['fair', 'good', 'excellent'];
+  const minIndex = levels.indexOf(minLevel);
+  const recIndex = levels.indexOf(recommendation.suitability);
+  
+  return recIndex >= minIndex;
+};
+
+/**
+ * 헤어스타일의 추천 점수 계산
+ */
+export const getRecommendationScore = (
+  hairstyle: Hairstyle,
+  faceAnalysis: FaceAnalysis | null
+): number => {
+  if (!faceAnalysis) return 0;
+  
+  let score = 0;
+  
+  // 커트 스타일 점수
+  if (hairstyle.serviceCategory === 'cut' && faceAnalysis.faceShape) {
+    const cutRec = hairstyle.aiRecommendations?.cut?.faceShapes.find(
+      fs => fs.shape === faceAnalysis.faceShape
+    );
+    if (cutRec) {
+      switch (cutRec.suitability) {
+        case 'excellent': score += 3; break;
+        case 'good': score += 2; break;
+        case 'fair': score += 1; break;
+      }
+    }
+  }
+  
+  // 염색 스타일 점수
+  if (hairstyle.serviceCategory === 'color' && faceAnalysis.personalColor) {
+    const colorRec = hairstyle.aiRecommendations?.color?.personalColors.find(
+      pc => pc.color === faceAnalysis.personalColor
+    );
+    if (colorRec) {
+      switch (colorRec.suitability) {
+        case 'excellent': score += 3; break;
+        case 'good': score += 2; break;
+        case 'fair': score += 1; break;
+      }
+    }
+  }
+  
+  return score;
+};
 
 // Function to migrate legacy category to service category
 export const migrateLegacyToService = (hairstyle: Hairstyle): Partial<Hairstyle> => {
@@ -569,7 +765,7 @@ export const STORAGE_KEYS = {
   SESSION_DESIGNER: 'hairfolio_designer',
   VISIT_TRACKING: 'hairfolio_visit_tracked',
   SETTINGS: 'hairfolio_settings',
-  FACE_ANALYSIS: 'hairfolio_face_analysis'  // 🆕 얼굴 분석 결과 캐싱
+  FACE_ANALYSIS: 'hairfolio_face_analysis'
 } as const;
 
 // API endpoints and configuration
@@ -579,5 +775,5 @@ export const API_CONFIG = {
   MAX_FILE_SIZE: 10, // MB
   SUPPORTED_FORMATS: ['image/jpeg', 'image/png', 'image/webp'],
   REQUEST_TIMEOUT: 30000, // 30 seconds
-  MEDIAPIPE_MODEL_URL: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh'  // 🆕 MediaPipe CDN
+  MEDIAPIPE_MODEL_URL: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh'
 } as const;
