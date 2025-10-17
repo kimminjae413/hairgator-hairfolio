@@ -33,7 +33,7 @@ const detectFaceFromImage = async (imageFile: File): Promise<FaceLandmark[] | nu
     
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
       
       if (!ctx) {
         URL.revokeObjectURL(url);
@@ -166,7 +166,7 @@ const findFaceRegion = (
 };
 
 /**
- * 피부톤 판별 함수 (개선: 더 넓은 범위)
+ * 피부톤 판별 함수 (개선: 더 넓은 범위 + 디버깅)
  */
 const isSkinTone = (r: number, g: number, b: number): boolean => {
   // 매우 다양한 피부톤 커버 (밝은 피부 ~ 어두운 피부)
@@ -182,12 +182,24 @@ const isSkinTone = (r: number, g: number, b: number): boolean => {
   const rbRatio = r / (b + 1);
   
   // 피부톤 범위 (훨씬 넓게)
-  return (
+  const result = (
     rgRatio > 0.8 && rgRatio < 3.0 &&
     rbRatio > 0.9 && rbRatio < 3.5 &&
     r >= g - 20 && // r이 g보다 약간 작아도 OK
     g >= b - 30    // g가 b보다 약간 작아도 OK
   );
+  
+  // 샘플 데이터 출력 (처음 5개만)
+  if (typeof window !== 'undefined' && !(window as any).__skinToneSampleCount) {
+    (window as any).__skinToneSampleCount = 0;
+  }
+  
+  if ((window as any).__skinToneSampleCount < 5 && result) {
+    console.log('✅ 피부톤 감지 샘플:', { r, g, b, rgRatio: rgRatio.toFixed(2), rbRatio: rbRatio.toFixed(2) });
+    (window as any).__skinToneSampleCount++;
+  }
+  
+  return result;
 };
 
 /**
