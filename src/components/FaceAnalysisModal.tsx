@@ -59,6 +59,16 @@ const FaceAnalysisModal: React.FC<FaceAnalysisModalProps> = ({
     canvas.width = img.naturalWidth;
     canvas.height = img.naturalHeight;
 
+    console.log('🎨 Canvas 그리기:', {
+      canvasSize: { width: canvas.width, height: canvas.height },
+      imageSize: { width: img.naturalWidth, height: img.naturalHeight },
+      landmarkCount: analysis.landmarks.length,
+      샘플랜드마크: analysis.landmarks.slice(0, 3).map(lm => ({
+        x: lm.x.toFixed(3),
+        y: lm.y.toFixed(3)
+      }))
+    });
+
     // 이미지를 Canvas 배경으로 그리기
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
