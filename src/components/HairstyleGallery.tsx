@@ -448,7 +448,6 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
             </div>
           ))
         ) : (
-          /* Empty State */}
           <div className="py-16 text-center">
             {searchTerm || selectedServiceCategory !== 'all' ? (
               <div>
