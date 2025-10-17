@@ -47,6 +47,76 @@ export type MinorCategory =
   | 'Eye'        // Emphasizes eyes
   | 'Cheekbone'; // Emphasizes cheekbones
 
+// ===== FACE ANALYSIS TYPES =====
+
+/**
+ * 얼굴형 타입 (7가지)
+ */
+export type FaceShapeType = 
+  | '계란형'          // Oval - 이상적인 균형잡힌 얼굴형
+  | '둥근형'          // Round - 부드러운 곡선
+  | '각진형'          // Square - 강한 턱선
+  | '하트형'          // Heart - 이마가 넓고 턱이 뾰족
+  | '긴 얼굴형'       // Long/Oblong - 세로로 긴 형태
+  | '다이아몬드형'    // Diamond - 광대가 돋보임
+  | '타원형'          // Oval-round - 계란형과 둥근형 중간
+  | '알 수 없음';     // Unknown
+
+/**
+ * 퍼스널 컬러 타입 (4계절)
+ */
+export type PersonalColorType = 
+  | '봄 웜톤'    // Spring Warm - 밝고 따뜻한 톤
+  | '여름 쿨톤'  // Summer Cool - 부드러운 차가운 톤
+  | '가을 웜톤'  // Autumn Warm - 깊고 따뜻한 톤
+  | '겨울 쿨톤'  // Winter Cool - 선명한 차가운 톤
+  | null;
+
+/**
+ * 얼굴 랜드마크 포인트 (MediaPipe Face Mesh - 468개)
+ */
+export interface FaceLandmark {
+  x: number;  // 정규화된 X 좌표 (0-1)
+  y: number;  // 정규화된 Y 좌표 (0-1)
+  z: number;  // 깊이 정보 (상대적)
+}
+
+/**
+ * 피부톤 정보
+ */
+export interface SkinTone {
+  r: number;    // Red 값 (0-255)
+  g: number;    // Green 값 (0-255)
+  b: number;    // Blue 값 (0-255)
+  hex: string;  // Hex 색상 코드 (#RRGGBB)
+}
+
+/**
+ * 얼굴 분석 결과
+ */
+export interface FaceAnalysis {
+  detected: boolean;                  // 얼굴 감지 성공 여부
+  faceShape: FaceShapeType | null;   // 얼굴형
+  personalColor: PersonalColorType;   // 퍼스널 컬러
+  confidence: number;                 // 분석 신뢰도 (0-1)
+  landmarks?: FaceLandmark[];         // 468개 얼굴 랜드마크
+  skinTone?: SkinTone;               // 피부톤 정보
+  message?: string;                   // 에러 또는 상태 메시지
+  analyzedAt?: string;               // 분석 시각 (ISO timestamp)
+}
+
+/**
+ * 얼굴 분석 상태
+ */
+export type FaceAnalysisState = 
+  | 'idle'          // 대기 중
+  | 'detecting'     // 얼굴 감지 중 (랜드마크 추출)
+  | 'analyzing'     // 분석 중 (얼굴형/퍼스널컬러)
+  | 'complete'      // 완료
+  | 'error';        // 오류
+
+// ===== HAIRSTYLE & DESIGNER DATA TYPES =====
+
 // Hairstyle data structure - Updated with new service categories
 export interface Hairstyle {
   id?: string;                                          // Unique identifier
@@ -77,6 +147,8 @@ export interface TrialResult {
   resultUrl: string;                                   // VModel 생성 결과 이미지 URL
   timestamp: string;                                   // 체험 시간 (ISO string)
   styleName?: string;                                  // 헤어스타일 이름 (선택사항)
+  type?: 'cut' | 'color';                             // 체험 타입
+  faceAnalysis?: FaceAnalysis;                        // 얼굴 분석 정보 (선택사항)
 }
 
 // Analytics data for tracking designer portfolio performance
@@ -148,7 +220,8 @@ export interface UploadStyleFormData {
   tags?: string[];
 }
 
-// UI component prop types
+// ===== UI COMPONENT PROP TYPES =====
+
 export interface HairstyleGalleryProps {
   images: Hairstyle[];
   onSelect: (hairstyle: Hairstyle) => void;
@@ -170,6 +243,33 @@ export interface ImageUploaderProps {
   maxFileSize?: number; // in MB
 }
 
+/**
+ * ColorTryOnModal Props (염색 체험 모달)
+ */
+export interface ColorTryOnModalProps {
+  colorStyleImage: {
+    name: string;
+    url: string;
+    serviceSubCategory?: string;
+    description?: string;
+  };
+  userFaceFile?: File | null;
+  userFacePreview?: string | null;
+  faceAnalysis?: FaceAnalysis | null;  // 🆕 얼굴 분석 정보 추가
+  onClose: () => void;
+  onComplete: (result: any) => void;
+}
+
+/**
+ * FaceAnalysisModal Props (얼굴 분석 모달)
+ */
+export interface FaceAnalysisModalProps {
+  imageUrl: string;
+  analysis: FaceAnalysis | null;
+  isAnalyzing: boolean;
+  onClose: () => void;
+}
+
 // Error handling types
 export interface AppError {
   message: string;
@@ -178,11 +278,14 @@ export interface AppError {
   stack?: string;
 }
 
+// ===== API REQUEST/RESPONSE TYPES =====
+
 // VModel API types
 export interface VModelRequest {
   faceImage: string;
   styleImage: string;
   styleDescription: string;
+  faceShape?: FaceShapeType;  // 🆕 얼굴형 정보 추가
   options?: {
     quality?: 'high' | 'medium' | 'low';
     preserveFaceFeatures?: boolean;
@@ -196,6 +299,28 @@ export interface VModelResponse {
   error?: string;
   processingTime?: number;
 }
+
+/**
+ * 스타일 추천 정보
+ */
+export interface StyleRecommendation {
+  faceShape: FaceShapeType;
+  recommendedStyles: string[];
+  avoidStyles: string[];
+  description: string;
+}
+
+/**
+ * 컬러 추천 정보
+ */
+export interface ColorRecommendation {
+  personalColor: PersonalColorType;
+  recommendedColors: string[];
+  avoidColors: string[];
+  description: string;
+}
+
+// ===== CONSTANTS =====
 
 // ===== NEW SERVICE CATEGORY CONSTANTS =====
 // Service category constants
@@ -268,7 +393,111 @@ export const MINOR_CATEGORIES: MinorCategory[] = [
   'None', 'Forehead', 'Eyebrow', 'Eye', 'Cheekbone'
 ];
 
+// ===== FACE ANALYSIS CONSTANTS =====
+
+/**
+ * 얼굴형 목록
+ */
+export const FACE_SHAPES: FaceShapeType[] = [
+  '계란형',
+  '둥근형',
+  '각진형',
+  '하트형',
+  '긴 얼굴형',
+  '다이아몬드형',
+  '타원형'
+];
+
+/**
+ * 퍼스널 컬러 목록
+ */
+export const PERSONAL_COLORS: Exclude<PersonalColorType, null>[] = [
+  '봄 웜톤',
+  '여름 쿨톤',
+  '가을 웜톤',
+  '겨울 쿨톤'
+];
+
+/**
+ * 얼굴형별 추천 정보
+ */
+export const FACE_SHAPE_RECOMMENDATIONS: Record<string, StyleRecommendation> = {
+  '계란형': {
+    faceShape: '계란형',
+    recommendedStyles: ['레이어드 컷', '단발', '긴 생머리', '웨이브', '모든 스타일'],
+    avoidStyles: [],
+    description: '균형잡힌 이상적인 얼굴형입니다. 대부분의 헤어스타일이 잘 어울립니다.'
+  },
+  '둥근형': {
+    faceShape: '둥근형',
+    recommendedStyles: ['레이어드 컷', '롱 웨이브', '앞머리 없는 스타일', '높이감 있는 스타일'],
+    avoidStyles: ['짧은 단발', '일자 앞머리', '볼륨 없는 스타일'],
+    description: '레이어드 컷으로 얼굴 라인을 살리고, 높이감 있는 스타일을 추천합니다.'
+  },
+  '각진형': {
+    faceShape: '각진형',
+    recommendedStyles: ['웨이브', '소프트 컬', '레이어드', '부드러운 앞머리'],
+    avoidStyles: ['일직선 컷', '너무 짧은 스타일', '슬릭백'],
+    description: '웨이브나 부드러운 컬로 각진 라인을 완화시켜보세요.'
+  },
+  '하트형': {
+    faceShape: '하트형',
+    recommendedStyles: ['미디엄 보브', '레이어드', '턱선 커버 스타일', '사이드 뱅'],
+    avoidStyles: ['너무 짧은 스타일', '볼륨 있는 탑', '이마 전체 노출'],
+    description: '턱선을 커버하는 미디엄 레이어드나 보브 스타일이 잘 어울립니다.'
+  },
+  '긴 얼굴형': {
+    faceShape: '긴 얼굴형',
+    recommendedStyles: ['옆 볼륨', '웨이브', '단발', '앞머리'],
+    avoidStyles: ['생머리 롱', '탑 볼륨', '센터 가르마'],
+    description: '옆 볼륨을 살린 스타일로 얼굴 비율의 균형을 맞춰보세요.'
+  },
+  '다이아몬드형': {
+    faceShape: '다이아몬드형',
+    recommendedStyles: ['사이드 뱅', '턱선 레이어', '웨이브', '볼륨 있는 스타일'],
+    avoidStyles: ['센터 가르마', '슬릭백', '짧은 컷'],
+    description: '이마와 턱선에 볼륨을 주는 스타일로 광대를 자연스럽게 커버하세요.'
+  },
+  '타원형': {
+    faceShape: '타원형',
+    recommendedStyles: ['레이어드', '보브', '웨이브', '다양한 스타일'],
+    avoidStyles: [],
+    description: '균형잡힌 얼굴형으로 다양한 스타일을 시도해보세요.'
+  }
+};
+
+/**
+ * 퍼스널 컬러별 추천 정보
+ */
+export const PERSONAL_COLOR_RECOMMENDATIONS: Record<string, ColorRecommendation> = {
+  '봄 웜톤': {
+    personalColor: '봄 웜톤',
+    recommendedColors: ['코랄', '피치', '카라멜 브라운', '골드 블론드', '밝은 오렌지'],
+    avoidColors: ['애쉬 그레이', '차가운 블랙', '실버', '플래티넘'],
+    description: '코랄, 피치, 카라멜 브라운, 골드 블론드 등 밝고 따뜻한 색상이 잘 어울립니다.'
+  },
+  '여름 쿨톤': {
+    personalColor: '여름 쿨톤',
+    recommendedColors: ['애쉬 브라운', '라벤더', '로즈 골드', '실버 그레이', '소프트 블랙'],
+    avoidColors: ['오렌지', '골드', '따뜻한 브라운', '구리빛'],
+    description: '애쉬 브라운, 라벤더, 로즈 골드, 실버 그레이 등 부드러운 쿨톤이 어울립니다.'
+  },
+  '가을 웜톤': {
+    personalColor: '가을 웜톤',
+    recommendedColors: ['오렌지 브라운', '구리빛', '올리브', '따뜻한 레드', '딥 브라운'],
+    avoidColors: ['애쉬 톤', '실버', '차가운 블랙', '플래티넘'],
+    description: '오렌지 브라운, 구리빛, 올리브, 따뜻한 레드 계열이 피부톤과 조화롭습니다.'
+  },
+  '겨울 쿨톤': {
+    personalColor: '겨울 쿨톤',
+    recommendedColors: ['젯 블랙', '플래티넘 블론드', '와인 레드', '블루 블랙', '실버'],
+    avoidColors: ['오렌지', '골드', '따뜻한 브라운', '피치'],
+    description: '젯 블랙, 플래티넘 블론드, 와인 레드, 블루 블랙 등 선명한 색상을 추천합니다.'
+  }
+};
+
 // ===== UTILITY FUNCTIONS =====
+
 // Function to migrate legacy category to service category
 export const migrateLegacyToService = (hairstyle: Hairstyle): Partial<Hairstyle> => {
   // If already has service category, return as is
@@ -339,7 +568,8 @@ export const STORAGE_KEYS = {
   DESIGNERS: 'hairfolio_designers',
   SESSION_DESIGNER: 'hairfolio_designer',
   VISIT_TRACKING: 'hairfolio_visit_tracked',
-  SETTINGS: 'hairfolio_settings'
+  SETTINGS: 'hairfolio_settings',
+  FACE_ANALYSIS: 'hairfolio_face_analysis'  // 🆕 얼굴 분석 결과 캐싱
 } as const;
 
 // API endpoints and configuration
@@ -348,5 +578,6 @@ export const API_CONFIG = {
   QR_CODE_API: 'https://api.qrserver.com/v1/create-qr-code/',
   MAX_FILE_SIZE: 10, // MB
   SUPPORTED_FORMATS: ['image/jpeg', 'image/png', 'image/webp'],
-  REQUEST_TIMEOUT: 30000 // 30 seconds
+  REQUEST_TIMEOUT: 30000, // 30 seconds
+  MEDIAPIPE_MODEL_URL: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh'  // 🆕 MediaPipe CDN
 } as const;
