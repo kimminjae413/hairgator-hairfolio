@@ -36,9 +36,6 @@ const initializeMediaPipe = async (): Promise<boolean> => {
   }
 
   try {
-    // NOTE: 실제 구현시 index.html에 다음 스크립트 추가 필요:
-    // <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh"></script>
-    
     console.log('🎭 MediaPipe Face Mesh 초기화 중...');
     
     // 현재는 시뮬레이션 모드
@@ -62,24 +59,148 @@ const initializeMediaPipe = async (): Promise<boolean> => {
 };
 
 /**
- * 468개 얼굴 랜드마크 생성 (시뮬레이션)
+ * 468개 얼굴 랜드마크 생성 (실제 얼굴 형태로 시뮬레이션)
  * 실제 구현시 MediaPipe API 결과 사용
  */
 const generateMockLandmarks = (): FaceLandmark[] => {
   const landmarks: FaceLandmark[] = [];
   
-  // Face Mesh는 468개의 3D 좌표를 제공
-  for (let i = 0; i < 468; i++) {
-    // 얼굴 중심을 0.5, 0.5로 가정
-    const angle = (i / 468) * Math.PI * 2;
-    const radius = 0.3 + Math.random() * 0.1;
-    
+  // 얼굴 중심 및 크기 설정
+  const centerX = 0.5;
+  const centerY = 0.45; // 약간 위로
+  const faceWidth = 0.25;
+  const faceHeight = 0.35;
+  
+  // 1. 얼굴 윤곽선 (0-16): 턱선
+  for (let i = 0; i <= 16; i++) {
+    const t = i / 16;
+    const angle = Math.PI * 0.3 + t * Math.PI * 0.4; // 턱선 곡선
+    const radius = faceWidth * (0.9 - Math.abs(t - 0.5) * 0.3);
     landmarks.push({
-      x: 0.5 + Math.cos(angle) * radius,
-      y: 0.5 + Math.sin(angle) * radius,
-      z: (Math.random() - 0.5) * 0.1
+      x: centerX + Math.cos(angle) * radius,
+      y: centerY + faceHeight * (0.5 + t * 0.5),
+      z: -0.05 + Math.random() * 0.01
     });
   }
+  
+  // 2. 왼쪽 눈썹 (17-21)
+  for (let i = 0; i <= 4; i++) {
+    const t = i / 4;
+    landmarks.push({
+      x: centerX - faceWidth * 0.5 + t * faceWidth * 0.35,
+      y: centerY - faceHeight * 0.25,
+      z: 0.01
+    });
+  }
+  
+  // 3. 오른쪽 눈썹 (22-26)
+  for (let i = 0; i <= 4; i++) {
+    const t = i / 4;
+    landmarks.push({
+      x: centerX + faceWidth * 0.15 + t * faceWidth * 0.35,
+      y: centerY - faceHeight * 0.25,
+      z: 0.01
+    });
+  }
+  
+  // 4. 코 브릿지 (27-30)
+  for (let i = 0; i <= 3; i++) {
+    const t = i / 3;
+    landmarks.push({
+      x: centerX,
+      y: centerY - faceHeight * 0.1 + t * faceHeight * 0.3,
+      z: 0.05 + t * 0.02
+    });
+  }
+  
+  // 5. 코 하단 (31-35)
+  for (let i = 0; i <= 4; i++) {
+    const t = i / 4;
+    landmarks.push({
+      x: centerX - faceWidth * 0.15 + t * faceWidth * 0.3,
+      y: centerY + faceHeight * 0.15,
+      z: 0.08
+    });
+  }
+  
+  // 6. 왼쪽 눈 (36-41)
+  const leftEyeCenterX = centerX - faceWidth * 0.35;
+  const eyeCenterY = centerY - faceHeight * 0.05;
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2;
+    landmarks.push({
+      x: leftEyeCenterX + Math.cos(angle) * faceWidth * 0.12,
+      y: eyeCenterY + Math.sin(angle) * faceHeight * 0.08,
+      z: 0.02
+    });
+  }
+  
+  // 7. 오른쪽 눈 (42-47)
+  const rightEyeCenterX = centerX + faceWidth * 0.35;
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2;
+    landmarks.push({
+      x: rightEyeCenterX + Math.cos(angle) * faceWidth * 0.12,
+      y: eyeCenterY + Math.sin(angle) * faceHeight * 0.08,
+      z: 0.02
+    });
+  }
+  
+  // 8. 입술 외곽 (48-59)
+  const mouthCenterY = centerY + faceHeight * 0.35;
+  for (let i = 0; i < 12; i++) {
+    const t = i / 11;
+    const x = centerX - faceWidth * 0.35 + t * faceWidth * 0.7;
+    const y = mouthCenterY + Math.sin(t * Math.PI) * faceHeight * 0.08;
+    landmarks.push({
+      x,
+      y,
+      z: 0.03
+    });
+  }
+  
+  // 9. 입술 내곽 (60-67)
+  for (let i = 0; i < 8; i++) {
+    const t = i / 7;
+    const x = centerX - faceWidth * 0.25 + t * faceWidth * 0.5;
+    const y = mouthCenterY + Math.sin(t * Math.PI) * faceHeight * 0.05;
+    landmarks.push({
+      x,
+      y,
+      z: 0.02
+    });
+  }
+  
+  // 10-468: 나머지 얼굴 메쉬 포인트들
+  // (실제로는 더 정교하지만, 여기서는 얼굴 영역 내에 랜덤 분포)
+  const remainingCount = 468 - landmarks.length;
+  
+  for (let i = 0; i < remainingCount; i++) {
+    // 타원형 영역 내에 분포
+    const angle = Math.random() * Math.PI * 2;
+    const radiusX = Math.random() * faceWidth * 0.8;
+    const radiusY = Math.random() * faceHeight * 0.8;
+    
+    landmarks.push({
+      x: centerX + Math.cos(angle) * radiusX,
+      y: centerY + Math.sin(angle) * radiusY,
+      z: (Math.random() - 0.5) * 0.05
+    });
+  }
+  
+  // 주요 포인트 보정 (MediaPipe 표준)
+  // 10: 이마 중앙
+  landmarks[10] = { x: centerX, y: centerY - faceHeight * 0.4, z: 0.01 };
+  // 152: 턱 끝
+  landmarks[152] = { x: centerX, y: centerY + faceHeight * 0.55, z: 0 };
+  // 234: 왼쪽 관자놀이
+  landmarks[234] = { x: centerX - faceWidth * 0.65, y: centerY - faceHeight * 0.15, z: -0.03 };
+  // 454: 오른쪽 관자놀이
+  landmarks[454] = { x: centerX + faceWidth * 0.65, y: centerY - faceHeight * 0.15, z: -0.03 };
+  // 172: 왼쪽 턱선
+  landmarks[172] = { x: centerX - faceWidth * 0.55, y: centerY + faceHeight * 0.45, z: -0.02 };
+  // 397: 오른쪽 턱선
+  landmarks[397] = { x: centerX + faceWidth * 0.55, y: centerY + faceHeight * 0.45, z: -0.02 };
   
   return landmarks;
 };
@@ -95,29 +216,25 @@ const analyzeFaceShape = (landmarks: FaceLandmark[]): string => {
 
   try {
     // MediaPipe Face Mesh 주요 랜드마크 인덱스
-    // 10: 이마 중앙, 152: 턱 끝
-    // 234: 왼쪽 관자놀이, 454: 오른쪽 관자놀이
-    // 172: 왼쪽 턱선, 397: 오른쪽 턱선
-    
     const foreheadTop = landmarks[10];
     const chinBottom = landmarks[152];
     const leftTemple = landmarks[234];
     const rightTemple = landmarks[454];
     const leftJaw = landmarks[172];
     const rightJaw = landmarks[397];
-    const leftCheek = landmarks[205];
-    const rightCheek = landmarks[425];
+    const leftCheek = landmarks[205] || landmarks[50];
+    const rightCheek = landmarks[425] || landmarks[280];
     
     // 얼굴 측정값 계산
     const faceWidth = Math.abs(rightTemple.x - leftTemple.x);
     const faceHeight = Math.abs(chinBottom.y - foreheadTop.y);
     const jawWidth = Math.abs(rightJaw.x - leftJaw.x);
-    const cheekWidth = Math.abs(rightCheek.x - leftCheek.x);
+    const cheekWidth = Math.abs((rightCheek?.x || 0) - (leftCheek?.x || 0));
     
     // 비율 계산
     const heightWidthRatio = faceHeight / faceWidth;
     const jawWidthRatio = jawWidth / faceWidth;
-    const cheekWidthRatio = cheekWidth / faceWidth;
+    const cheekWidthRatio = cheekWidth / faceWidth || 0.85;
     
     console.log('📊 얼굴 측정:', {
       heightWidthRatio: heightWidthRatio.toFixed(2),
@@ -288,7 +405,8 @@ export const analyzeFace = async (imageFile: File): Promise<FaceAnalysis> => {
       confidence: 0.87 + Math.random() * 0.1, // 87-97% 신뢰도
       landmarks,
       skinTone,
-      message: '분석 완료'
+      message: '분석 완료',
+      analyzedAt: new Date().toISOString()
     };
   } catch (error) {
     console.error('❌ 얼굴 분석 오류:', error);
@@ -331,4 +449,4 @@ export const getPersonalColorRecommendation = (personalColor: string): string =>
   };
   
   return recommendations[personalColor] || '다양한 색상을 시도해보세요!';
-};
+}
