@@ -69,9 +69,11 @@ const FaceAnalysisModal: React.FC<FaceAnalysisModalProps> = ({
         return;
       }
 
+      // Canvas 크기 설정
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
 
+      // 배경 이미지 그리기
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
@@ -252,7 +254,7 @@ const FaceAnalysisModal: React.FC<FaceAnalysisModalProps> = ({
               alt="Face Analysis"
               onLoad={handleImageLoad}
               className="w-full rounded-lg shadow-lg"
-              style={{ display: analysis?.landmarks ? 'none' : 'block' }}
+              style={{ display: 'none' }} // Canvas에서 그릴 용도로만 사용
             />
             {analysis?.landmarks && (
               <canvas
