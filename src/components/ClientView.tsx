@@ -1,12 +1,14 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { analyzeHairstyle, applyHairstyle } from '../services/vmodelService'
+import { analyzeFace } from '../services/faceAnalysisService'
 import * as firebaseService from '../services/firebaseService'
-import { LoadingState, Hairstyle, DesignerProfile } from '../types'
+import { LoadingState, Hairstyle, DesignerProfile, FaceAnalysis } from '../types'
 import ImageUploader from './ImageUploader'
 import ResultDisplay from './ResultDisplay'
 import HairstyleGallery from './HairstyleGallery'
 import ColorTryOnModal from './ColorTryOnModal'
+import FaceAnalysisModal from './FaceAnalysisModal'
 import IntroScreen from './IntroScreen'
 import LanguageSelector from './LanguageSelector'
 import UserIcon from './icons/UserIcon'
@@ -39,6 +41,11 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
   // State for uploaded face image
   const [faceFile, setFaceFile] = useState<File | null>(null)
   const [facePreview, setFacePreview] = useState<string | null>(null)
+  
+  // 🆕 State for face analysis
+  const [faceAnalysis, setFaceAnalysis] = useState<FaceAnalysis | null>(null)
+  const [isFaceAnalyzing, setIsFaceAnalyzing] = useState(false)
+  const [showFaceAnalysisModal, setShowFaceAnalysisModal] = useState(false)
   
   // State for designer data
   const [portfolio, setPortfolio] = useState<Hairstyle[]>([])
@@ -97,22 +104,63 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
     setShowIntro(false)
   }, [])
 
-  // Handle face image upload
-  const handleFaceFileChange = useCallback((file: File | null) => {
+  // 🆕 Handle face image upload with analysis
+  const handleFaceFileChange = useCallback(async (file: File | null) => {
     setFaceFile(file)
+    
     if (file) {
       const previewUrl = URL.createObjectURL(file)
       setFacePreview(previewUrl)
       
       // Clean up any existing error
       if (error) setError(null)
+      
+      // 🎭 얼굴 분석 시작
+      console.log('🎭 MediaPipe 얼굴 분석 시작...')
+      setIsFaceAnalyzing(true)
+      setShowFaceAnalysisModal(true)
+      setFaceAnalysis(null)
+      
+      try {
+        const analysis = await analyzeFace(file)
+        setFaceAnalysis(analysis)
+        
+        if (analysis.detected) {
+          console.log('✅ 얼굴 분석 완료:', {
+            faceShape: analysis.faceShape,
+            personalColor: analysis.personalColor,
+            confidence: `${(analysis.confidence * 100).toFixed(0)}%`
+          })
+        } else {
+          console.warn('⚠️ 얼굴 감지 실패:', analysis.message)
+        }
+      } catch (err) {
+        console.error('❌ 얼굴 분석 오류:', err)
+        setFaceAnalysis({
+          detected: false,
+          faceShape: null,
+          personalColor: null,
+          confidence: 0,
+          message: '얼굴 분석 중 오류가 발생했습니다.'
+        })
+      } finally {
+        setIsFaceAnalyzing(false)
+      }
     } else {
+      // 파일 제거 시 정리
       if (facePreview) {
         URL.revokeObjectURL(facePreview)
       }
       setFacePreview(null)
+      setFaceAnalysis(null)
+      setShowFaceAnalysisModal(false)
     }
   }, [facePreview, error])
+
+  // 🆕 Handle face analysis modal close
+  const handleFaceAnalysisModalClose = useCallback(() => {
+    setShowFaceAnalysisModal(false)
+  }, [])
 
   // Handle regular hairstyle selection (VModel processing)
   const handleHairstyleSelect = useCallback(async (hairstyle: Hairstyle) => {
@@ -143,9 +191,12 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
         'image/jpeg'
       )
 
-      // Analyze hairstyle characteristics
+      // 🆕 Analyze hairstyle with face shape info
       setLoadingState('analyzing')
-      const hairstyleDescription = await analyzeHairstyle(hairstyleFile)
+      const hairstyleDescription = await analyzeHairstyle(
+        hairstyleFile,
+        faceAnalysis?.faceShape || undefined
+      )
       
       // Apply hairstyle to face
       setLoadingState('generating')
@@ -160,7 +211,9 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
           await firebaseService.trackTrialResult(designerName, {
             styleUrl: hairstyle.url,
             resultUrl: finalImage,
-            styleName: hairstyle.name
+            styleName: hairstyle.name,
+            type: 'cut',
+            faceAnalysis: faceAnalysis || undefined
           })
           console.log('Trial result tracked successfully')
         } catch (trackError) {
@@ -175,7 +228,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
       setError(`${t('client.hairstyleApplyError')}: ${errorMessage}`)
       setLoadingState('error')
     }
-  }, [faceFile, designerName, t])
+  }, [faceFile, faceAnalysis, designerName, t])
 
   // Handle color try-on selection (Advanced AI processing)
   const handleColorTryOn = useCallback((colorStyle: Hairstyle) => {
@@ -204,10 +257,11 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
         styleUrl: selectedColorStyle.url,
         resultUrl: result.resultImageUrl,
         styleName: selectedColorStyle.name,
-        type: 'color'
+        type: 'color',
+        faceAnalysis: faceAnalysis || undefined
       }).catch(console.error)
     }
-  }, [designerName, selectedColorStyle])
+  }, [designerName, selectedColorStyle, faceAnalysis])
 
   // Handle color modal close
   const handleColorModalClose = useCallback(() => {
@@ -242,7 +296,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
   }, [designerName, reservationUrl, t])
   
   // Check if processing is in progress
-  const isAIProcessing = loadingState === 'analyzing' || loadingState === 'generating'
+  const isAIProcessing = loadingState === 'analyzing' || loadingState === 'generating' || isFaceAnalyzing
 
   // Generate designer profile image placeholder
   const getDesignerInitials = (name: string) => {
@@ -412,6 +466,37 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
           )}
         </header>
 
+        {/* 🆕 Face Analysis Result Display */}
+        {faceAnalysis?.detected && !showFaceAnalysisModal && (
+          <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-indigo-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">
+                    얼굴형: <span className="text-indigo-600">{faceAnalysis.faceShape}</span>
+                    {' • '}
+                    퍼스널 컬러: <span className="text-purple-600">{faceAnalysis.personalColor}</span>
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    신뢰도 {(faceAnalysis.confidence * 100).toFixed(0)}% • AI 분석 완료
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowFaceAnalysisModal(true)}
+                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+              >
+                자세히 보기
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Color Try-On Result Display */}
         {colorTryOnResult && (
           <div className="mb-6 p-6 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200">
@@ -499,6 +584,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
                   <p>• {t('client.supportedFormats')}</p>
                   <p>• {t('client.maxFileSize')}</p>
                   <p>• {t('client.privacyProtected')}</p>
+                  <p className="mt-2 text-indigo-600 font-medium">• AI 얼굴 분석 자동 실행</p>
                 </div>
               </div>
 
@@ -545,6 +631,16 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
           )}
         </main>
         
+        {/* 🆕 Face Analysis Modal */}
+        {showFaceAnalysisModal && facePreview && (
+          <FaceAnalysisModal
+            imageUrl={facePreview}
+            analysis={faceAnalysis}
+            isAnalyzing={isFaceAnalyzing}
+            onClose={handleFaceAnalysisModalClose}
+          />
+        )}
+        
         {/* VModel Result Modal */}
         {isResultModalOpen && selectedHairstyle && (
           <ResultDisplay 
@@ -565,6 +661,7 @@ const ClientView: React.FC<ClientViewProps> = ({ designerName }) => {
             colorStyleImage={selectedColorStyle}
             userFaceFile={faceFile}
             userFacePreview={facePreview}
+            faceAnalysis={faceAnalysis}
             onClose={handleColorModalClose}
             onComplete={handleColorTryOnComplete}
           />
