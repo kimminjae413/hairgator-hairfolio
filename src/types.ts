@@ -294,12 +294,17 @@ export interface UploadStyleFormData {
 export interface HairstyleGalleryProps {
   images: Hairstyle[];
   onSelect: (hairstyle: Hairstyle) => void;
+  onColorTryOn?: (hairstyle: Hairstyle) => void;  // 🆕 염색 전용 핸들러 추가
   selectedUrl: string | null;
   disabled: boolean;
   onAddImage?: () => void;
   showCategories?: boolean;
   allowMultipleSelection?: boolean;
   faceAnalysis?: FaceAnalysis | null;  // 🆕 얼굴 분석 기반 필터링용
+  // 🆕 DesignerView 전용 props
+  onDeleteImage?: (imageUrl: string) => void;
+  onEditImage?: (hairstyle: Hairstyle) => void;
+  isDesignerView?: boolean;
 }
 
 export interface ImageUploaderProps {
