@@ -1,3 +1,4 @@
+// src/services/firebaseService.ts - 완전한 최종 버전
 import { initializeApp } from "firebase/app";
 import { 
   getFirestore, 
@@ -8,7 +9,11 @@ import {
   increment,
   collection,
   getDocs,
-  deleteDoc
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  limit as firestoreLimit
 } from "firebase/firestore";
 import { 
   Hairstyle, 
@@ -18,7 +23,13 @@ import {
   DesignerSettings,
   TrialResult,
   DEFAULT_STATS,
-  DEFAULT_SETTINGS
+  DEFAULT_SETTINGS,
+  User,
+  UserType,
+  ClientProfile,
+  Favorite,
+  SearchHistory,
+  TryOnHistory
 } from '../types';
 import { portfolioImages, sampleDesigner } from '../portfolioImages';
 
@@ -59,14 +70,18 @@ try {
     code: (error as any)?.code || 'No code',
     stack: error instanceof Error ? error.stack : 'No stack'
   });
-  // Firebase 초기화 실패시에도 앱이 동작하도록 null로 설정
   app = null;
   db = null;
 }
 
 // 컬렉션 레퍼런스
 const COLLECTIONS = {
-  DESIGNERS: 'designers'
+  DESIGNERS: 'designers',
+  USERS: 'users',
+  CLIENTS: 'clients',
+  FAVORITES: 'favorites',
+  SEARCH_HISTORY: 'searchHistory',
+  TRYON_HISTORY: 'tryonHistory'
 } as const;
 
 // Generate unique ID for new items
@@ -101,12 +116,411 @@ const isFirebaseAvailable = (): boolean => {
   return db !== null;
 };
 
-// Initialize database with sample data
+// ===== 사용자 관리 함수 (신규 추가) =====
+
+/**
+ * 사용자 기본 정보 저장 (회원가입 시)
+ */
+export const createUser = async (
+  userId: string, 
+  userType: UserType, 
+  email: string, 
+  displayName: string
+): Promise<boolean> => {
+  try {
+    if (!isFirebaseAvailable()) {
+      console.log('⚠️ Firebase not available, using localStorage for createUser');
+      const userData: User = {
+        userId,
+        userType,
+        email,
+        displayName,
+        emailVerified: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      localStorage.setItem(`hairfolio_user_${userId}`, JSON.stringify(userData));
+      return true;
+    }
+
+    const userRef = doc(db, COLLECTIONS.USERS, userId);
+    const userData: User = {
+      userId,
+      userType,
+      email,
+      displayName,
+      emailVerified: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    await setDoc(userRef, userData);
+    console.log('✅ User created:', userId, userType);
+    return true;
+  } catch (error) {
+    console.error('❌ Error creating user:', error);
+    return false;
+  }
+};
+
+/**
+ * 사용자 정보 조회
+ */
+export const getUser = async (userId: string): Promise<User | null> => {
+  try {
+    if (!isFirebaseAvailable()) {
+      const userData = localStorage.getItem(`hairfolio_user_${userId}`);
+      return userData ? JSON.parse(userData) : null;
+    }
+
+    const userRef = doc(db, COLLECTIONS.USERS, userId);
+    const userSnap = await getDoc(userRef);
+    
+    if (userSnap.exists()) {
+      return userSnap.data() as User;
+    }
+    return null;
+  } catch (error) {
+    console.error('❌ Error getting user:', error);
+    return null;
+  }
+};
+
+/**
+ * 일반 사용자 프로필 저장
+ */
+export const saveClientProfile = async (profile: ClientProfile): Promise<boolean> => {
+  try {
+    if (!isFirebaseAvailable()) {
+      localStorage.setItem(`hairfolio_client_${profile.userId}`, JSON.stringify(profile));
+      return true;
+    }
+
+    const clientRef = doc(db, COLLECTIONS.CLIENTS, profile.userId);
+    const cleanedProfile = removeUndefinedFields({
+      ...profile,
+      updatedAt: new Date().toISOString()
+    });
+    
+    await setDoc(clientRef, cleanedProfile);
+    console.log('✅ Client profile saved:', profile.userId);
+    return true;
+  } catch (error) {
+    console.error('❌ Error saving client profile:', error);
+    return false;
+  }
+};
+
+/**
+ * 일반 사용자 프로필 조회
+ */
+export const getClientProfile = async (userId: string): Promise<ClientProfile | null> => {
+  try {
+    if (!isFirebaseAvailable()) {
+      const data = localStorage.getItem(`hairfolio_client_${userId}`);
+      return data ? JSON.parse(data) : null;
+    }
+
+    const clientRef = doc(db, COLLECTIONS.CLIENTS, userId);
+    const clientSnap = await getDoc(clientRef);
+    
+    if (clientSnap.exists()) {
+      return clientSnap.data() as ClientProfile;
+    }
+    return null;
+  } catch (error) {
+    console.error('❌ Error getting client profile:', error);
+    return null;
+  }
+};
+
+/**
+ * 찜하기 추가
+ */
+export const addFavorite = async (favorite: Omit<Favorite, 'id' | 'createdAt'>): Promise<boolean> => {
+  try {
+    const favoriteId = generateId();
+    const favoriteData: Favorite = {
+      ...favorite,
+      id: favoriteId,
+      createdAt: new Date().toISOString()
+    };
+
+    if (!isFirebaseAvailable()) {
+      const favorites = JSON.parse(localStorage.getItem('hairfolio_favorites') || '{}');
+      if (!favorites[favorite.userId]) favorites[favorite.userId] = [];
+      favorites[favorite.userId].push(favoriteData);
+      localStorage.setItem('hairfolio_favorites', JSON.stringify(favorites));
+      return true;
+    }
+
+    const favoriteRef = doc(db, COLLECTIONS.FAVORITES, favoriteId);
+    await setDoc(favoriteRef, favoriteData);
+    console.log('✅ Favorite added:', favoriteId);
+    return true;
+  } catch (error) {
+    console.error('❌ Error adding favorite:', error);
+    return false;
+  }
+};
+
+/**
+ * 찜하기 목록 조회
+ */
+export const getFavorites = async (userId: string): Promise<Favorite[]> => {
+  try {
+    if (!isFirebaseAvailable()) {
+      const favorites = JSON.parse(localStorage.getItem('hairfolio_favorites') || '{}');
+      return favorites[userId] || [];
+    }
+
+    const favoritesRef = collection(db, COLLECTIONS.FAVORITES);
+    const q = query(
+      favoritesRef, 
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc')
+    );
+    
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => doc.data() as Favorite);
+  } catch (error) {
+    console.error('❌ Error getting favorites:', error);
+    return [];
+  }
+};
+
+/**
+ * 찜하기 삭제
+ */
+export const removeFavorite = async (favoriteId: string, userId: string): Promise<boolean> => {
+  try {
+    if (!isFirebaseAvailable()) {
+      const favorites = JSON.parse(localStorage.getItem('hairfolio_favorites') || '{}');
+      if (favorites[userId]) {
+        favorites[userId] = favorites[userId].filter((f: Favorite) => f.id !== favoriteId);
+        localStorage.setItem('hairfolio_favorites', JSON.stringify(favorites));
+      }
+      return true;
+    }
+
+    const favoriteRef = doc(db, COLLECTIONS.FAVORITES, favoriteId);
+    await deleteDoc(favoriteRef);
+    console.log('✅ Favorite removed:', favoriteId);
+    return true;
+  } catch (error) {
+    console.error('❌ Error removing favorite:', error);
+    return false;
+  }
+};
+
+/**
+ * 가상 체험 기록 저장
+ */
+export const saveTryOnHistory = async (history: Omit<TryOnHistory, 'id' | 'createdAt'>): Promise<boolean> => {
+  try {
+    const historyId = generateId();
+    const historyData: TryOnHistory = {
+      ...history,
+      id: historyId,
+      createdAt: new Date().toISOString()
+    };
+
+    if (!isFirebaseAvailable()) {
+      const histories = JSON.parse(localStorage.getItem('hairfolio_tryon_history') || '{}');
+      if (!histories[history.userId]) histories[history.userId] = [];
+      histories[history.userId].unshift(historyData);
+      // 최근 50개만 유지
+      if (histories[history.userId].length > 50) {
+        histories[history.userId] = histories[history.userId].slice(0, 50);
+      }
+      localStorage.setItem('hairfolio_tryon_history', JSON.stringify(histories));
+      return true;
+    }
+
+    const historyRef = doc(db, COLLECTIONS.TRYON_HISTORY, historyId);
+    await setDoc(historyRef, historyData);
+    console.log('✅ Try-on history saved:', historyId);
+    return true;
+  } catch (error) {
+    console.error('❌ Error saving try-on history:', error);
+    return false;
+  }
+};
+
+/**
+ * 가상 체험 기록 조회
+ */
+export const getTryOnHistory = async (userId: string, limitCount: number = 20): Promise<TryOnHistory[]> => {
+  try {
+    if (!isFirebaseAvailable()) {
+      const histories = JSON.parse(localStorage.getItem('hairfolio_tryon_history') || '{}');
+      return (histories[userId] || []).slice(0, limitCount);
+    }
+
+    const historyRef = collection(db, COLLECTIONS.TRYON_HISTORY);
+    const q = query(
+      historyRef,
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc'),
+      firestoreLimit(limitCount)
+    );
+    
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => doc.data() as TryOnHistory);
+  } catch (error) {
+    console.error('❌ Error getting try-on history:', error);
+    return [];
+  }
+};
+
+/**
+ * 모든 디자이너의 포트폴리오 조회 (일반 사용자용)
+ */
+export const getAllPortfolios = async (): Promise<Array<{ designerId: string; designerName: string; data: DesignerData }>> => {
+  try {
+    if (!isFirebaseAvailable()) {
+      const localData = localStorage.getItem('hairfolio_designers');
+      if (localData) {
+        const designers = JSON.parse(localData);
+        return Object.entries(designers).map(([name, data]) => ({
+          designerId: name, // localStorage에서는 이름이 ID
+          designerName: name,
+          data: data as DesignerData
+        }));
+      }
+      return [];
+    }
+
+    const designersRef = collection(db, COLLECTIONS.DESIGNERS);
+    const snapshot = await getDocs(designersRef);
+    
+    return snapshot.docs.map(doc => ({
+      designerId: doc.id,
+      designerName: doc.data().profile?.name || doc.id,
+      data: doc.data() as DesignerData
+    }));
+  } catch (error) {
+    console.error('❌ Error getting all portfolios:', error);
+    return [];
+  }
+};
+
+/**
+ * 디자이너 ID로 데이터 조회 (Firebase UID 사용)
+ */
+export const getDesignerDataById = async (userId: string): Promise<DesignerData> => {
+  try {
+    if (!isFirebaseAvailable()) {
+      const localData = localStorage.getItem('hairfolio_designers');
+      if (localData) {
+        const designers = JSON.parse(localData);
+        return designers[userId] || {
+          portfolio: [],
+          stats: { ...DEFAULT_STATS },
+          settings: { ...DEFAULT_SETTINGS },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+      }
+      throw new Error('No data available');
+    }
+
+    const designerRef = doc(db, COLLECTIONS.DESIGNERS, userId);
+    const designerSnap = await getDoc(designerRef);
+    
+    if (designerSnap.exists()) {
+      const data = designerSnap.data() as DesignerData;
+      return {
+        ...data,
+        stats: data.stats || { ...DEFAULT_STATS },
+        settings: data.settings || { ...DEFAULT_SETTINGS },
+        portfolio: data.portfolio || []
+      };
+    } else {
+      return {
+        portfolio: [],
+        stats: { ...DEFAULT_STATS },
+        settings: { ...DEFAULT_SETTINGS },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+    }
+  } catch (error) {
+    console.error('❌ Error getting designer data by ID:', error);
+    throw error;
+  }
+};
+
+/**
+ * 포트폴리오 저장 (Firebase UID 사용)
+ */
+export const savePortfolioById = async (userId: string, portfolio: Hairstyle[]): Promise<boolean> => {
+  try {
+    if (!isFirebaseAvailable()) {
+      console.log('⚠️ Firebase not available, using localStorage');
+      const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
+      const existingData = localData[userId] || {
+        stats: { ...DEFAULT_STATS },
+        settings: { ...DEFAULT_SETTINGS },
+        createdAt: new Date().toISOString()
+      };
+      
+      const updatedPortfolio = portfolio.map(style => ({
+        ...style,
+        id: style.id || generateId(),
+        uploadedBy: userId, // 디자이너 ID 추가
+        createdAt: style.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }));
+
+      localData[userId] = {
+        ...existingData,
+        portfolio: updatedPortfolio,
+        updatedAt: new Date().toISOString()
+      };
+      
+      localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
+      return true;
+    }
+
+    const designerRef = doc(db, COLLECTIONS.DESIGNERS, userId);
+    
+    const updatedPortfolio = portfolio.map(style => ({
+      ...style,
+      id: style.id || generateId(),
+      uploadedBy: userId,
+      createdAt: style.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }));
+    
+    const existingData = await getDesignerDataById(userId);
+    
+    const updatedData: DesignerData = {
+      ...existingData,
+      portfolio: updatedPortfolio,
+      updatedAt: new Date().toISOString()
+    };
+    
+    const cleanedData = removeUndefinedFields(updatedData);
+    await setDoc(designerRef, cleanedData);
+    
+    const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
+    localData[userId] = cleanedData;
+    localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
+    
+    return true;
+  } catch (error) {
+    console.error('❌ Error saving portfolio:', error);
+    return false;
+  }
+};
+
+// ===== 기존 디자이너 관리 함수들 (하위 호환성 유지) =====
+
 export const initializeDB = async (): Promise<void> => {
   try {
     if (!isFirebaseAvailable()) {
       console.warn('⚠️ Firebase not available, using localStorage fallback');
-      // Fallback to localStorage if Firebase fails
       const localData = localStorage.getItem('hairfolio_designers');
       if (!localData) {
         localStorage.setItem('hairfolio_designers', JSON.stringify({
@@ -129,7 +543,6 @@ export const initializeDB = async (): Promise<void> => {
     const sampleDesignerRef = doc(db, COLLECTIONS.DESIGNERS, 'Sample Designer');
     const sampleDesignerSnap = await getDoc(sampleDesignerRef);
     
-    // Only initialize if Sample Designer doesn't exist
     if (!sampleDesignerSnap.exists()) {
       console.log('📝 Creating Sample Designer in Firebase...');
       const sampleDesignerData: DesignerData = {
@@ -155,13 +568,6 @@ export const initializeDB = async (): Promise<void> => {
     }
   } catch (error) {
     console.error('❌ Error initializing Firebase DB:', error);
-    console.error('Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      code: (error as any)?.code || 'No code',
-      name: (error as any)?.name || 'No name'
-    });
-    
-    // Fallback to localStorage if Firebase fails
     const localData = localStorage.getItem('hairfolio_designers');
     if (!localData) {
       localStorage.setItem('hairfolio_designers', JSON.stringify({
@@ -180,7 +586,6 @@ export const initializeDB = async (): Promise<void> => {
   }
 };
 
-// Get designer data
 export const getDesignerData = async (designerName: string): Promise<DesignerData> => {
   try {
     if (!isFirebaseAvailable()) {
@@ -211,7 +616,6 @@ export const getDesignerData = async (designerName: string): Promise<DesignerDat
         portfolio: data.portfolio || []
       };
     } else {
-      // Return empty data structure for new designers
       return {
         portfolio: [],
         stats: { ...DEFAULT_STATS },
@@ -222,7 +626,6 @@ export const getDesignerData = async (designerName: string): Promise<DesignerDat
     }
   } catch (error) {
     console.error('❌ Error getting designer data from Firebase:', error);
-    // Fallback to localStorage
     const localData = localStorage.getItem('hairfolio_designers');
     if (localData) {
       const designers = JSON.parse(localData);
@@ -238,7 +641,6 @@ export const getDesignerData = async (designerName: string): Promise<DesignerDat
   }
 };
 
-// Save designer portfolio
 export const savePortfolio = async (designerName: string, portfolio: Hairstyle[]): Promise<boolean> => {
   try {
     if (!isFirebaseAvailable()) {
@@ -269,7 +671,6 @@ export const savePortfolio = async (designerName: string, portfolio: Hairstyle[]
 
     const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
     
-    // Ensure each style has required fields
     const updatedPortfolio = portfolio.map(style => ({
       ...style,
       id: style.id || generateId(),
@@ -277,7 +678,6 @@ export const savePortfolio = async (designerName: string, portfolio: Hairstyle[]
       updatedAt: new Date().toISOString()
     }));
     
-    // Get existing data or create new
     const existingData = await getDesignerData(designerName);
     
     const updatedData: DesignerData = {
@@ -289,7 +689,6 @@ export const savePortfolio = async (designerName: string, portfolio: Hairstyle[]
     const cleanedData = removeUndefinedFields(updatedData);
     await setDoc(designerRef, cleanedData);
     
-    // Also update localStorage as backup
     const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
     localData[designerName] = cleanedData;
     localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
@@ -301,7 +700,6 @@ export const savePortfolio = async (designerName: string, portfolio: Hairstyle[]
   }
 };
 
-// Add single style to portfolio
 export const addStyleToPortfolio = async (designerName: string, style: Hairstyle): Promise<boolean> => {
   try {
     const currentData = await getDesignerData(designerName);
@@ -332,7 +730,6 @@ export const addStyleToPortfolio = async (designerName: string, style: Hairstyle
     const cleanedData = removeUndefinedFields(updatedData);
     await setDoc(designerRef, cleanedData);
     
-    // Also update localStorage as backup
     const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
     localData[designerName] = cleanedData;
     localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
@@ -344,7 +741,6 @@ export const addStyleToPortfolio = async (designerName: string, style: Hairstyle
   }
 };
 
-// Remove style from portfolio
 export const removeStyleFromPortfolio = async (designerName: string, styleId: string): Promise<boolean> => {
   try {
     const currentData = await getDesignerData(designerName);
@@ -356,7 +752,6 @@ export const removeStyleFromPortfolio = async (designerName: string, styleId: st
   }
 };
 
-// Update style in portfolio
 export const updateStyleInPortfolio = async (designerName: string, styleId: string, updates: Partial<Hairstyle>): Promise<boolean> => {
   try {
     const currentData = await getDesignerData(designerName);
@@ -376,10 +771,9 @@ export const updateStyleInPortfolio = async (designerName: string, styleId: stri
   }
 };
 
-// Save designer profile
-export const saveDesignerProfile = async (designerName: string, profile: DesignerProfile): Promise<boolean> => {
+export const saveDesignerProfile = async (userId: string, profile: DesignerProfile): Promise<boolean> => {
   try {
-    const currentData = await getDesignerData(designerName);
+    const currentData = await getDesignerDataById(userId);
     
     const updatedData: DesignerData = {
       ...currentData,
@@ -390,18 +784,17 @@ export const saveDesignerProfile = async (designerName: string, profile: Designe
     if (!isFirebaseAvailable()) {
       console.log('⚠️ Firebase not available, using localStorage for saveDesignerProfile');
       const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
-      localData[designerName] = updatedData;
+      localData[userId] = updatedData;
       localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
       return true;
     }
 
-    const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
+    const designerRef = doc(db, COLLECTIONS.DESIGNERS, userId);
     const cleanedData = removeUndefinedFields(updatedData);
     await setDoc(designerRef, cleanedData);
     
-    // Also update localStorage
     const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
-    localData[designerName] = cleanedData;
+    localData[userId] = cleanedData;
     localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
     
     return true;
@@ -411,7 +804,6 @@ export const saveDesignerProfile = async (designerName: string, profile: Designe
   }
 };
 
-// Save designer settings
 export const saveDesignerSettings = async (designerName: string, settings: DesignerSettings): Promise<boolean> => {
   try {
     const currentData = await getDesignerData(designerName);
@@ -434,7 +826,6 @@ export const saveDesignerSettings = async (designerName: string, settings: Desig
     const cleanedData = removeUndefinedFields(updatedData);
     await setDoc(designerRef, cleanedData);
     
-    // Also update localStorage
     const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
     localData[designerName] = cleanedData;
     localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
@@ -446,7 +837,6 @@ export const saveDesignerSettings = async (designerName: string, settings: Desig
   }
 };
 
-// Save reservation URL
 export const saveReservationUrl = async (designerName: string, url: string): Promise<boolean> => {
   try {
     const currentData = await getDesignerData(designerName);
@@ -469,7 +859,6 @@ export const saveReservationUrl = async (designerName: string, url: string): Pro
     const cleanedData = removeUndefinedFields(updatedData);
     await setDoc(designerRef, cleanedData);
     
-    // Also update localStorage
     const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
     localData[designerName] = cleanedData;
     localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
@@ -481,7 +870,6 @@ export const saveReservationUrl = async (designerName: string, url: string): Pro
   }
 };
 
-// Check if designer exists
 export const designerExists = async (designerName: string): Promise<boolean> => {
   try {
     if (!isFirebaseAvailable()) {
@@ -499,7 +887,6 @@ export const designerExists = async (designerName: string): Promise<boolean> => 
     return designerSnap.exists();
   } catch (error) {
     console.error('❌ Error checking if designer exists:', error);
-    // Fallback to localStorage
     const localData = localStorage.getItem('hairfolio_designers');
     if (localData) {
       const designers = JSON.parse(localData);
@@ -509,7 +896,6 @@ export const designerExists = async (designerName: string): Promise<boolean> => 
   }
 };
 
-// Get all designer names
 export const getAllDesignerNames = async (): Promise<string[]> => {
   try {
     if (!isFirebaseAvailable()) {
@@ -526,7 +912,6 @@ export const getAllDesignerNames = async (): Promise<string[]> => {
     return snapshot.docs.map(doc => doc.id);
   } catch (error) {
     console.error('❌ Error getting all designer names:', error);
-    // Fallback to localStorage
     const localData = localStorage.getItem('hairfolio_designers');
     if (localData) {
       return Object.keys(JSON.parse(localData));
@@ -535,7 +920,6 @@ export const getAllDesignerNames = async (): Promise<string[]> => {
   }
 };
 
-// Delete designer
 export const deleteDesigner = async (designerName: string): Promise<boolean> => {
   try {
     if (!isFirebaseAvailable()) {
@@ -549,7 +933,6 @@ export const deleteDesigner = async (designerName: string): Promise<boolean> => 
     const designerRef = doc(db, COLLECTIONS.DESIGNERS, designerName);
     await deleteDoc(designerRef);
     
-    // Also remove from localStorage
     const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
     delete localData[designerName];
     localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
@@ -561,11 +944,9 @@ export const deleteDesigner = async (designerName: string): Promise<boolean> => 
   }
 };
 
-// Track visit (once per session)
 export const trackVisit = async (designerName: string): Promise<void> => {
   const sessionKey = `hairfolio_visit_tracked_${designerName}`;
   
-  // Check if already tracked this session
   if (sessionStorage.getItem(sessionKey)) {
     return;
   }
@@ -585,14 +966,12 @@ export const trackVisit = async (designerName: string): Promise<void> => {
       updatedAt: new Date().toISOString()
     });
     
-    // Mark as tracked for this session
     sessionStorage.setItem(sessionKey, 'true');
   } catch (error) {
     console.error('❌ Error tracking visit:', error);
   }
 };
 
-// Track style view/try-on
 export const trackStyleView = async (designerName: string, styleUrl: string): Promise<void> => {
   try {
     if (!isFirebaseAvailable()) {
@@ -617,7 +996,6 @@ export const trackStyleView = async (designerName: string, styleUrl: string): Pr
   }
 };
 
-// Track booking
 export const trackBooking = async (designerName: string, styleUrl: string): Promise<void> => {
   try {
     if (!isFirebaseAvailable()) {
@@ -631,7 +1009,6 @@ export const trackBooking = async (designerName: string, styleUrl: string): Prom
     const bookings = currentData.stats?.bookings || {};
     bookings[styleUrl] = (bookings[styleUrl] || 0) + 1;
     
-    // Calculate conversion rate
     const totalViews = Object.values(currentData.stats?.styleViews || {}).reduce((sum, count) => sum + count, 0);
     const totalBookings = Object.values(bookings).reduce((sum, count) => sum + count, 0);
     const conversionRate = totalViews > 0 ? (totalBookings / totalViews) * 100 : 0;
@@ -647,7 +1024,6 @@ export const trackBooking = async (designerName: string, styleUrl: string): Prom
   }
 };
 
-// Track trial result (NEW FUNCTION)
 export const trackTrialResult = async (
   designerName: string, 
   trialData: {
@@ -673,9 +1049,8 @@ export const trackTrialResult = async (
     };
     
     const trialResults = currentData.stats?.trialResults || [];
-    trialResults.unshift(trialResult); // Add to beginning
+    trialResults.unshift(trialResult);
     
-    // Keep only the most recent 20 trial results (용량 관리)
     if (trialResults.length > 20) {
       trialResults.splice(20);
     }
@@ -689,11 +1064,9 @@ export const trackTrialResult = async (
     console.log('✅ Trial result tracked successfully');
   } catch (error) {
     console.error('❌ Error tracking trial result:', error);
-    // Silently fail - don't interrupt user experience
   }
 };
 
-// Reset analytics data
 export const resetAnalytics = async (designerName: string): Promise<boolean> => {
   try {
     const currentData = await getDesignerData(designerName);
@@ -719,7 +1092,6 @@ export const resetAnalytics = async (designerName: string): Promise<boolean> => 
     const cleanedData = removeUndefinedFields(updatedData);
     await setDoc(designerRef, cleanedData);
     
-    // Also update localStorage
     const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
     localData[designerName] = cleanedData;
     localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
@@ -731,7 +1103,6 @@ export const resetAnalytics = async (designerName: string): Promise<boolean> => 
   }
 };
 
-// Export designer data
 export const exportDesignerData = async (designerName: string): Promise<string | null> => {
   try {
     const data = await getDesignerData(designerName);
@@ -749,7 +1120,6 @@ export const exportDesignerData = async (designerName: string): Promise<string |
   }
 };
 
-// Import designer data
 export const importDesignerData = async (jsonData: string): Promise<boolean> => {
   try {
     const imported = JSON.parse(jsonData);
@@ -776,7 +1146,6 @@ export const importDesignerData = async (jsonData: string): Promise<boolean> => 
     const cleanedData = removeUndefinedFields(updatedData);
     await setDoc(designerRef, cleanedData);
     
-    // Also update localStorage
     const localData = JSON.parse(localStorage.getItem('hairfolio_designers') || '{}');
     localData[imported.designerName] = cleanedData;
     localStorage.setItem('hairfolio_designers', JSON.stringify(localData));
@@ -788,10 +1157,8 @@ export const importDesignerData = async (jsonData: string): Promise<boolean> => 
   }
 };
 
-// Clear all data (use with caution)
 export const clearAllData = async (): Promise<boolean> => {
   try {
-    // This is dangerous - only clear localStorage for safety
     localStorage.removeItem('hairfolio_designers');
     sessionStorage.clear();
     
@@ -803,7 +1170,6 @@ export const clearAllData = async (): Promise<boolean> => {
   }
 };
 
-// Get storage info
 export const getStorageInfo = async () => {
   try {
     const localData = localStorage.getItem('hairfolio_designers') || '{}';
@@ -814,7 +1180,7 @@ export const getStorageInfo = async () => {
       totalSize,
       designerCount,
       formattedSize: formatBytes(totalSize),
-      isNearLimit: false // Firebase has much higher limits
+      isNearLimit: false
     };
   } catch {
     return {
@@ -826,7 +1192,6 @@ export const getStorageInfo = async () => {
   }
 };
 
-// Get analytics summary
 export const getAnalyticsSummary = async (designerName: string) => {
   try {
     const data = await getDesignerData(designerName);
@@ -835,7 +1200,6 @@ export const getAnalyticsSummary = async (designerName: string) => {
     const totalViews = Object.values(stats.styleViews || {}).reduce((sum, count) => sum + count, 0);
     const totalBookings = Object.values(stats.bookings || {}).reduce((sum, count) => sum + count, 0);
     
-    // Find top performing styles
     const topViewedStyle = Object.entries(stats.styleViews || {})
       .sort(([, a], [, b]) => b - a)[0];
     
@@ -875,7 +1239,6 @@ export const getAnalyticsSummary = async (designerName: string) => {
   }
 };
 
-// Helper: Format bytes to readable string
 const formatBytes = (bytes: number): string => {
   if (bytes === 0) return '0 B';
   
