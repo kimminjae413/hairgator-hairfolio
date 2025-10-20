@@ -14,7 +14,7 @@ export interface ColorTryOnResult {
   resultImageUrl: string;
   confidence: number;
   processingTime: number;
-  apiCallsUsed: number; // ✅ 추가: API 호출 횟수 추적
+  apiCallsUsed: number;
   colorAnalysis: {
     dominantColors: string[];
     skinToneMatch: 'excellent' | 'good' | 'fair' | 'poor';
@@ -52,10 +52,7 @@ class GeminiColorTryOnService {
   private analysisEndpoint: string = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
   private imageGenerationEndpoint: string = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent';
   
-  // ✅ 캐시 시스템
   private colorCache = new Map<string, string[]>();
-  
-  // ✅ Rate Limiter
   private callTimestamps: number[] = [];
   private maxCallsPerMinute = 10;
 
@@ -67,18 +64,14 @@ class GeminiColorTryOnService {
     }
   }
 
-  // ✅ Rate Limiter 함수
   private async waitForAvailableSlot(): Promise<void> {
     const now = Date.now();
     const oneMinuteAgo = now - 60000;
-
-    // 1분 이내 호출 기록만 유지
     this.callTimestamps = this.callTimestamps.filter(t => t > oneMinuteAgo);
 
     if (this.callTimestamps.length >= this.maxCallsPerMinute) {
       const oldestCall = this.callTimestamps[0];
-      const waitTime = 60000 - (now - oldestCall) + 1000; // +1초 여유
-      
+      const waitTime = 60000 - (now - oldestCall) + 1000;
       console.log(`⏳ API 호출 제한: ${Math.ceil(waitTime / 1000)}초 대기`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
@@ -86,7 +79,6 @@ class GeminiColorTryOnService {
     this.callTimestamps.push(now);
   }
 
-  // ✅ 이미지 해시 함수 (캐시 키 생성)
   private hashImage(base64OrUrl: string): string {
     return base64OrUrl.slice(0, 100);
   }
@@ -125,7 +117,6 @@ class GeminiColorTryOnService {
     }
   }
 
-  // ✅ 최적화된 메인 함수 (API 호출 75% 감소)
   async tryOnHairColor(request: ColorTryOnRequest): Promise<ColorTryOnResult> {
     let apiCallsUsed = 0;
     
@@ -136,10 +127,8 @@ class GeminiColorTryOnService {
         return this.createDemoResult(request, startTime);
       }
 
-      // ✅ STEP 1: Canvas로 색상 추출 (API 호출 0회)
       const colorAnalysis = await this.analyzeColorStyle(request.colorStyleUrl);
       
-      // ✅ STEP 2: 기본값 사용 (API 호출 생략)
       const hairAnalysis: HairAnalysis = {
         currentColor: "자연스러운 갈색",
         texture: "직모",
@@ -155,7 +144,6 @@ class GeminiColorTryOnService {
         avoidColors: ["극단적인 색상"]
       };
       
-      // ✅ STEP 3: 이미지 생성 (API 호출 1회만)
       await this.waitForAvailableSlot();
       const resultImageUrl = await this.processColorTransformation(
         request.userPhotoUrl,
@@ -260,9 +248,7 @@ class GeminiColorTryOnService {
     };
   }
 
-  // ✅ 최적화: Canvas 기반 색상 추출 (API 사용 안함)
   private async analyzeColorStyle(styleImageUrl: string): Promise<ColorAnalysis> {
-    // 캐시 확인
     const cacheKey = this.hashImage(styleImageUrl);
     if (this.colorCache.has(cacheKey)) {
       console.log('💾 캐시된 색상 사용');
@@ -278,17 +264,11 @@ class GeminiColorTryOnService {
     }
 
     try {
-      // Canvas로 색상 추출
       const colors = await this.analyzeImageColors(styleImageUrl);
-      
-      // 캐시 저장
       this.colorCache.set(cacheKey, colors.dominantColors);
-      
       return colors;
-      
     } catch (error) {
       console.error('색상 분석 실패, 기본값 사용:', error);
-      
       return {
         dominantColors: ["#8B4513", "#D2691E"],
         technique: "전체염색",
@@ -346,7 +326,6 @@ class GeminiColorTryOnService {
       
     } catch (error) {
       console.error('이미지 색상 분석 실패:', error);
-      
       return {
         dominantColors: ["#8B4513", "#D2691E"],
         technique: "전체염색",
@@ -361,7 +340,6 @@ class GeminiColorTryOnService {
   private extractDominantColors(imageData: Uint8ClampedArray): string[] {
     const colorMap = new Map<string, number>();
     
-    // 이미지 데이터를 샘플링해서 색상 빈도 계산
     for (let i = 0; i < imageData.length; i += 64) {
       const r = imageData[i];
       const g = imageData[i + 1];
@@ -369,17 +347,14 @@ class GeminiColorTryOnService {
       const a = imageData[i + 3];
       
       if (a > 200) {
-        // 너무 어둡거나 너무 밝은 색상 제외
         const brightness = (r + g + b) / 3;
         if (brightness < 30 || brightness > 240) continue;
         
-        // 채도가 너무 낮은 색상 제외 (회색 제거)
         const max = Math.max(r, g, b);
         const min = Math.min(r, g, b);
         const saturation = max === 0 ? 0 : (max - min) / max;
         if (saturation < 0.1) continue;
         
-        // 색상을 그룹화하기 위해 반올림
         const roundedR = Math.round(r / 16) * 16;
         const roundedG = Math.round(g / 16) * 16;
         const roundedB = Math.round(b / 16) * 16;
@@ -389,13 +364,11 @@ class GeminiColorTryOnService {
       }
     }
     
-    // 색상이 충분히 감지되지 않으면 기본값
     if (colorMap.size < 2) {
       console.log('충분한 색상 감지 안됨, 기본값 사용');
       return ['#E6B3FF', '#D147A3', '#8A2BE2'];
     }
     
-    // 가장 빈번한 색상들을 찾기
     const sortedColors = Array.from(colorMap.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3);
@@ -405,7 +378,6 @@ class GeminiColorTryOnService {
       return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
     });
     
-    // 추출된 색상이 모두 어두우면 밝은 색상 추가
     const allDark = extractedColors.every(color => {
       const r = parseInt(color.slice(1, 3), 16);
       const g = parseInt(color.slice(3, 5), 16);
@@ -449,7 +421,7 @@ class GeminiColorTryOnService {
     }
   }
 
-  // ✅ 이미지 생성 (Rate Limiter 적용됨)
+  // 🔥 강력한 색상 전용 프롬프트
   private async processColorTransformation(
     originalImageUrl: string,
     hairAnalysis: HairAnalysis,
@@ -458,23 +430,38 @@ class GeminiColorTryOnService {
   ): Promise<string> {
     try {
       const transformationPrompt = `
-Apply ONLY the hair colors from the reference style to this person's existing hairstyle.
+HAIR COLOR TRANSFORMATION TASK - EXTREMELY IMPORTANT RULES
 
-EXTRACT these colors from reference: ${colorAnalysis.dominantColors.join(', ')}
-Color Technique: ${colorAnalysis.technique}
+TARGET COLORS: ${colorAnalysis.dominantColors.join(', ')}
+Technique: ${request.colorType}
 Intensity: ${request.intensity}
 
-CRITICAL RULES:
-1. Keep the person's face EXACTLY the same
-2. Keep their ORIGINAL hairstyle (length, cut, waves, texture) EXACTLY the same
-3. Do NOT copy the reference hairstyle - only use its COLORS
-4. Apply the extracted colors to their existing hair structure
-5. Maintain their natural hair flow and volume
-6. Do NOT change hair length, layers, or styling
-7. Only change the hair color using the reference colors
-8. Preserve their original hair texture and movement
+🚨 ABSOLUTE REQUIREMENTS - DO NOT DEVIATE:
 
-Transform ONLY the color - keep everything else identical to the original photo.
+1. ONLY CHANGE HAIR COLOR - Nothing else
+2. DO NOT modify hairstyle, haircut, hair length, or hair shape
+3. DO NOT change face, facial features, skin, or background
+4. DO NOT copy hairstyle from any reference image
+5. PRESERVE the exact same hair structure, layers, and flow
+6. KEEP all waves, curls, straight parts exactly as they are
+7. MAINTAIN the original hair volume and texture
+8. APPLY colors ONLY to the existing hair strands
+
+WHAT TO DO:
+✅ Apply the specified colors (${colorAnalysis.dominantColors.join(', ')}) to the person's EXISTING hair
+✅ Match the color intensity level: ${request.intensity}
+✅ Use ${request.colorType} coloring technique
+✅ Keep natural hair highlights and shadows for realism
+
+WHAT NOT TO DO:
+❌ Do NOT change hair length
+❌ Do NOT change haircut or hairstyle
+❌ Do NOT add or remove hair layers
+❌ Do NOT modify hair texture (straight/wavy/curly)
+❌ Do NOT change the person's face or body
+❌ Do NOT alter background or clothing
+
+This is a HAIR COLOR ONLY transformation. The result should look exactly like the original photo but with different hair color.
       `;
 
       const imageData = await this.fetchImageAsBase64(originalImageUrl);
@@ -497,9 +484,9 @@ Transform ONLY the color - keep everything else identical to the original photo.
             ]
           }],
           generationConfig: {
-            temperature: 0.3,
-            topK: 32,
-            topP: 1,
+            temperature: 0.2,  // 🔥 더 낮은 temperature로 일관성 증가
+            topK: 20,          // 🔥 더 낮은 topK로 예측 가능성 증가
+            topP: 0.8,         // 🔥 더 낮은 topP로 정확도 증가
             maxOutputTokens: 4096,
             response_modalities: ["TEXT", "IMAGE"]
           }
@@ -612,7 +599,6 @@ export const useColorTryOn = () => {
       const colorResult = await service.tryOnHairColor(request);
       setResult(colorResult);
       
-      // ✅ API 호출 횟수 로그
       console.log(`📊 API 호출 횟수: ${colorResult.apiCallsUsed}회`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.';
