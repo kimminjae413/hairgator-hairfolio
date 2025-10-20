@@ -1,4 +1,4 @@
-// src/services/firebaseAuthService.ts
+// src/services/firebaseAuthService.ts - 완전한 최종 버전 (사용자 타입 포함)
 import { 
   getAuth, 
   createUserWithEmailAndPassword,
@@ -11,6 +11,8 @@ import {
   Auth,
   AuthError
 } from "firebase/auth";
+import { UserType } from '../types';
+import * as firebaseService from './firebaseService';
 
 // Initialize Firebase Auth
 let auth: Auth | null = null;
@@ -46,11 +48,14 @@ const getAuthErrorMessage = (error: AuthError): string => {
   return errorMessages[error.code] || `인증 오류: ${error.message}`;
 };
 
-// Sign up with email and password
+/**
+ * 회원가입 (사용자 타입 포함)
+ */
 export const signUpWithEmail = async (
   email: string, 
   password: string, 
-  displayName: string
+  displayName: string,
+  userType: UserType = 'designer' // 기본값: designer (하위 호환성)
 ): Promise<{ success: boolean; user?: User; error?: string }> => {
   try {
     if (!auth) {
@@ -60,19 +65,40 @@ export const signUpWithEmail = async (
       }
     }
 
-    // Create user account
+    // 1. Firebase Auth에 사용자 생성
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
-    // Update user profile with display name
+    // 2. 프로필 업데이트
     await updateProfile(user, {
       displayName: displayName
     });
 
-    // Send email verification
+    // 3. Firestore에 사용자 정보 저장
+    await firebaseService.createUser(user.uid, userType, email, displayName);
+
+    // 4. 사용자 타입별 추가 초기화
+    if (userType === 'designer') {
+      // 디자이너: 빈 포트폴리오 생성
+      await firebaseService.savePortfolioById(user.uid, []);
+      await firebaseService.saveDesignerProfile(user.uid, {
+        name: displayName
+      });
+    } else if (userType === 'client') {
+      // 일반 사용자: 빈 프로필 생성
+      await firebaseService.saveClientProfile({
+        userId: user.uid,
+        name: displayName,
+        email: email,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+    }
+
+    // 5. 이메일 인증 발송
     await sendEmailVerification(user);
 
-    console.log('✅ User signed up successfully:', user.uid);
+    console.log('✅ User signed up successfully:', user.uid, userType);
     return { success: true, user };
   } catch (error) {
     console.error('❌ Sign up error:', error);
@@ -84,11 +110,13 @@ export const signUpWithEmail = async (
   }
 };
 
-// Sign in with email and password
+/**
+ * 로그인
+ */
 export const signInWithEmail = async (
   email: string, 
   password: string
-): Promise<{ success: boolean; user?: User; error?: string }> => {
+): Promise<{ success: boolean; user?: User; userType?: UserType; error?: string }> => {
   try {
     if (!auth) {
       auth = initializeAuth();
@@ -100,8 +128,12 @@ export const signInWithEmail = async (
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
-    console.log('✅ User signed in successfully:', user.uid);
-    return { success: true, user };
+    // Firestore에서 사용자 타입 조회
+    const userData = await firebaseService.getUser(user.uid);
+    const userType = userData?.userType || 'designer'; // 기본값: designer (하위 호환성)
+
+    console.log('✅ User signed in successfully:', user.uid, userType);
+    return { success: true, user, userType };
   } catch (error) {
     console.error('❌ Sign in error:', error);
     const authError = error as AuthError;
@@ -112,7 +144,9 @@ export const signInWithEmail = async (
   }
 };
 
-// Sign out
+/**
+ * 로그아웃
+ */
 export const signOutUser = async (): Promise<{ success: boolean; error?: string }> => {
   try {
     if (!auth) {
@@ -120,6 +154,13 @@ export const signOutUser = async (): Promise<{ success: boolean; error?: string 
     }
 
     await signOut(auth);
+    
+    // 세션 정보 정리
+    sessionStorage.removeItem('hairfolio_designer');
+    sessionStorage.removeItem('hairfolio_userId');
+    sessionStorage.removeItem('hairfolio_userType');
+    localStorage.removeItem('hairfolio_user_type');
+    
     console.log('✅ User signed out successfully');
     return { success: true };
   } catch (error) {
@@ -131,7 +172,9 @@ export const signOutUser = async (): Promise<{ success: boolean; error?: string 
   }
 };
 
-// Resend email verification
+/**
+ * 이메일 인증 재발송
+ */
 export const resendEmailVerification = async (): Promise<{ success: boolean; error?: string }> => {
   try {
     if (!auth) {
@@ -162,7 +205,9 @@ export const resendEmailVerification = async (): Promise<{ success: boolean; err
   }
 };
 
-// Check if email is verified
+/**
+ * 이메일 인증 확인
+ */
 export const checkEmailVerified = async (): Promise<boolean> => {
   try {
     if (!auth) {
@@ -174,7 +219,7 @@ export const checkEmailVerified = async (): Promise<boolean> => {
       return false;
     }
 
-    // Reload user to get latest email verification status
+    // 최신 인증 상태 새로고침
     await user.reload();
     return user.emailVerified;
   } catch (error) {
@@ -183,7 +228,9 @@ export const checkEmailVerified = async (): Promise<boolean> => {
   }
 };
 
-// Get current user
+/**
+ * 현재 로그인한 사용자 조회
+ */
 export const getCurrentUser = (): User | null => {
   if (!auth) {
     auth = initializeAuth();
@@ -191,7 +238,25 @@ export const getCurrentUser = (): User | null => {
   return auth?.currentUser || null;
 };
 
-// Listen to auth state changes
+/**
+ * 현재 사용자 타입 조회
+ */
+export const getCurrentUserType = async (): Promise<UserType | null> => {
+  try {
+    const user = getCurrentUser();
+    if (!user) return null;
+
+    const userData = await firebaseService.getUser(user.uid);
+    return userData?.userType || null;
+  } catch (error) {
+    console.error('❌ Error getting current user type:', error);
+    return null;
+  }
+};
+
+/**
+ * 인증 상태 변경 리스너
+ */
 export const onAuthStateChange = (callback: (user: User | null) => void): (() => void) => {
   if (!auth) {
     auth = initializeAuth();
@@ -204,13 +269,17 @@ export const onAuthStateChange = (callback: (user: User | null) => void): (() =>
   return onAuthStateChanged(auth, callback);
 };
 
-// Validate email format
+/**
+ * 이메일 형식 검증
+ */
 export const isValidEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 };
 
-// Validate password strength
+/**
+ * 비밀번호 강도 검증
+ */
 export const isValidPassword = (password: string): { valid: boolean; message?: string } => {
   if (password.length < 6) {
     return { valid: false, message: '비밀번호는 최소 6자 이상이어야 합니다.' };
@@ -220,32 +289,30 @@ export const isValidPassword = (password: string): { valid: boolean; message?: s
     return { valid: false, message: '비밀번호는 128자를 초과할 수 없습니다.' };
   }
 
-  // Optional: Add more password strength requirements
-  // const hasUpperCase = /[A-Z]/.test(password);
-  // const hasLowerCase = /[a-z]/.test(password);
-  // const hasNumber = /\d/.test(password);
-  // const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-
   return { valid: true };
 };
 
-// Validate designer name
-export const isValidDesignerName = (name: string): { valid: boolean; message?: string } => {
+/**
+ * 디자이너/사용자 이름 검증
+ */
+export const isValidName = (name: string): { valid: boolean; message?: string } => {
   const trimmedName = name.trim();
   
   if (trimmedName.length < 2) {
-    return { valid: false, message: '디자이너 이름은 최소 2자 이상이어야 합니다.' };
+    return { valid: false, message: '이름은 최소 2자 이상이어야 합니다.' };
   }
   
   if (trimmedName.length > 30) {
-    return { valid: false, message: '디자이너 이름은 30자를 초과할 수 없습니다.' };
+    return { valid: false, message: '이름은 30자를 초과할 수 없습니다.' };
   }
 
-  // Check for invalid characters (optional)
   const invalidCharsRegex = /[<>{}[\]\\\/]/;
   if (invalidCharsRegex.test(trimmedName)) {
-    return { valid: false, message: '디자이너 이름에 특수문자를 사용할 수 없습니다.' };
+    return { valid: false, message: '이름에 특수문자를 사용할 수 없습니다.' };
   }
 
   return { valid: true };
 };
+
+// 하위 호환성을 위한 별칭
+export const isValidDesignerName = isValidName;
