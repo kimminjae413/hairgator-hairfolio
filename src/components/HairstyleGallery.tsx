@@ -24,11 +24,12 @@ const SERVICE_CATEGORY_COLORS: Record<ServiceMajorCategory, string> = {
 const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({ 
   images, 
   onSelect, 
+  onColorTryOn, // 🆕 염색 전용 핸들러 추가
   selectedUrl, 
   disabled, 
   onAddImage, 
   showCategories = true,
-  faceAnalysis, // 🆕 얼굴 분석 정보
+  faceAnalysis,
   allowMultipleSelection = false
 }) => {
   const { t } = useTranslation();
@@ -63,18 +64,31 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
     setLoadedImages(prev => new Set([...prev, imageUrl]));
   };
 
+  // 🆕 스타일 클릭 핸들러 - 카테고리에 따라 다른 API 사용
+  const handleStyleClick = (image: Hairstyle) => {
+    // 염색 스타일이면서 onColorTryOn이 제공된 경우 Gemini API 사용
+    if (image.serviceCategory === 'color' && onColorTryOn) {
+      console.log('🎨 염색 스타일 선택 → Gemini API 사용');
+      onColorTryOn(image);
+    } else {
+      // 그 외의 경우 VModel API 사용
+      console.log('✂️ 커트/기타 스타일 선택 → VModel API 사용');
+      onSelect(image);
+    }
+  };
+
   // 🆕 AI 추천 여부 확인
   const isRecommended = (image: Hairstyle): boolean => {
     if (!faceAnalysis) return false;
     
     // 커트 스타일
     if (image.serviceCategory === 'cut' && faceAnalysis.faceShape) {
-      return isSuitableForFaceShape(image, faceAnalysis.faceShape, 'good'); // good 이상만
+      return isSuitableForFaceShape(image, faceAnalysis.faceShape, 'good');
     }
     
     // 염색 스타일
     if (image.serviceCategory === 'color' && faceAnalysis.personalColor) {
-      return isSuitableForPersonalColor(image, faceAnalysis.personalColor, 'good'); // good 이상만
+      return isSuitableForPersonalColor(image, faceAnalysis.personalColor, 'good');
     }
     
     return false;
@@ -109,7 +123,7 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
       filtered.sort((a, b) => {
         const scoreA = getRecommendationScore(a, faceAnalysis);
         const scoreB = getRecommendationScore(b, faceAnalysis);
-        return scoreB - scoreA; // 높은 점수가 먼저
+        return scoreB - scoreA;
       });
     }
     
@@ -341,7 +355,7 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                       className="relative group mb-2 break-inside-avoid"
                     >
                       <button
-                        onClick={() => onSelect(image)}
+                        onClick={() => handleStyleClick(image)} // ✅ 수정된 핸들러 사용
                         disabled={disabled}
                         className={`w-full ${randomHeight} block rounded-xl overflow-hidden transition-all duration-300 ${
                           selectedUrl === image.url
@@ -388,6 +402,18 @@ const HairstyleGallery: React.FC<HairstyleGalleryProps> = ({
                             <span className={`px-2 py-1 text-xs font-medium rounded-full ${SERVICE_CATEGORY_COLORS[image.serviceCategory]}`}>
                               {SERVICE_CATEGORY_LABELS[image.serviceCategory]}
                             </span>
+                          </div>
+                        )}
+                        
+                        {/* 🎨 염색 스타일 특별 표시 */}
+                        {image.serviceCategory === 'color' && (
+                          <div className="absolute top-2 right-2">
+                            <div className="bg-purple-600/90 text-white px-2 py-1 rounded-full text-xs font-bold shadow-lg flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 2L13.09 8.26L22 9L13.09 9.74L12 16L10.91 9.74L2 9L10.91 8.26L12 2Z"/>
+                              </svg>
+                              AI
+                            </div>
                           </div>
                         )}
                         
