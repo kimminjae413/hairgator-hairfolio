@@ -64,9 +64,28 @@ const App: React.FC = () => {
             // 인증된 사용자 로그인
             console.log('✅ 인증된 사용자:', user.uid);
             
-            // Firestore에서 사용자 타입 조회
+            // Firestore에서 사용자 데이터 조회
             const userData = await firebaseService.getUser(user.uid);
-            const currentUserType = userData?.userType || 'designer'; // 기본값: designer
+            
+            // 사용자 타입 결정 (userData가 없으면 기본값 'designer')
+            let currentUserType: UserType = 'designer';
+            
+            if (userData && userData.userType) {
+              currentUserType = userData.userType;
+            } else {
+              // 🔄 하위 호환성: 기존 사용자는 디자이너로 간주
+              console.log('⚠️ 사용자 타입 정보 없음, 기본값 designer 사용');
+              
+              // 사용자 데이터 생성 (처음 로그인하는 기존 사용자)
+              if (!userData) {
+                await firebaseService.createUser(
+                  user.uid,
+                  'designer',
+                  user.email || '',
+                  user.displayName || 'Designer'
+                );
+              }
+            }
 
             setUserType(currentUserType);
 
