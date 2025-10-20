@@ -28,10 +28,25 @@ const App: React.FC = () => {
         // Initialize Firebase with sample data
         await firebaseService.initializeDB();
 
-        // Firebase Auth 상태를 먼저 확인
+        // 🆕 URL 파라미터를 먼저 확인 (고객용 링크 우선 처리)
+        const urlParams = new URLSearchParams(window.location.search);
+        const designerParam = urlParams.get('designer');
+        const designerFromUrl = designerParam ? decodeURIComponent(designerParam) : null;
+
+        // Firebase Auth 상태 확인
         const unsubscribe = authService.onAuthStateChange(async (user) => {
+          // 🔥 중요: URL에 designer 파라미터가 있으면 무조건 ClientView로 이동
+          if (designerFromUrl) {
+            console.log('🎯 고객용 링크 접속 감지:', designerFromUrl);
+            setClientViewDesigner(designerFromUrl);
+            setLoggedInDesigner(null);
+            setLoggedInUserId(null);
+            setIsLoading(false);
+            return; // 여기서 종료
+          }
+
           if (user && user.emailVerified) {
-            // 인증된 디자이너가 로그인되어 있는 경우
+            // 인증된 디자이너가 로그인되어 있는 경우 (URL 파라미터 없을 때만)
             console.log('✅ 인증된 사용자 로그인:', user.uid);
             
             // Get designer data to get display name
@@ -40,21 +55,11 @@ const App: React.FC = () => {
             
             setLoggedInDesigner(displayName);
             setLoggedInUserId(user.uid);
-            setClientViewDesigner(null); // 디자이너 로그인 시 클라이언트 뷰 해제
+            setClientViewDesigner(null);
             
             // Store in sessionStorage for quick access
             sessionStorage.setItem('hairfolio_designer', JSON.stringify(displayName));
             sessionStorage.setItem('hairfolio_userId', JSON.stringify(user.uid));
-            
-            // URL에서 designer 파라미터 제거 (디자이너 로그인 시)
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.has('designer')) {
-              urlParams.delete('designer');
-              const newUrl = urlParams.toString() 
-                ? `${window.location.pathname}?${urlParams.toString()}`
-                : window.location.pathname;
-              window.history.replaceState({}, document.title, newUrl);
-            }
             
           } else if (user && !user.emailVerified) {
             // User exists but email not verified - will be handled by AuthLogin
@@ -63,30 +68,11 @@ const App: React.FC = () => {
             setLoggedInUserId(null);
             setClientViewDesigner(null);
           } else {
-            // 로그인된 사용자가 없는 경우 - URL 파라미터 확인
-            console.log('ℹ️ 로그인된 사용자 없음 - URL 파라미터 확인');
-            
-            // Check URL for a designer parameter to determine the view mode
-            const urlParams = new URLSearchParams(window.location.search);
-            const designerParam = urlParams.get('designer');
-            
-            // 한글 URL 인코딩 문제 해결: decodeURIComponent로 디코딩
-            const designerFromUrl = designerParam 
-              ? decodeURIComponent(designerParam) 
-              : null;
-
-            if (designerFromUrl) {
-              // Client view mode
-              console.log('URL에서 디자이너명 추출:', designerFromUrl);
-              setClientViewDesigner(designerFromUrl);
-              setLoggedInDesigner(null);
-              setLoggedInUserId(null);
-            } else {
-              // No URL parameter and no logged in user
-              setClientViewDesigner(null);
-              setLoggedInDesigner(null);
-              setLoggedInUserId(null);
-            }
+            // 로그인된 사용자가 없는 경우
+            console.log('ℹ️ 로그인된 사용자 없음');
+            setClientViewDesigner(null);
+            setLoggedInDesigner(null);
+            setLoggedInUserId(null);
             
             // Clean up sessionStorage
             sessionStorage.removeItem('hairfolio_designer');
@@ -168,6 +154,11 @@ const App: React.FC = () => {
     );
   }
 
+  // 🆕 URL 파라미터를 먼저 체크 (최우선 순위)
+  const urlParams = new URLSearchParams(window.location.search);
+  const designerParam = urlParams.get('designer');
+  const designerFromUrl = designerParam ? decodeURIComponent(designerParam) : null;
+
   // sessionStorage에서 직접 확인 (JSON 파싱)
   const storedDesigner = sessionStorage.getItem('hairfolio_designer');
   const storedUserId = sessionStorage.getItem('hairfolio_userId');
@@ -182,42 +173,41 @@ const App: React.FC = () => {
     console.error('SessionStorage 파싱 오류:', e);
   }
 
-  // 디버그 로그
-  console.log('🎯 App 렌더링 상태:', {
-    loggedInDesigner,
-    loggedInUserId,
-    clientViewDesigner,
-    storedDesigner,
-    storedUserId,
-    parsedDesigner,
-    parsedUserId,
-    url: window.location.href
-  });
-
   // sessionStorage 값을 우선으로 사용
   const effectiveDesigner = loggedInDesigner || parsedDesigner;
   const effectiveUserId = loggedInUserId || parsedUserId;
 
-  // 라우팅 로직: 우선순위에 따른 화면 렌더링
+  // 디버그 로그
+  console.log('🎯 App 렌더링 상태:', {
+    designerFromUrl,
+    clientViewDesigner,
+    loggedInDesigner,
+    loggedInUserId,
+    effectiveDesigner,
+    effectiveUserId,
+    url: window.location.href
+  });
+
+  // 🔥 라우팅 로직: URL 파라미터가 최우선!
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-gray-50">
-        {effectiveDesigner && effectiveUserId ? (
-          // 1순위: 디자이너가 로그인되어 있으면 DesignerView
+        {designerFromUrl || clientViewDesigner ? (
+          // 🎯 최우선: URL에 designer 파라미터가 있으면 무조건 ClientView
           <>
-            {console.log('✅ DesignerView 렌더링 중...', { effectiveDesigner, effectiveUserId })}
-            <DesignerView designerName={effectiveUserId} onLogout={handleLogout} />
+            {console.log('👤 ClientView 렌더링 (고객용 링크):', designerFromUrl || clientViewDesigner)}
+            <ClientView designerName={designerFromUrl || clientViewDesigner!} />
           </>
-        ) : clientViewDesigner ? (
-          // 2순위: URL 파라미터로 디자이너가 지정되어 있으면 ClientView
+        ) : effectiveDesigner && effectiveUserId ? (
+          // 2순위: 디자이너가 로그인되어 있으면 DesignerView
           <>
-            {console.log('👤 ClientView 렌더링 중...', { clientViewDesigner })}
-            <ClientView designerName={clientViewDesigner} />
+            {console.log('✅ DesignerView 렌더링:', { effectiveDesigner, effectiveUserId })}
+            <DesignerView designerName={effectiveUserId} onLogout={handleLogout} />
           </>
         ) : (
           // 3순위: 로그인 화면
           <>
-            {console.log('🔐 AuthLogin 렌더링 중...')}
+            {console.log('🔐 AuthLogin 렌더링')}
             <AuthLogin onLogin={handleLogin} />
           </>
         )}
