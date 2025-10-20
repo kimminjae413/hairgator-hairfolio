@@ -1,9 +1,10 @@
-// src/components/AuthLogin.tsx - 국제화 적용
+// src/components/AuthLogin.tsx - 완전한 최종 버전 (디자이너 + 일반 사용자)
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as firebaseService from '../services/firebaseService';
 import * as authService from '../services/firebaseAuthService';
 import { User } from 'firebase/auth';
+import { UserType } from '../types';
 import { portfolioImages } from '../portfolioImages';
 import LanguageSelector from './LanguageSelector';
 
@@ -11,15 +12,16 @@ interface AuthLoginProps {
   onLogin: (name: string, userId: string) => void;
 }
 
-type Mode = 'login' | 'signup-step1' | 'signup-step2' | 'verify-email';
+type Mode = 'login' | 'signup-select-type' | 'signup-step1' | 'signup-step2' | 'verify-email';
 
 const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
   const { t } = useTranslation();
   const [mode, setMode] = useState<Mode>('login');
+  const [userType, setUserType] = useState<UserType>('designer'); // 신규: 사용자 타입
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [designerName, setDesignerName] = useState('');
+  const [name, setName] = useState(''); // designerName에서 name으로 변경
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingUser, setPendingUser] = useState<User | null>(null);
@@ -31,16 +33,25 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
   const handleModeChange = (newMode: Mode) => {
     setMode(newMode);
     setError(null);
-    setEmail('');
-    setPassword('');
-    setConfirmPassword('');
-    setDesignerName('');
-    setShowPassword(false);
-    setShowConfirmPassword(false);
-    setEmailVerified(false);
+    if (newMode === 'login' || newMode === 'signup-select-type') {
+      setEmail('');
+      setPassword('');
+      setConfirmPassword('');
+      setName('');
+      setShowPassword(false);
+      setShowConfirmPassword(false);
+      setEmailVerified(false);
+      setUserType('designer');
+    }
   };
 
-  // Step 1: 이메일 유효성 확인
+  // Step 0: 사용자 타입 선택 (신규)
+  const handleSelectUserType = (type: UserType) => {
+    setUserType(type);
+    setMode('signup-step1');
+  };
+
+  // Step 1: 이메일 & 이름 확인
   const handleCheckEmail = async () => {
     setError(null);
     setIsCheckingEmail(true);
@@ -50,7 +61,7 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
         throw new Error(t('auth.invalidEmailFormat'));
       }
 
-      const nameValidation = authService.isValidDesignerName(designerName);
+      const nameValidation = authService.isValidName(name);
       if (!nameValidation.valid) {
         throw new Error(nameValidation.message);
       }
@@ -94,10 +105,19 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
         return;
       }
 
-      const designerData = await firebaseService.getDesignerData(user.uid);
-      const displayName = user.displayName || designerData.profile?.name || t('common.designer');
+      // 사용자 타입 확인
+      const userData = await firebaseService.getUser(user.uid);
+      const currentUserType = userData?.userType || 'designer';
+
+      if (currentUserType === 'designer') {
+        const designerData = await firebaseService.getDesignerDataById(user.uid);
+        const displayName = user.displayName || designerData.profile?.name || t('common.designer');
+        onLogin(displayName, user.uid);
+      } else {
+        const displayName = user.displayName || t('common.client', '사용자');
+        onLogin(displayName, user.uid);
+      }
       
-      onLogin(displayName, user.uid);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('auth.loginError'));
     } finally {
@@ -121,8 +141,10 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
         throw new Error(t('auth.passwordMismatch'));
       }
 
-      const trimmedName = designerName.trim();
-      const result = await authService.signUpWithEmail(email, password, trimmedName);
+      const trimmedName = name.trim();
+      
+      // 회원가입 (사용자 타입 포함)
+      const result = await authService.signUpWithEmail(email, password, trimmedName, userType);
       
       if (!result.success || !result.user) {
         if (result.error?.includes('이미 사용 중인 이메일')) {
@@ -132,16 +154,6 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
       }
 
       const user = result.user;
-      const success = await firebaseService.savePortfolio(user.uid, portfolioImages);
-      
-      if (!success) {
-        throw new Error(t('auth.portfolioCreationFailed'));
-      }
-
-      await firebaseService.saveDesignerProfile(user.uid, {
-        name: trimmedName
-      });
-
       setPendingUser(user);
       setMode('verify-email');
       
@@ -187,10 +199,18 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
         throw new Error(t('auth.userNotFound'));
       }
 
-      const designerData = await firebaseService.getDesignerData(user.uid);
-      const displayName = user.displayName || designerData.profile?.name || t('common.designer');
+      const userData = await firebaseService.getUser(user.uid);
+      const currentUserType = userData?.userType || 'designer';
       
-      onLogin(displayName, user.uid);
+      if (currentUserType === 'designer') {
+        const designerData = await firebaseService.getDesignerDataById(user.uid);
+        const displayName = user.displayName || designerData.profile?.name || t('common.designer');
+        onLogin(displayName, user.uid);
+      } else {
+        const displayName = user.displayName || t('common.client', '사용자');
+        onLogin(displayName, user.uid);
+      }
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : t('auth.verificationCheckError'));
     } finally {
@@ -202,11 +222,10 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
   const activeTabStyle = "text-indigo-600 border-b-2 border-indigo-600";
   const inactiveTabStyle = "text-gray-500 hover:text-gray-700";
 
-  // Email Verification Screen (Step 3)
+  // Email Verification Screen
   if (mode === 'verify-email') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex flex-col items-center justify-center p-4 font-sans">
-        {/* Language Selector */}
         <div className="absolute top-4 right-4">
           <LanguageSelector />
         </div>
@@ -302,11 +321,89 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
     );
   }
 
+  // 사용자 타입 선택 화면 (신규)
+  if (mode === 'signup-select-type') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex flex-col items-center justify-center p-4">
+        <div className="absolute top-4 right-4">
+          <LanguageSelector />
+        </div>
+
+        <div className="w-full max-w-2xl mx-auto">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-2xl mb-4">
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h1 className="text-4xl font-bold text-gray-800 tracking-tight">Hairfolio</h1>
+            <p className="text-lg text-gray-600 mt-2">{t('auth.platformSubtitle')}</p>
+          </div>
+
+          <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">가입 유형을 선택하세요</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* 디자이너 가입 */}
+              <button
+                onClick={() => handleSelectUserType('designer')}
+                className="p-6 border-2 border-indigo-200 rounded-xl hover:border-indigo-600 hover:bg-indigo-50 transition-all group"
+              >
+                <div className="text-center">
+                  <div className="text-5xl mb-4">✂️</div>
+                  <h3 className="text-xl font-bold text-gray-800 mb-2">헤어 디자이너</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    포트폴리오를 만들고<br />
+                    고객들과 공유하세요
+                  </p>
+                  <ul className="text-xs text-gray-500 space-y-1 text-left">
+                    <li>✓ AI 가상 체험 제공</li>
+                    <li>✓ QR 코드로 간편 공유</li>
+                    <li>✓ 분석 리포트 제공</li>
+                  </ul>
+                </div>
+              </button>
+
+              {/* 일반 사용자 가입 */}
+              <button
+                onClick={() => handleSelectUserType('client')}
+                className="p-6 border-2 border-purple-200 rounded-xl hover:border-purple-600 hover:bg-purple-50 transition-all group"
+              >
+                <div className="text-center">
+                  <div className="text-5xl mb-4">👤</div>
+                  <h3 className="text-xl font-bold text-gray-800 mb-2">일반 사용자</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    헤어스타일을 찾고<br />
+                    AI로 미리 체험해보세요
+                  </p>
+                  <ul className="text-xs text-gray-500 space-y-1 text-left">
+                    <li>✓ 전체 포트폴리오 탐색</li>
+                    <li>✓ 얼굴형 맞춤 추천</li>
+                    <li>✓ 위치 기반 검색</li>
+                  </ul>
+                </div>
+              </button>
+            </div>
+
+            <div className="mt-6 pt-6 border-t border-gray-200 text-center">
+              <p className="text-sm text-gray-600 mb-2">{t('auth.alreadyHaveAccount')}</p>
+              <button
+                onClick={() => handleModeChange('login')}
+                className="text-indigo-600 hover:text-indigo-700 font-medium text-sm transition-colors"
+              >
+                {t('auth.loginButton')} →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Signup Step 2: Password Setting
   if (mode === 'signup-step2') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex flex-col items-center justify-center p-4 font-sans">
-        {/* Language Selector */}
         <div className="absolute top-4 right-4">
           <LanguageSelector />
         </div>
@@ -338,7 +435,6 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
             </div>
 
             <form onSubmit={handleSignup} className="space-y-4">
-              {/* Password */}
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                   {t('auth.password')} *
@@ -376,7 +472,6 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
                 </div>
               </div>
 
-              {/* Confirm Password */}
               <div>
                 <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 mb-2">
                   {t('auth.confirmPassword')} *
@@ -414,7 +509,6 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
                 </div>
               </div>
 
-              {/* Error Message */}
               {error && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                   <div className="flex items-center">
@@ -426,7 +520,6 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
                 </div>
               )}
 
-              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={isLoading}
@@ -447,7 +540,6 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
                 )}
               </button>
 
-              {/* Back Button */}
               <button
                 type="button"
                 onClick={() => handleModeChange('signup-step1')}
@@ -466,7 +558,6 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
   // Login / Signup Step 1 Screen
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex flex-col items-center justify-center p-4 font-sans">
-      {/* Language Selector */}
       <div className="absolute top-4 right-4">
         <LanguageSelector />
       </div>
@@ -493,7 +584,7 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
               {t('auth.login')}
             </button>
             <button
-              onClick={() => handleModeChange('signup-step1')}
+              onClick={() => handleModeChange('signup-select-type')}
               className={`${tabStyle} ${mode === 'signup-step1' ? activeTabStyle : inactiveTabStyle}`}
               disabled={isLoading || isCheckingEmail}
             >
@@ -503,40 +594,45 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
 
           {/* Form Header */}
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              {mode === 'login' ? t('auth.portfolioManagement') : t('auth.createNewPortfolio')}
-            </h2>
-            <p className="text-gray-500">
-              {mode === 'login' ? t('auth.loginDesc') : t('auth.signupDesc')}
-            </p>
+            {mode === 'login' ? (
+              <>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">{t('auth.login')}</h2>
+                <p className="text-gray-500">{t('auth.loginDesc')}</p>
+              </>
+            ) : (
+              <>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                  {userType === 'designer' ? '디자이너 회원가입' : '일반 회원가입'}
+                </h2>
+                <p className="text-gray-500">이메일과 이름을 입력하세요</p>
+              </>
+            )}
           </div>
 
           {/* Form */}
           <form onSubmit={mode === 'login' ? handleLogin : (e) => { e.preventDefault(); handleCheckEmail(); }} className="space-y-4">
-            {/* Designer Name (Signup Step 1 only) */}
             {mode === 'signup-step1' && (
               <div>
-                <label htmlFor="designer-name" className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('auth.designerName')} *
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                  {userType === 'designer' ? t('auth.designerName') : '이름'} *
                 </label>
                 <input
-                  id="designer-name"
+                  id="name"
                   type="text"
-                  value={designerName}
-                  onChange={(e) => setDesignerName(e.target.value)}
-                  placeholder={t('auth.designerNamePlaceholder')}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={userType === 'designer' ? t('auth.designerNamePlaceholder') : '홍길동'}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
                   required
                   disabled={isLoading || isCheckingEmail}
                   maxLength={30}
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  {t('auth.designerNameNote')}
-                </p>
+                {userType === 'designer' && (
+                  <p className="text-xs text-gray-500 mt-1">{t('auth.designerNameNote')}</p>
+                )}
               </div>
             )}
 
-            {/* Email */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                 {t('auth.emailAddress')} *
@@ -554,7 +650,6 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
               />
             </div>
 
-            {/* Password (Login only) */}
             {mode === 'login' && (
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
@@ -594,7 +689,6 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
               </div>
             )}
 
-            {/* Error Message */}
             {error && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                 <div className="flex items-center">
@@ -606,7 +700,6 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
               </div>
             )}
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={isLoading || isCheckingEmail}
@@ -619,7 +712,7 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
                 </>
               ) : (
                 <>
-                  {mode === 'login' ? t('auth.login') : t('auth.verifyEmail')}
+                  {mode === 'login' ? t('auth.login') : '다음'}
                   <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                   </svg>
@@ -634,7 +727,7 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
               <div className="text-center">
                 <p className="text-sm text-gray-600 mb-2">{t('auth.firstTime')}</p>
                 <button
-                  onClick={() => handleModeChange('signup-step1')}
+                  onClick={() => handleModeChange('signup-select-type')}
                   className="text-indigo-600 hover:text-indigo-700 font-medium text-sm transition-colors"
                   disabled={isLoading || isCheckingEmail}
                 >
@@ -678,9 +771,7 @@ const AuthLogin: React.FC<AuthLoginProps> = ({ onLogin }) => {
         {/* Footer */}
         <footer className="text-center mt-8">
           <p className="text-sm text-gray-500">{t('auth.poweredBy')}</p>
-          <p className="text-xs text-gray-400 mt-1">
-            {t('auth.copyright')}
-          </p>
+          <p className="text-xs text-gray-400 mt-1">{t('auth.copyright')}</p>
         </footer>
       </div>
     </div>
