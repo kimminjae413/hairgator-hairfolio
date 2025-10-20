@@ -294,18 +294,16 @@ const App: React.FC = () => {
             {console.log('👤 ClientView 렌더링 (포트폴리오 보기):', designerFromUrl || clientViewDesigner)}
             <ClientView designerName={designerFromUrl || clientViewDesigner!} />
           </>
-        ) 
-        
-        {/* 2순위: 디자이너 로그인 */}
-        : effectiveUserType === 'designer' && effectiveDesigner && effectiveUserId ? (
+        ) : 
+        // 2순위: 디자이너 로그인
+        effectiveUserType === 'designer' && effectiveDesigner && effectiveUserId ? (
           <>
             {console.log('✅ DesignerView 렌더링:', { effectiveDesigner, effectiveUserId })}
             <DesignerView designerName={effectiveUserId} onLogout={handleLogout} />
           </>
-        ) 
-        
-        {/* 3순위: 일반 사용자 로그인 (신규) */}
-        : effectiveUserType === 'client' && effectiveClient ? (
+        ) : 
+        // 3순위: 일반 사용자 로그인 (신규)
+        effectiveUserType === 'client' && effectiveClient ? (
           <>
             {console.log('✅ ClientHomeView 렌더링:', effectiveClient)}
             <ClientHomeView 
@@ -314,10 +312,9 @@ const App: React.FC = () => {
               onLogout={handleLogout} 
             />
           </>
-        ) 
-        
-        {/* 4순위: 로그인 화면 */}
-        : (
+        ) : 
+        // 4순위: 로그인 화면
+        (
           <>
             {console.log('🔐 AuthLogin 렌더링')}
             <AuthLogin onLogin={handleLogin} />
