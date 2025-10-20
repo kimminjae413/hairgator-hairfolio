@@ -187,6 +187,19 @@ export const getUser = async (userId: string): Promise<User | null> => {
 };
 
 /**
+ * 사용자 타입 조회 (간편 함수) - 🆕 추가!
+ */
+export const getUserType = async (userId: string): Promise<UserType | null> => {
+  try {
+    const user = await getUser(userId);
+    return user?.userType || null;
+  } catch (error) {
+    console.error('❌ Error getting user type:', error);
+    return null;
+  }
+};
+
+/**
  * 일반 사용자 프로필 저장
  */
 export const saveClientProfile = async (profile: ClientProfile): Promise<boolean> => {
