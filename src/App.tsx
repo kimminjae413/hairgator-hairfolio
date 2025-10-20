@@ -1,106 +1,163 @@
-// src/App.tsx - Firebase Authentication + i18n 적용 (수정된 라우팅 로직)
+// src/App.tsx - 완전한 최종 버전 (디자이너 + 일반 사용자)
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as firebaseService from './services/firebaseService';
 import * as authService from './services/firebaseAuthService';
+import { UserType } from './types';
 import ClientView from './components/ClientView';
 import DesignerView from './components/DesignerView';
+import ClientHomeView from './components/ClientHomeView'; // 신규: 일반 사용자 홈
 import AuthLogin from './components/AuthLogin';
 import ErrorBoundary from './components/ErrorBoundary';
-import './i18n'; // i18n 초기화
+import './i18n';
 
 const App: React.FC = () => {
-  const { t, ready } = useTranslation(); // i18n 준비 상태 확인
+  const { t, ready } = useTranslation();
+  
+  // 디자이너 상태
   const [loggedInDesigner, setLoggedInDesigner] = useState<string | null>(null);
   const [loggedInUserId, setLoggedInUserId] = useState<string | null>(null);
+  
+  // 일반 사용자 상태 (신규)
+  const [loggedInClient, setLoggedInClient] = useState<{
+    userId: string;
+    name: string;
+  } | null>(null);
+  
+  // 사용자 타입 (신규)
+  const [userType, setUserType] = useState<UserType | null>(null);
+  
+  // 고객용 포트폴리오 뷰 (URL 파라미터로 접근)
   const [clientViewDesigner, setClientViewDesigner] = useState<string | null>(null);
+  
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        // i18n이 준비될 때까지 대기
         if (!ready) return;
 
-        // Initialize Firebase Auth
+        // Initialize Firebase Auth & Database
         authService.initializeAuth();
-        
-        // Initialize Firebase with sample data
         await firebaseService.initializeDB();
 
-        // 🆕 URL 파라미터를 먼저 확인 (고객용 링크 우선 처리)
+        // URL 파라미터 확인 (고객용 포트폴리오 링크)
         const urlParams = new URLSearchParams(window.location.search);
         const designerParam = urlParams.get('designer');
         const designerFromUrl = designerParam ? decodeURIComponent(designerParam) : null;
 
-        // Firebase Auth 상태 확인
+        // Firebase Auth 상태 리스너
         const unsubscribe = authService.onAuthStateChange(async (user) => {
-          // 🔥 중요: URL에 designer 파라미터가 있으면 무조건 ClientView로 이동
+          // 🔥 최우선: URL에 designer 파라미터가 있으면 ClientView (포트폴리오 보기)
           if (designerFromUrl) {
-            console.log('🎯 고객용 링크 접속 감지:', designerFromUrl);
+            console.log('🎯 고객용 포트폴리오 링크:', designerFromUrl);
             setClientViewDesigner(designerFromUrl);
             setLoggedInDesigner(null);
             setLoggedInUserId(null);
+            setLoggedInClient(null);
+            setUserType(null);
             setIsLoading(false);
-            return; // 여기서 종료
+            return;
           }
 
           if (user && user.emailVerified) {
-            // 인증된 디자이너가 로그인되어 있는 경우 (URL 파라미터 없을 때만)
-            console.log('✅ 인증된 사용자 로그인:', user.uid);
+            // 인증된 사용자 로그인
+            console.log('✅ 인증된 사용자:', user.uid);
             
-            // Get designer data to get display name
-            const designerData = await firebaseService.getDesignerData(user.uid);
-            const displayName = user.displayName || designerData.profile?.name || t('common.designer', '디자이너');
-            
-            setLoggedInDesigner(displayName);
-            setLoggedInUserId(user.uid);
-            setClientViewDesigner(null);
-            
-            // Store in sessionStorage for quick access
-            sessionStorage.setItem('hairfolio_designer', JSON.stringify(displayName));
-            sessionStorage.setItem('hairfolio_userId', JSON.stringify(user.uid));
+            // Firestore에서 사용자 타입 조회
+            const userData = await firebaseService.getUser(user.uid);
+            const currentUserType = userData?.userType || 'designer'; // 기본값: designer
+
+            setUserType(currentUserType);
+
+            if (currentUserType === 'designer') {
+              // 디자이너 로그인
+              const designerData = await firebaseService.getDesignerDataById(user.uid);
+              const displayName = user.displayName || designerData.profile?.name || t('common.designer');
+              
+              setLoggedInDesigner(displayName);
+              setLoggedInUserId(user.uid);
+              setLoggedInClient(null);
+              
+              sessionStorage.setItem('hairfolio_designer', JSON.stringify(displayName));
+              sessionStorage.setItem('hairfolio_userId', JSON.stringify(user.uid));
+              sessionStorage.setItem('hairfolio_userType', 'designer');
+              
+              console.log('✅ 디자이너 로그인:', displayName);
+              
+            } else if (currentUserType === 'client') {
+              // 일반 사용자 로그인
+              const clientProfile = await firebaseService.getClientProfile(user.uid);
+              const displayName = user.displayName || clientProfile?.name || t('common.client', '사용자');
+              
+              setLoggedInClient({
+                userId: user.uid,
+                name: displayName
+              });
+              setLoggedInDesigner(null);
+              setLoggedInUserId(null);
+              
+              sessionStorage.setItem('hairfolio_clientId', user.uid);
+              sessionStorage.setItem('hairfolio_clientName', displayName);
+              sessionStorage.setItem('hairfolio_userType', 'client');
+              
+              console.log('✅ 일반 사용자 로그인:', displayName);
+            }
             
           } else if (user && !user.emailVerified) {
-            // User exists but email not verified - will be handled by AuthLogin
-            console.log('⚠️ 이메일 미인증 사용자:', user.email);
+            // 이메일 미인증
+            console.log('⚠️ 이메일 미인증:', user.email);
             setLoggedInDesigner(null);
             setLoggedInUserId(null);
-            setClientViewDesigner(null);
-          } else {
-            // 로그인된 사용자가 없는 경우
-            console.log('ℹ️ 로그인된 사용자 없음');
-            setClientViewDesigner(null);
-            setLoggedInDesigner(null);
-            setLoggedInUserId(null);
+            setLoggedInClient(null);
+            setUserType(null);
             
-            // Clean up sessionStorage
+          } else {
+            // 로그아웃 상태
+            console.log('ℹ️ 로그인된 사용자 없음');
+            setLoggedInDesigner(null);
+            setLoggedInUserId(null);
+            setLoggedInClient(null);
+            setUserType(null);
+            setClientViewDesigner(null);
+            
+            // 세션 정리
             sessionStorage.removeItem('hairfolio_designer');
             sessionStorage.removeItem('hairfolio_userId');
+            sessionStorage.removeItem('hairfolio_clientId');
+            sessionStorage.removeItem('hairfolio_clientName');
+            sessionStorage.removeItem('hairfolio_userType');
           }
+          
           setIsLoading(false);
         });
 
-        // Cleanup subscription on unmount
         return () => unsubscribe();
       } catch (error) {
-        console.error('❌ Error initializing app:', error);
+        console.error('❌ App 초기화 오류:', error);
         setIsLoading(false);
       }
     };
 
     initializeApp();
-  }, [ready, t]); // ready와 t 의존성 추가
+  }, [ready, t]);
 
+  /**
+   * 로그인 핸들러 (디자이너용 - 하위 호환성)
+   */
   const handleLogin = (name: string, userId: string) => {
     if (name.trim() && userId) {
       setLoggedInDesigner(name.trim());
       setLoggedInUserId(userId);
-      setClientViewDesigner(null); // 로그인 시 클라이언트 뷰 해제
+      setLoggedInClient(null);
+      setUserType('designer');
+      setClientViewDesigner(null);
+      
       sessionStorage.setItem('hairfolio_designer', JSON.stringify(name.trim()));
       sessionStorage.setItem('hairfolio_userId', JSON.stringify(userId));
+      sessionStorage.setItem('hairfolio_userType', 'designer');
       
-      // URL에서 designer 파라미터 제거 (로그인 성공 시)
+      // URL 파라미터 제거
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.has('designer')) {
         urlParams.delete('designer');
@@ -112,19 +169,28 @@ const App: React.FC = () => {
     }
   };
 
+  /**
+   * 로그아웃 핸들러
+   */
   const handleLogout = async () => {
     try {
-      // Sign out from Firebase Auth
       const result = await authService.signOutUser();
       
       if (result.success) {
         setLoggedInDesigner(null);
         setLoggedInUserId(null);
+        setLoggedInClient(null);
+        setUserType(null);
         setClientViewDesigner(null);
+        
+        // 세션 정리
         sessionStorage.removeItem('hairfolio_designer');
         sessionStorage.removeItem('hairfolio_userId');
+        sessionStorage.removeItem('hairfolio_clientId');
+        sessionStorage.removeItem('hairfolio_clientName');
+        sessionStorage.removeItem('hairfolio_userType');
         
-        // Clear URL parameters if any
+        // URL 파라미터 제거
         if (window.location.search) {
           window.history.replaceState({}, document.title, window.location.pathname);
         }
@@ -140,28 +206,29 @@ const App: React.FC = () => {
     }
   };
 
-  // i18n이 준비되지 않았으면 로딩 표시
+  // 로딩 화면
   if (!ready || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
           <p className="text-gray-600">
-            {!ready ? t('common.initializingLanguage', '언어 설정 초기화 중...') : t('common.initializingFirebase', 'Firebase 초기화 중...')}
+            {!ready 
+              ? t('common.initializingLanguage', '언어 설정 초기화 중...') 
+              : t('common.initializingFirebase', 'Firebase 초기화 중...')
+            }
           </p>
         </div>
       </div>
     );
   }
 
-  // 🆕 URL 파라미터를 먼저 체크 (최우선 순위)
-  const urlParams = new URLSearchParams(window.location.search);
-  const designerParam = urlParams.get('designer');
-  const designerFromUrl = designerParam ? decodeURIComponent(designerParam) : null;
-
-  // sessionStorage에서 직접 확인 (JSON 파싱)
+  // SessionStorage 백업 (새로고침 대응)
   const storedDesigner = sessionStorage.getItem('hairfolio_designer');
   const storedUserId = sessionStorage.getItem('hairfolio_userId');
+  const storedClientId = sessionStorage.getItem('hairfolio_clientId');
+  const storedClientName = sessionStorage.getItem('hairfolio_clientName');
+  const storedUserType = sessionStorage.getItem('hairfolio_userType') as UserType | null;
   
   let parsedDesigner = null;
   let parsedUserId = null;
@@ -173,39 +240,65 @@ const App: React.FC = () => {
     console.error('SessionStorage 파싱 오류:', e);
   }
 
-  // sessionStorage 값을 우선으로 사용
+  // 최종 상태 결정
   const effectiveDesigner = loggedInDesigner || parsedDesigner;
   const effectiveUserId = loggedInUserId || parsedUserId;
+  const effectiveClient = loggedInClient || (storedClientId && storedClientName ? {
+    userId: storedClientId,
+    name: storedClientName
+  } : null);
+  const effectiveUserType = userType || storedUserType;
+
+  // URL 파라미터 재확인
+  const urlParams = new URLSearchParams(window.location.search);
+  const designerParam = urlParams.get('designer');
+  const designerFromUrl = designerParam ? decodeURIComponent(designerParam) : null;
 
   // 디버그 로그
   console.log('🎯 App 렌더링 상태:', {
     designerFromUrl,
     clientViewDesigner,
-    loggedInDesigner,
-    loggedInUserId,
+    effectiveUserType,
     effectiveDesigner,
     effectiveUserId,
+    effectiveClient,
     url: window.location.href
   });
 
-  // 🔥 라우팅 로직: URL 파라미터가 최우선!
+  // 🔥 라우팅 로직
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-gray-50">
-        {designerFromUrl || clientViewDesigner ? (
-          // 🎯 최우선: URL에 designer 파라미터가 있으면 무조건 ClientView
+        {/* 1순위: URL 파라미터 (고객용 포트폴리오 링크) */}
+        {(designerFromUrl || clientViewDesigner) ? (
           <>
-            {console.log('👤 ClientView 렌더링 (고객용 링크):', designerFromUrl || clientViewDesigner)}
+            {console.log('👤 ClientView 렌더링 (포트폴리오 보기):', designerFromUrl || clientViewDesigner)}
             <ClientView designerName={designerFromUrl || clientViewDesigner!} />
           </>
-        ) : effectiveDesigner && effectiveUserId ? (
-          // 2순위: 디자이너가 로그인되어 있으면 DesignerView
+        ) 
+        
+        {/* 2순위: 디자이너 로그인 */}
+        : effectiveUserType === 'designer' && effectiveDesigner && effectiveUserId ? (
           <>
             {console.log('✅ DesignerView 렌더링:', { effectiveDesigner, effectiveUserId })}
             <DesignerView designerName={effectiveUserId} onLogout={handleLogout} />
           </>
-        ) : (
-          // 3순위: 로그인 화면
+        ) 
+        
+        {/* 3순위: 일반 사용자 로그인 (신규) */}
+        : effectiveUserType === 'client' && effectiveClient ? (
+          <>
+            {console.log('✅ ClientHomeView 렌더링:', effectiveClient)}
+            <ClientHomeView 
+              userId={effectiveClient.userId} 
+              userName={effectiveClient.name}
+              onLogout={handleLogout} 
+            />
+          </>
+        ) 
+        
+        {/* 4순위: 로그인 화면 */}
+        : (
           <>
             {console.log('🔐 AuthLogin 렌더링')}
             <AuthLogin onLogin={handleLogin} />
