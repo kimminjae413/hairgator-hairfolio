@@ -1,8 +1,100 @@
+// src/types.ts - 완전한 최종 버전 (일반 사용자 기능 포함)
+
 // Loading states for UI components
 export type LoadingState = 'idle' | 'analyzing' | 'generating' | 'error' | 'done';
 
 // Gender types for hairstyle categorization
 export type Gender = 'Female' | 'Male';
+
+// ===== USER MANAGEMENT TYPES (신규 추가) =====
+
+/**
+ * 사용자 유형 (디자이너 / 일반 사용자)
+ */
+export type UserType = 'designer' | 'client';
+
+/**
+ * 사용자 기본 정보
+ */
+export interface User {
+  userId: string;           // Firebase Auth UID
+  userType: UserType;       // 사용자 유형
+  email: string;            // 이메일
+  displayName: string;      // 표시 이름
+  emailVerified: boolean;   // 이메일 인증 여부
+  createdAt: string;        // 가입일
+  updatedAt: string;        // 수정일
+}
+
+/**
+ * 일반 사용자(고객) 프로필
+ */
+export interface ClientProfile {
+  userId: string;
+  name: string;
+  email: string;
+  phone?: string;
+  profileImage?: string;
+  location?: {
+    address?: string;        // 주소
+    coordinates?: {
+      latitude: number;      // 위도
+      longitude: number;     // 경도
+    };
+  };
+  preferences?: {
+    faceShape?: FaceShapeType;         // 얼굴형
+    personalColor?: PersonalColorType; // 퍼스널 컬러
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * 찜하기 정보
+ */
+export interface Favorite {
+  id: string;                // 찜하기 ID
+  userId: string;            // 사용자 ID
+  designerId: string;        // 디자이너 ID (Firebase UID)
+  designerName: string;      // 디자이너 이름
+  styleId: string;           // 스타일 ID
+  styleName: string;         // 스타일 이름
+  styleImageUrl: string;     // 스타일 이미지 URL
+  createdAt: string;         // 찜한 시간
+}
+
+/**
+ * 검색 기록
+ */
+export interface SearchHistory {
+  id: string;
+  userId: string;
+  query: string;             // 검색어
+  filters?: {
+    gender?: Gender;
+    serviceCategory?: ServiceMajorCategory;
+    faceShape?: FaceShapeType;
+    location?: string;
+  };
+  createdAt: string;
+}
+
+/**
+ * 가상 체험 기록
+ */
+export interface TryOnHistory {
+  id: string;
+  userId: string;
+  designerId: string;
+  designerName: string;
+  styleId: string;
+  styleName: string;
+  originalImageUrl: string;  // 원본 얼굴 사진
+  resultImageUrl: string;    // 변환 결과
+  faceAnalysis?: FaceAnalysis;
+  createdAt: string;
+}
 
 // ===== NEW SERVICE-BASED CATEGORY SYSTEM =====
 // Service-based major categories (required selection)
@@ -202,7 +294,7 @@ export interface Hairstyle {
   description?: string;                                // Optional description
   tags?: string[];                                     // Optional tags for searching
   uploadedAt?: Date;                                   // When it was uploaded
-  uploadedBy?: string;                                 // Who uploaded it
+  uploadedBy?: string;                                 // Who uploaded it (디자이너 ID 추가)
   createdAt?: string;                                  // ISO date string
   updatedAt?: string;                                  // ISO date string
 }
@@ -237,6 +329,10 @@ export interface DesignerProfile {
   location?: string;
   address?: string;
   profileImage?: string;                              // Profile image URL
+  coordinates?: {                                     // 위치 기반 필터링용 좌표 (신규 추가)
+    latitude: number;
+    longitude: number;
+  };
   socialLinks?: {
     instagram?: string;
     facebook?: string;
@@ -770,7 +866,14 @@ export const STORAGE_KEYS = {
   SESSION_DESIGNER: 'hairfolio_designer',
   VISIT_TRACKING: 'hairfolio_visit_tracked',
   SETTINGS: 'hairfolio_settings',
-  FACE_ANALYSIS: 'hairfolio_face_analysis'
+  FACE_ANALYSIS: 'hairfolio_face_analysis',
+  // 신규 추가: 사용자 관련
+  USER_TYPE: 'hairfolio_user_type',
+  USER_ID: 'hairfolio_user_id',
+  CLIENT_PROFILE: 'hairfolio_client_profile',
+  FAVORITES: 'hairfolio_favorites',
+  SEARCH_HISTORY: 'hairfolio_search_history',
+  TRYON_HISTORY: 'hairfolio_tryon_history'
 } as const;
 
 // API endpoints and configuration
