@@ -90,21 +90,17 @@ class GeminiColorTryOnService {
       try {
         let cleanText = text.trim();
         
-        // 1단계: ```json ... ``` 블록 제거
         const jsonBlockMatch = cleanText.match(/```json\s*([\s\S]*?)\s*```/);
         if (jsonBlockMatch && jsonBlockMatch[1]) {
           cleanText = jsonBlockMatch[1].trim();
         } else {
-          // 2단계: ``` ... ``` 블록 제거
           const codeBlockMatch = cleanText.match(/```\s*([\s\S]*?)\s*```/);
           if (codeBlockMatch && codeBlockMatch[1]) {
             cleanText = codeBlockMatch[1].trim();
-            // "json" 키워드 제거
             cleanText = cleanText.replace(/^json\s*\n?/i, '');
           }
         }
 
-        // 3단계: { ... } 추출
         const jsonStart = cleanText.indexOf('{');
         const jsonEnd = cleanText.lastIndexOf('}');
         
@@ -112,9 +108,7 @@ class GeminiColorTryOnService {
           cleanText = cleanText.substring(jsonStart, jsonEnd + 1);
         }
 
-        // 4단계: 줄바꿈 및 공백 정리
         cleanText = cleanText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-
         console.log('🔧 정리된 JSON:', cleanText.substring(0, 200) + '...');
         
         return JSON.parse(cleanText);
@@ -137,42 +131,13 @@ class GeminiColorTryOnService {
         return this.createDemoResult(request, startTime);
       }
 
-      // 🆕 Gemini Vision으로 포트폴리오 이미지의 헤어 색상 분석
       const colorAnalysis = await this.analyzeColorStyleWithGemini(request.colorStyleUrl);
       apiCallsUsed++;
       
-      // 🆕 피부톤에 따른 추천 헤어 색상
-  private getRecommendedColorsBySkinTone(skinToneType: string): string[] {
-    const colorRecommendations = {
-      'warm': [
-        "#8B4513", // 웜 브라운
-        "#C49A6C", // 캐러멜
-        "#D2691E"  // 초콜릿
-      ],
-      'cool': [
-        "#4A4A4A", // 애쉬 브라운
-        "#8B7D7B", // 애쉬 그레이
-        "#B8A99A"  // 쿨 베이지
-      ],
-      'neutral': [
-        "#8B4513", // 내추럴 브라운
-        "#A0522D", // 시에나 브라운
-        "#C49A6C"  // 밀크 캐러멜
-      ]
-    };
-
-    return colorRecommendations[skinToneType as keyof typeof colorRecommendations] 
-      || colorRecommendations['neutral'];
-  }
-
-  // 🆕 Gemini Vision으로 사용자 사진 분석 (헤어 + 피부톤)
-  private async analyzeUserPhotoForHairAndSkinTone(userPhotoUrl: string): Promise<{ hairAnalysis: HairAnalysis, skinToneAnalysis: SkinToneAnalysis }> {
       const { hairAnalysis, skinToneAnalysis } = await this.analyzeUserPhotoForHairAndSkinTone(request.userPhotoUrl);
       apiCallsUsed++;
 
-      // 🆕 포트폴리오 색상 분석이 실패했다면, 사용자 피부톤에 맞는 추천 색상 사용
       if (colorAnalysis.dominantColors.includes("#8B4513") && colorAnalysis.technique === "full-color") {
-        // 폴백 기본값인 경우 (분석 실패), 피부톤에 맞는 색상으로 교체
         const recommendedColors = this.getRecommendedColorsBySkinTone(skinToneAnalysis.type);
         colorAnalysis.dominantColors = recommendedColors;
         console.log(`🎨 피부톤 ${skinToneAnalysis.type}에 맞는 추천 색상 적용:`, recommendedColors);
@@ -221,92 +186,16 @@ class GeminiColorTryOnService {
     }
   }
 
-  // 🆕 피부톤에 따른 추천 헤어 색상
   private getRecommendedColorsBySkinTone(skinToneType: string): string[] {
     const colorRecommendations = {
-      'warm': [
-        "#8B4513", // 웜 브라운
-        "#C49A6C", // 캐러멜
-        "#D2691E"  // 초콜릿
-      ],
-      'cool': [
-        "#4A4A4A", // 애쉬 브라운
-        "#8B7D7B", // 애쉬 그레이
-        "#B8A99A"  // 쿨 베이지
-      ],
-      'neutral': [
-        "#8B4513", // 내추럴 브라운
-        "#A0522D", // 시에나 브라운
-        "#C49A6C"  // 밀크 캐러멜
-      ]
+      'warm': ["#8B4513", "#C49A6C", "#D2691E"],
+      'cool': ["#4A4A4A", "#8B7D7B", "#B8A99A"],
+      'neutral': ["#8B4513", "#A0522D", "#C49A6C"]
     };
 
-    return colorRecommendations[skinToneType as keyof typeof colorRecommendations] 
-      || colorRecommendations['neutral'];
+    return colorRecommendations[skinToneType as keyof typeof colorRecommendations] || colorRecommendations['neutral'];
   }
 
-  private createDemoResult(request: ColorTryOnRequest, startTime: number): ColorTryOnResult {
-    const processingTime = Date.now() - startTime + 2500;
-    
-    const demoResults = {
-      'highlight': {
-        resultImageUrl: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=400&h=600&fit=crop',
-        dominantColors: ['#D4AF37', '#F4E4BC'],
-        skinToneMatch: 'excellent' as const,
-        recommendations: [
-          '하이라이트는 자연스러운 입체감을 연출합니다',
-          '뿌리염색 없이도 화사한 효과를 얻을 수 있어요',
-          '6-8주마다 터치업을 권장합니다'
-        ]
-      },
-      'full-color': {
-        resultImageUrl: 'https://images.unsplash.com/photo-1594736797933-d0501ba2fe65?w=400&h=500&fit=crop',
-        dominantColors: ['#8B4513', '#D2691E'],
-        skinToneMatch: 'good' as const,
-        recommendations: [
-          '전체 염색으로 완전한 이미지 변화가 가능합니다',
-          '컬러 보호 샴푸 사용을 권장합니다',
-          '염색 후 72시간은 머리를 감지 마세요'
-        ]
-      },
-      'ombre': {
-        resultImageUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=550&fit=crop',
-        dominantColors: ['#2F1B14', '#D4AF37'],
-        skinToneMatch: 'good' as const,
-        recommendations: [
-          '옴브레는 자연스러운 그라데이션이 매력적입니다',
-          '뿌리 관리가 상대적으로 쉬워요',
-          '정기적인 톤 조정이 필요합니다'
-        ]
-      },
-      'balayage': {
-        resultImageUrl: 'https://images.unsplash.com/photo-1487412912498-0447578fcca8?w=400&h=650&fit=crop',
-        dominantColors: ['#6B4423', '#F4E4BC'],
-        skinToneMatch: 'excellent' as const,
-        recommendations: [
-          '발레아쥬는 가장 자연스러운 염색 기법입니다',
-          '손상이 적고 유지보수가 편리해요',
-          '계절마다 톤 조정하면 더욱 예뻐집니다'
-        ]
-      }
-    };
-
-    const demo = demoResults[request.colorType] || demoResults['full-color'];
-    
-    return {
-      resultImageUrl: demo.resultImageUrl,
-      confidence: 0.85,
-      processingTime,
-      apiCallsUsed: 0,
-      colorAnalysis: {
-        dominantColors: demo.dominantColors,
-        skinToneMatch: demo.skinToneMatch,
-        recommendations: demo.recommendations
-      }
-    };
-  }
-
-  // 🆕 Gemini Vision으로 사용자 사진 분석 (헤어 + 피부톤)
   private async analyzeUserPhotoForHairAndSkinTone(userPhotoUrl: string): Promise<{ hairAnalysis: HairAnalysis, skinToneAnalysis: SkinToneAnalysis }> {
     try {
       console.log('🔍 Gemini Vision으로 사용자 사진 분석 시작...');
@@ -377,8 +266,6 @@ Strictly output only the JSON object. Do not add any conversational text.
       let jsonString = '';
       if (result.candidates && result.candidates[0]) {
         const candidate = result.candidates[0];
-        
-        // 텍스트 응답 추출
         if (candidate.content && candidate.content.parts) {
           for (const part of candidate.content.parts) {
             if (part.text) {
@@ -405,7 +292,6 @@ Strictly output only the JSON object. Do not add any conversational text.
 
     } catch (error) {
       console.error('❌ 사용자 사진 분석 실패, 기본값 사용:', error);
-      // 🆕 폴백: 중성적인 기본값
       console.log('⚠️ 사용자 분석 실패, 범용 기본값 사용');
       return {
         hairAnalysis: { 
@@ -425,7 +311,6 @@ Strictly output only the JSON object. Do not add any conversational text.
     }
   }
 
-  // 🆕 Gemini Vision을 사용한 헤어 색상 분석
   private async analyzeColorStyleWithGemini(imageUrl: string): Promise<ColorAnalysis> {
     const cacheKey = this.hashImage(imageUrl);
     if (this.colorCache.has(cacheKey)) {
@@ -498,8 +383,6 @@ Strictly output only the JSON object. Do not add any conversational text.
       let jsonString = '';
       if (result.candidates && result.candidates[0]) {
         const candidate = result.candidates[0];
-        
-        // 텍스트 응답 추출
         if (candidate.content && candidate.content.parts) {
           for (const part of candidate.content.parts) {
             if (part.text) {
@@ -524,10 +407,9 @@ Strictly output only the JSON object. Do not add any conversational text.
 
     } catch (error) {
       console.error('❌ Gemini 이미지 색상 분석 실패:', error);
-      // 🆕 폴백: 사용자 피부톤 기반 추천 색상 사용
       console.log('⚠️ 포트폴리오 색상 분석 실패, 범용 추천 색상으로 폴백');
       return {
-        dominantColors: ["#8B4513", "#C49A6C", "#A0522D"], // 자연스러운 브라운 계열 (대부분 피부톤에 무난)
+        dominantColors: ["#8B4513", "#C49A6C", "#A0522D"],
         technique: "full-color",
         gradientPattern: "uniform",
         difficulty: "easy",
@@ -565,7 +447,6 @@ Strictly output only the JSON object. Do not add any conversational text.
     }
   }
 
-  // 🔥 강화된 색상 전용 프롬프트
   private async processColorTransformation(
     originalImageUrl: string,
     hairAnalysis: HairAnalysis,
@@ -573,7 +454,6 @@ Strictly output only the JSON object. Do not add any conversational text.
     request: ColorTryOnRequest
   ): Promise<string> {
     try {
-      // 🆕 사용자가 직접 지정한 색상이 있으면 우선 사용
       const targetColors = request.colorHex 
         ? [request.colorHex, ...colorAnalysis.dominantColors].slice(0, 3)
         : colorAnalysis.dominantColors;
@@ -646,9 +526,9 @@ This is a portrait photo. Maintain all details with photorealistic quality.
             ]
           }],
           generationConfig: {
-            temperature: 0.15,  // 🔥 더 낮은 temperature로 일관성 극대화
-            topK: 10,           // 🔥 더 낮은 topK로 예측 가능성 증가
-            topP: 0.7,          // 🔥 더 낮은 topP로 정확도 증가
+            temperature: 0.15,
+            topK: 10,
+            topP: 0.7,
             maxOutputTokens: 4096,
             response_modalities: ["TEXT", "IMAGE"]
           }
@@ -700,6 +580,67 @@ This is a portrait photo. Maintain all details with photorealistic quality.
       await new Promise(resolve => setTimeout(resolve, 2000));
       return originalImageUrl;
     }
+  }
+
+  private createDemoResult(request: ColorTryOnRequest, startTime: number): ColorTryOnResult {
+    const processingTime = Date.now() - startTime + 2500;
+    
+    const demoResults = {
+      'highlight': {
+        resultImageUrl: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=400&h=600&fit=crop',
+        dominantColors: ['#D4AF37', '#F4E4BC'],
+        skinToneMatch: 'excellent' as const,
+        recommendations: [
+          '하이라이트는 자연스러운 입체감을 연출합니다',
+          '뿌리염색 없이도 화사한 효과를 얻을 수 있어요',
+          '6-8주마다 터치업을 권장합니다'
+        ]
+      },
+      'full-color': {
+        resultImageUrl: 'https://images.unsplash.com/photo-1594736797933-d0501ba2fe65?w=400&h=500&fit=crop',
+        dominantColors: ['#8B4513', '#D2691E'],
+        skinToneMatch: 'good' as const,
+        recommendations: [
+          '전체 염색으로 완전한 이미지 변화가 가능합니다',
+          '컬러 보호 샴푸 사용을 권장합니다',
+          '염색 후 72시간은 머리를 감지 마세요'
+        ]
+      },
+      'ombre': {
+        resultImageUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=550&fit=crop',
+        dominantColors: ['#2F1B14', '#D4AF37'],
+        skinToneMatch: 'good' as const,
+        recommendations: [
+          '옴브레는 자연스러운 그라데이션이 매력적입니다',
+          '뿌리 관리가 상대적으로 쉬워요',
+          '정기적인 톤 조정이 필요합니다'
+        ]
+      },
+      'balayage': {
+        resultImageUrl: 'https://images.unsplash.com/photo-1487412912498-0447578fcca8?w=400&h=650&fit=crop',
+        dominantColors: ['#6B4423', '#F4E4BC'],
+        skinToneMatch: 'excellent' as const,
+        recommendations: [
+          '발레아쥬는 가장 자연스러운 염색 기법입니다',
+          '손상이 적고 유지보수가 편리해요',
+          '계절마다 톤 조정하면 더욱 예뻐집니다'
+        ]
+      }
+    };
+
+    const demo = demoResults[request.colorType] || demoResults['full-color'];
+    
+    return {
+      resultImageUrl: demo.resultImageUrl,
+      confidence: 0.85,
+      processingTime,
+      apiCallsUsed: 0,
+      colorAnalysis: {
+        dominantColors: demo.dominantColors,
+        skinToneMatch: demo.skinToneMatch,
+        recommendations: demo.recommendations
+      }
+    };
   }
 
   private generateRecommendations(
