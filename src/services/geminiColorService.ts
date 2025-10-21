@@ -90,21 +90,10 @@ class GeminiColorTryOnService {
       try {
         let cleanText = text.trim();
         
-        // 1단계: ```json ... ``` 블록 제거
-        const jsonBlockMatch = cleanText.match(/```json\s*([\s\S]*?)\s*```/);
-        if (jsonBlockMatch && jsonBlockMatch[1]) {
-          cleanText = jsonBlockMatch[1].trim();
-        } else {
-          // 2단계: ``` ... ``` 블록 제거
-          const codeBlockMatch = cleanText.match(/```\s*([\s\S]*?)\s*```/);
-          if (codeBlockMatch && codeBlockMatch[1]) {
-            cleanText = codeBlockMatch[1].trim();
-            // "json" 키워드 제거
-            cleanText = cleanText.replace(/^json\s*\n?/i, '');
-          }
-        }
+        // 1단계: 코드 블록 제거
+        cleanText = cleanText.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
 
-        // 3단계: { ... } 추출
+        // 2단계: { ... } 추출
         const jsonStart = cleanText.indexOf('{');
         const jsonEnd = cleanText.lastIndexOf('}');
         
@@ -112,16 +101,27 @@ class GeminiColorTryOnService {
           cleanText = cleanText.substring(jsonStart, jsonEnd + 1);
         }
 
-        // 4단계: 줄바꿈을 공백으로 변경 (제거하지 않음!)
-        cleanText = cleanText.replace(/\r?\n/g, ' ').replace(/\s{2,}/g, ' ').trim();
+        // 3단계: 불완전한 JSON 복구 (괄호/중괄호 자동 닫기)
+        let openBrackets = (cleanText.match(/\[/g) || []).length;
+        let closeBrackets = (cleanText.match(/\]/g) || []).length;
+        let openBraces = (cleanText.match(/\{/g) || []).length;
+        let closeBraces = (cleanText.match(/\}/g) || []).length;
 
-        console.log('🔧 정리된 JSON (전체):', cleanText);
+        // 부족한 괄호 자동 추가
+        for (let i = 0; i < (openBrackets - closeBrackets); i++) {
+          cleanText += ']';
+        }
+        for (let i = 0; i < (openBraces - closeBraces); i++) {
+          cleanText += '}';
+        }
+
+        console.log('🔧 정리된 JSON:', cleanText.substring(0, 200) + '...');
         
         return JSON.parse(cleanText);
         
       } catch (parseError) {
-        console.error('JSON 파싱 실패:', parseError);
-        console.error('원본 텍스트:', text);
+        console.error('❌ JSON 파싱 최종 실패:', parseError);
+        console.error('원본 텍스트:', text.substring(0, 500));
         throw new Error('응답 파싱 실패: JSON 형식이 아닙니다');
       }
     }
@@ -137,18 +137,22 @@ class GeminiColorTryOnService {
         return this.createDemoResult(request, startTime);
       }
 
+      // 1. 포트폴리오 색상 분석
       const colorAnalysis = await this.analyzeColorStyleWithGemini(request.colorStyleUrl);
       apiCallsUsed++;
       
+      // 2. 사용자 사진 분석
       const { hairAnalysis, skinToneAnalysis } = await this.analyzeUserPhotoForHairAndSkinTone(request.userPhotoUrl);
       apiCallsUsed++;
 
+      // 3. 폴백 색상 처리
       if (colorAnalysis.dominantColors.includes("#8B4513") && colorAnalysis.technique === "full-color") {
         const recommendedColors = this.getRecommendedColorsBySkinTone(skinToneAnalysis.type);
         colorAnalysis.dominantColors = recommendedColors;
         console.log(`🎨 피부톤 ${skinToneAnalysis.type}에 맞는 추천 색상 적용:`, recommendedColors);
       }
       
+      // 4. 염색 이미지 생성
       await this.waitForAvailableSlot();
       const resultImageUrl = await this.processColorTransformation(
         request.userPhotoUrl,
@@ -181,10 +185,10 @@ class GeminiColorTryOnService {
       };
 
     } catch (error) {
-      console.error('Color try-on failed:', error);
+      console.error('❌ Color try-on failed:', error);
       
       if (error instanceof Error && (error.message.includes('API') || error.message.includes('파싱'))) {
-        console.warn('AI 분석 오류 발생, 데모 모드로 전환합니다.');
+        console.warn('⚠️ AI 분석 오류 발생, 데모 모드로 전환합니다.');
         return { ...this.createDemoResult(request, Date.now()), apiCallsUsed };
       }
       
@@ -207,33 +211,25 @@ class GeminiColorTryOnService {
       console.log('🔍 Gemini Vision으로 사용자 사진 분석 시작...');
       const imageData = await this.fetchImageAsBase64(userPhotoUrl);
 
-      const prompt = `
-Analyze the person's hair and skin tone in this image. Provide a JSON object with the following details:
+      const prompt = `Analyze this person's hair and skin tone. Return ONLY this JSON:
 
 {
   "hairAnalysis": {
-    "currentColor": "brown" | "black" | "blonde" | "red" | "gray" | "other",
-    "texture": "straight" | "wavy" | "curly" | "coily",
-    "length": "short" | "medium" | "long" | "very-long",
-    "clarity": 0.0-1.0
+    "currentColor": "brown|black|blonde|red|gray",
+    "texture": "straight|wavy|curly",
+    "length": "short|medium|long",
+    "clarity": 0.8
   },
   "skinToneAnalysis": {
-    "type": "warm" | "cool" | "neutral",
-    "undertone": "peach" | "pink" | "olive" | "yellow" | "neutral",
-    "rgbValue": "rgb(R, G, B)",
-    "suitableColors": ["color1", "color2"],
-    "avoidColors": ["color1", "color2"]
+    "type": "warm|cool|neutral",
+    "undertone": "peach|pink|olive",
+    "rgbValue": "rgb(200,170,145)",
+    "suitableColors": ["browns", "caramel"],
+    "avoidColors": ["neon", "icy blue"]
   }
 }
 
-IMPORTANT:
-- Analyze the current natural hair color
-- Identify hair texture and length
-- Determine skin tone and undertone for color matching
-- Provide clarity score (how clear/distinct the hair is)
-
-Strictly output only the JSON object. Do not add any conversational text.
-      `;
+Rules: Use exact field names. No extra text.`;
 
       await this.waitForAvailableSlot();
       const response = await fetch(`${this.analysisEndpoint}?key=${this.apiKey}`, {
@@ -243,19 +239,14 @@ Strictly output only the JSON object. Do not add any conversational text.
           contents: [{
             parts: [
               { text: prompt },
-              {
-                inline_data: {
-                  mime_type: "image/jpeg",
-                  data: imageData
-                }
-              }
+              { inline_data: { mime_type: "image/jpeg", data: imageData } }
             ]
           }],
           generationConfig: {
             temperature: 0.1,
             topK: 1,
             topP: 1,
-            maxOutputTokens: 1000,
+            maxOutputTokens: 2000, // 🔥 1000 → 2000 (MAX_TOKENS 방지)
           }
         })
       });
@@ -269,15 +260,15 @@ Strictly output only the JSON object. Do not add any conversational text.
       const result = await response.json();
       console.log('📊 Gemini 사용자 분석 응답:', result);
       
+      // finishReason 체크 (MAX_TOKENS 감지)
+      if (result.candidates?.[0]?.finishReason === 'MAX_TOKENS') {
+        console.error('🚨 MAX_TOKENS 에러 발생! 응답이 잘렸습니다.');
+      }
+      
       let jsonString = '';
-      if (result.candidates && result.candidates[0]) {
-        const candidate = result.candidates[0];
-        if (candidate.content && candidate.content.parts) {
-          for (const part of candidate.content.parts) {
-            if (part.text) {
-              jsonString += part.text;
-            }
-          }
+      if (result.candidates?.[0]?.content?.parts) {
+        for (const part of result.candidates[0].content.parts) {
+          if (part.text) jsonString += part.text;
         }
       }
       
@@ -298,7 +289,6 @@ Strictly output only the JSON object. Do not add any conversational text.
 
     } catch (error) {
       console.error('❌ 사용자 사진 분석 실패, 기본값 사용:', error);
-      console.log('⚠️ 사용자 분석 실패, 범용 기본값 사용');
       return {
         hairAnalysis: { 
           currentColor: "brown", 
@@ -310,8 +300,8 @@ Strictly output only the JSON object. Do not add any conversational text.
           type: "neutral", 
           undertone: "neutral", 
           rgbValue: "rgb(200, 170, 145)", 
-          suitableColors: ["natural browns", "warm beige", "soft caramel"], 
-          avoidColors: ["extreme bright colors", "very dark colors"] 
+          suitableColors: ["natural browns", "warm beige"], 
+          avoidColors: ["extreme bright colors"] 
         }
       };
     }
@@ -321,58 +311,46 @@ Strictly output only the JSON object. Do not add any conversational text.
     const cacheKey = this.hashImage(imageUrl);
     if (this.colorCache.has(cacheKey)) {
       console.log('💾 캐시된 색상 분석 사용');
-      const cachedData = this.colorCache.get(cacheKey)!;
-      return JSON.parse(cachedData);
+      return JSON.parse(this.colorCache.get(cacheKey)!);
     }
 
     try {
       console.log('🔍 Gemini Vision으로 헤어 색상 분석 시작...');
       const imageData = await this.fetchImageAsBase64(imageUrl);
 
-      const prompt = `
-Analyze the hair color style in this image. Focus ONLY on the hair, not the background or skin.
+      const prompt = `Analyze hair color in this image. Return ONLY this JSON:
 
-Provide a JSON object with the following details:
 {
-  "dominantColors": ["#HEX1", "#HEX2", "#HEX3"],
-  "technique": "full-color" | "highlight" | "ombre" | "balayage" | "unknown",
-  "gradientPattern": "uniform" | "root-to-tip" | "natural-swept" | "defined-sections" | "subtle-blend" | "unknown",
-  "difficulty": "easy" | "medium" | "hard",
-  "suitableSkinTones": ["warm", "cool", "neutral", "all"],
-  "compatibility": 0.0-1.0
+  "dominantColors": ["#8B4513", "#C49A6C"],
+  "technique": "full-color|highlight|ombre|balayage",
+  "gradientPattern": "uniform|root-to-tip|natural-swept",
+  "difficulty": "easy|medium|hard",
+  "suitableSkinTones": ["warm", "cool", "neutral"],
+  "compatibility": 0.8
 }
 
-IMPORTANT:
-- Extract up to 3 dominant HAIR colors only (exclude background, skin, clothing)
-- Identify the coloring technique used
-- Provide HEX color codes (e.g., #8B4513 for brown)
-
-Strictly output only the JSON object. Do not add any conversational text.
-      `;
+Rules:
+- Extract 2-3 hair colors (HEX format)
+- Ignore background/skin/clothing
+- Use exact field names
+- No extra text`;
 
       await this.waitForAvailableSlot();
       const response = await fetch(`${this.analysisEndpoint}?key=${this.apiKey}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{
             parts: [
               { text: prompt },
-              {
-                inline_data: {
-                  mime_type: "image/jpeg",
-                  data: imageData
-                }
-              }
+              { inline_data: { mime_type: "image/jpeg", data: imageData } }
             ]
           }],
           generationConfig: {
             temperature: 0.1,
             topK: 1,
             topP: 1,
-            maxOutputTokens: 1024,  // 🔥 500 → 1024 증가
+            maxOutputTokens: 4096, // 🔥 1024 → 4096 (MAX_TOKENS 완전 해결)
           }
         })
       });
@@ -386,27 +364,24 @@ Strictly output only the JSON object. Do not add any conversational text.
       const result = await response.json();
       console.log('📊 Gemini 색상 분석 응답:', result);
       
+      // 🚨 MAX_TOKENS 체크
+      const candidate = result.candidates?.[0];
+      if (candidate?.finishReason === 'MAX_TOKENS') {
+        console.error('🚨 MAX_TOKENS 에러! 응답이 잘림:', {
+          finishReason: candidate.finishReason,
+          usageMetadata: result.usageMetadata
+        });
+      }
+      
       let jsonString = '';
-      if (result.candidates && result.candidates[0]) {
-        const candidate = result.candidates[0];
-        console.log('🔍 Candidate:', candidate);
-        
-        if (candidate.content && candidate.content.parts) {
-          console.log('🔍 Parts:', candidate.content.parts);
-          for (const part of candidate.content.parts) {
-            if (part.text) {
-              jsonString += part.text;
-            }
-          }
-        } else {
-          console.log('❌ candidate.content.parts 없음:', candidate.content);
+      if (candidate?.content?.parts) {
+        for (const part of candidate.content.parts) {
+          if (part.text) jsonString += part.text;
         }
-      } else {
-        console.log('❌ candidates 없음 또는 비어있음');
       }
       
       if (!jsonString) {
-        console.log('❌ jsonString이 비어있음. 전체 응답:', JSON.stringify(result, null, 2));
+        console.error('❌ JSON 응답 없음:', JSON.stringify(result, null, 2));
         throw new Error('Gemini 색상 분석 결과가 올바르지 않습니다.');
       }
 
@@ -456,7 +431,7 @@ Strictly output only the JSON object. Do not add any conversational text.
         reader.readAsDataURL(blob);
       });
     } catch (error) {
-      console.error('Image conversion failed:', error);
+      console.error('❌ Image conversion failed:', error);
       throw new Error('이미지 변환에 실패했습니다.');
     }
   }
@@ -477,66 +452,35 @@ Strictly output only the JSON object. Do not add any conversational text.
         : targetColors.join(', ');
 
       const transformationPrompt = `
-HAIR COLOR TRANSFORMATION - STRICT ADHERENCE REQUIRED
+HAIR COLOR TRANSFORMATION - STRICT RULES
 
-GOAL: ONLY change hair color. Preserve ALL other aspects of the original image.
-
-USER'S CURRENT HAIR:
-- Current Color: ${hairAnalysis.currentColor}
-- Texture: ${hairAnalysis.texture}
-- Length: ${hairAnalysis.length}
-
+CURRENT HAIR: ${hairAnalysis.currentColor}, ${hairAnalysis.texture}, ${hairAnalysis.length}
 TARGET COLORS: ${colorDescription}
-Primary Technique: ${request.colorType}
-${colorAnalysis.technique !== request.colorType ? `Reference Style Nuance: ${colorAnalysis.technique} (use subtle elements if they complement the primary technique)` : ''}
-Intensity: ${request.intensity}
+TECHNIQUE: ${request.colorType}
+INTENSITY: ${request.intensity}
 
-🚨 CRITICAL INSTRUCTIONS - ABSOLUTE PRIORITY:
+🚨 CRITICAL - MUST FOLLOW:
+1. ONLY change hair color to: ${targetColors.join(', ')}
+2. PRESERVE: exact hair shape, cut, length, texture (${hairAnalysis.texture})
+3. PRESERVE: face, skin, body, clothing, background
+4. DO NOT: change haircut, add/remove hair, modify texture
+5. Result must be photorealistic
 
-1. **HAIR SHAPE & STRUCTURE:** Maintain the original hair's EXACT SHAPE, CUT, LENGTH, LAYERS, and SILHOUETTE.
-2. **HAIR TEXTURE:** Preserve the original hair's EXACT TEXTURE (${hairAnalysis.texture}), VOLUME, and NATURAL FLOW.
-3. **FEATURES:** DO NOT alter the face, facial features, skin tone, body shape, clothing, background, or any non-hair elements.
-4. **REALISM:** The result must be photorealistic. Seamlessly blend the new color into the existing hair strands, respecting natural highlights, shadows, and hair growth patterns.
-
-WHAT TO DO:
-- Apply the TARGET COLORS (${targetColors.join(', ')}) to the EXISTING hair area ONLY
-- Implement the PRIMARY coloring TECHNIQUE: ${request.colorType}
-- Match the requested INTENSITY: ${request.intensity}
-- Ensure the new color follows the original hair's natural light and shadow contours
-- Transform from current ${hairAnalysis.currentColor} hair to target colors naturally
-
-WHAT NOT TO DO:
-❌ DO NOT change the haircut or hair length in any way
-❌ DO NOT add, remove, or modify hair strands, layers, or volume
-❌ DO NOT introduce new styles or textures
-❌ DO NOT deform or alter any part of the face or body
-❌ DO NOT modify the background
-❌ DO NOT copy hairstyle from any reference image
-❌ DO NOT change the hair texture from ${hairAnalysis.texture}
-
-The transformed image should be indistinguishable from the original, except for the hair color.
-Focus on meticulous color application within the existing hair boundaries.
-
-This is a portrait photo. Maintain all details with photorealistic quality.
-      `;
+Apply ${request.colorType} technique with ${request.intensity} intensity.
+Transform ONLY the hair color from ${hairAnalysis.currentColor} to target colors.
+Keep everything else identical.
+`;
 
       const imageData = await this.fetchImageAsBase64(originalImageUrl);
       
       const response = await fetch(`${this.imageGenerationEndpoint}?key=${this.apiKey}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{
             parts: [
               { text: transformationPrompt },
-              {
-                inline_data: {
-                  mime_type: "image/jpeg",
-                  data: imageData
-                }
-              }
+              { inline_data: { mime_type: "image/jpeg", data: imageData } }
             ]
           }],
           generationConfig: {
@@ -558,30 +502,28 @@ This is a portrait photo. Maintain all details with photorealistic quality.
       const result = await response.json();
       console.log('📸 Gemini 이미지 생성 응답:', result);
       
-      if (result.candidates && result.candidates[0]) {
-        const candidate = result.candidates[0];
-        
-        if (candidate.finishReason === 'SAFETY') {
-          console.warn('⚠️ 안전성 필터에 의해 차단됨');
-          throw new Error('이미지 내용이 안전성 정책에 위배되어 처리할 수 없습니다.');
-        }
-        
-        if (candidate.content && candidate.content.parts) {
-          for (const part of candidate.content.parts) {
-            if ((part.inline_data && part.inline_data.data) || (part.inlineData && part.inlineData.data)) {
-              const base64Data = part.inline_data?.data || part.inlineData?.data;
-              const byteCharacters = atob(base64Data);
-              const byteNumbers = new Array(byteCharacters.length);
-              for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-              }
-              const byteArray = new Uint8Array(byteNumbers);
-              const blob = new Blob([byteArray], { type: 'image/jpeg' });
-              const blobUrl = URL.createObjectURL(blob);
-              
-              console.log('✅ 염색 이미지 생성 성공');
-              return blobUrl;
+      const candidate = result.candidates?.[0];
+      
+      if (candidate?.finishReason === 'SAFETY') {
+        console.warn('⚠️ 안전성 필터 차단');
+        throw new Error('이미지 내용이 안전성 정책에 위배되어 처리할 수 없습니다.');
+      }
+      
+      if (candidate?.content?.parts) {
+        for (const part of candidate.content.parts) {
+          const base64Data = part.inline_data?.data || part.inlineData?.data;
+          if (base64Data) {
+            const byteCharacters = atob(base64Data);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+              byteNumbers[i] = byteCharacters.charCodeAt(i);
             }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: 'image/jpeg' });
+            const blobUrl = URL.createObjectURL(blob);
+            
+            console.log('✅ 염색 이미지 생성 성공');
+            return blobUrl;
           }
         }
       }
@@ -720,7 +662,7 @@ export const useColorTryOn = () => {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.';
       setError(errorMessage);
-      console.error('Color try-on error:', err);
+      console.error('❌ Color try-on error:', err);
     } finally {
       setIsProcessing(false);
     }
