@@ -383,16 +383,24 @@ Strictly output only the JSON object. Do not add any conversational text.
       let jsonString = '';
       if (result.candidates && result.candidates[0]) {
         const candidate = result.candidates[0];
+        console.log('🔍 Candidate:', candidate);
+        
         if (candidate.content && candidate.content.parts) {
+          console.log('🔍 Parts:', candidate.content.parts);
           for (const part of candidate.content.parts) {
             if (part.text) {
               jsonString += part.text;
             }
           }
+        } else {
+          console.log('❌ candidate.content.parts 없음:', candidate.content);
         }
+      } else {
+        console.log('❌ candidates 없음 또는 비어있음');
       }
       
       if (!jsonString) {
+        console.log('❌ jsonString이 비어있음. 전체 응답:', JSON.stringify(result, null, 2));
         throw new Error('Gemini 색상 분석 결과가 올바르지 않습니다.');
       }
 
