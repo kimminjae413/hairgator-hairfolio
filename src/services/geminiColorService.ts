@@ -131,20 +131,9 @@ class GeminiColorTryOnService {
       const colorAnalysis = await this.analyzeColorStyleWithGemini(request.colorStyleUrl);
       apiCallsUsed++;
       
-      const hairAnalysis: HairAnalysis = {
-        currentColor: "자연스러운 갈색",
-        texture: "직모",
-        length: "중간",
-        clarity: 0.75
-      };
-
-      const skinToneAnalysis: SkinToneAnalysis = {
-        type: "뉴트럴톤",
-        undertone: "중성 언더톤",
-        rgbValue: "rgb(200, 170, 145)",
-        suitableColors: ["갈색 계열", "자연스러운 색상"],
-        avoidColors: ["극단적인 색상"]
-      };
+      // 🆕 Gemini Vision으로 사용자 사진 분석 (헤어 + 피부톤)
+      const { hairAnalysis, skinToneAnalysis } = await this.analyzeUserPhotoForHairAndSkinTone(request.userPhotoUrl);
+      apiCallsUsed++;
       
       await this.waitForAvailableSlot();
       const resultImageUrl = await this.processColorTransformation(
@@ -248,6 +237,111 @@ class GeminiColorTryOnService {
         recommendations: demo.recommendations
       }
     };
+  }
+
+  // 🆕 Gemini Vision으로 사용자 사진 분석 (헤어 + 피부톤)
+  private async analyzeUserPhotoForHairAndSkinTone(userPhotoUrl: string): Promise<{ hairAnalysis: HairAnalysis, skinToneAnalysis: SkinToneAnalysis }> {
+    try {
+      console.log('🔍 Gemini Vision으로 사용자 사진 분석 시작...');
+      const imageData = await this.fetchImageAsBase64(userPhotoUrl);
+
+      const prompt = `
+Analyze the person's hair and skin tone in this image. Provide a JSON object with the following details:
+
+{
+  "hairAnalysis": {
+    "currentColor": "brown" | "black" | "blonde" | "red" | "gray" | "other",
+    "texture": "straight" | "wavy" | "curly" | "coily",
+    "length": "short" | "medium" | "long" | "very-long",
+    "clarity": 0.0-1.0
+  },
+  "skinToneAnalysis": {
+    "type": "warm" | "cool" | "neutral",
+    "undertone": "peach" | "pink" | "olive" | "yellow" | "neutral",
+    "rgbValue": "rgb(R, G, B)",
+    "suitableColors": ["color1", "color2"],
+    "avoidColors": ["color1", "color2"]
+  }
+}
+
+IMPORTANT:
+- Analyze the current natural hair color
+- Identify hair texture and length
+- Determine skin tone and undertone for color matching
+- Provide clarity score (how clear/distinct the hair is)
+
+Strictly output only the JSON object. Do not add any conversational text.
+      `;
+
+      await this.waitForAvailableSlot();
+      const response = await fetch(`${this.analysisEndpoint}?key=${this.apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              {
+                inline_data: {
+                  mime_type: "image/jpeg",
+                  data: imageData
+                }
+              }
+            ]
+          }],
+          generationConfig: {
+            temperature: 0.1,
+            topK: 1,
+            topP: 1,
+            maxOutputTokens: 1000,
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Gemini 사용자 분석 API 오류:', errorText);
+        throw new Error(`Gemini 사용자 분석 실패: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('📊 Gemini 사용자 분석 응답:', result);
+      
+      let jsonString = '';
+      if (result.candidates && result.candidates[0] && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts[0].text) {
+        jsonString = result.candidates[0].content.parts[0].text;
+      } else {
+        throw new Error('Gemini 사용자 분석 결과가 올바르지 않습니다.');
+      }
+
+      const parsedResult = this.extractJsonFromResponse(jsonString);
+      
+      console.log('✅ 현재 헤어 색상:', parsedResult.hairAnalysis.currentColor);
+      console.log('✅ 피부톤:', parsedResult.skinToneAnalysis.type);
+      
+      return {
+        hairAnalysis: parsedResult.hairAnalysis,
+        skinToneAnalysis: parsedResult.skinToneAnalysis
+      };
+
+    } catch (error) {
+      console.error('❌ 사용자 사진 분석 실패, 기본값 사용:', error);
+      return {
+        hairAnalysis: { 
+          currentColor: "brown", 
+          texture: "straight", 
+          length: "medium", 
+          clarity: 0.7 
+        },
+        skinToneAnalysis: { 
+          type: "neutral", 
+          undertone: "neutral", 
+          rgbValue: "rgb(200, 170, 145)", 
+          suitableColors: ["browns", "natural tones"], 
+          avoidColors: ["extreme colors"] 
+        }
+      };
+    }
   }
 
   // 🆕 Gemini Vision을 사용한 헤어 색상 분석
@@ -385,28 +479,43 @@ Strictly output only the JSON object. Do not add any conversational text.
     request: ColorTryOnRequest
   ): Promise<string> {
     try {
+      // 🆕 사용자가 직접 지정한 색상이 있으면 우선 사용
+      const targetColors = request.colorHex 
+        ? [request.colorHex, ...colorAnalysis.dominantColors].slice(0, 3)
+        : colorAnalysis.dominantColors;
+      
+      const colorDescription = request.colorName 
+        ? `${request.colorName} (${targetColors.join(', ')})`
+        : targetColors.join(', ');
+
       const transformationPrompt = `
 HAIR COLOR TRANSFORMATION - STRICT ADHERENCE REQUIRED
 
 GOAL: ONLY change hair color. Preserve ALL other aspects of the original image.
 
-TARGET COLORS: ${colorAnalysis.dominantColors.join(', ')}
-Technique: ${request.colorType} (also consider: ${colorAnalysis.technique})
+USER'S CURRENT HAIR:
+- Current Color: ${hairAnalysis.currentColor}
+- Texture: ${hairAnalysis.texture}
+- Length: ${hairAnalysis.length}
+
+TARGET COLORS: ${colorDescription}
+Primary Technique: ${request.colorType}
+${colorAnalysis.technique !== request.colorType ? `Reference Style Nuance: ${colorAnalysis.technique} (use subtle elements if they complement the primary technique)` : ''}
 Intensity: ${request.intensity}
-Exact Hex Colors: ${colorAnalysis.dominantColors.join(', ')}
 
 🚨 CRITICAL INSTRUCTIONS - ABSOLUTE PRIORITY:
 
 1. **HAIR SHAPE & STRUCTURE:** Maintain the original hair's EXACT SHAPE, CUT, LENGTH, LAYERS, and SILHOUETTE.
-2. **HAIR TEXTURE:** Preserve the original hair's EXACT TEXTURE (straight, wavy, curly, coily, frizz), VOLUME, and NATURAL FLOW.
+2. **HAIR TEXTURE:** Preserve the original hair's EXACT TEXTURE (${hairAnalysis.texture}), VOLUME, and NATURAL FLOW.
 3. **FEATURES:** DO NOT alter the face, facial features, skin tone, body shape, clothing, background, or any non-hair elements.
 4. **REALISM:** The result must be photorealistic. Seamlessly blend the new color into the existing hair strands, respecting natural highlights, shadows, and hair growth patterns.
 
 WHAT TO DO:
-- Apply the TARGET COLORS (${colorAnalysis.dominantColors.join(', ')}) to the EXISTING hair area ONLY
-- Implement the specified coloring TECHNIQUE (${request.colorType})
-- Match the requested INTENSITY (${request.intensity})
+- Apply the TARGET COLORS (${targetColors.join(', ')}) to the EXISTING hair area ONLY
+- Implement the PRIMARY coloring TECHNIQUE: ${request.colorType}
+- Match the requested INTENSITY: ${request.intensity}
 - Ensure the new color follows the original hair's natural light and shadow contours
+- Transform from current ${hairAnalysis.currentColor} hair to target colors naturally
 
 WHAT NOT TO DO:
 ❌ DO NOT change the haircut or hair length in any way
@@ -415,11 +524,12 @@ WHAT NOT TO DO:
 ❌ DO NOT deform or alter any part of the face or body
 ❌ DO NOT modify the background
 ❌ DO NOT copy hairstyle from any reference image
+❌ DO NOT change the hair texture from ${hairAnalysis.texture}
 
 The transformed image should be indistinguishable from the original, except for the hair color.
 Focus on meticulous color application within the existing hair boundaries.
 
-This is a close-up portrait. Maintain all details.
+This is a portrait photo. Maintain all details with photorealistic quality.
       `;
 
       const imageData = await this.fetchImageAsBase64(originalImageUrl);
