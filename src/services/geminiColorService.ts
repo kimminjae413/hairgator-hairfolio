@@ -141,9 +141,41 @@ class GeminiColorTryOnService {
       const colorAnalysis = await this.analyzeColorStyleWithGemini(request.colorStyleUrl);
       apiCallsUsed++;
       
-      // 🆕 Gemini Vision으로 사용자 사진 분석 (헤어 + 피부톤)
+      // 🆕 피부톤에 따른 추천 헤어 색상
+  private getRecommendedColorsBySkinTone(skinToneType: string): string[] {
+    const colorRecommendations = {
+      'warm': [
+        "#8B4513", // 웜 브라운
+        "#C49A6C", // 캐러멜
+        "#D2691E"  // 초콜릿
+      ],
+      'cool': [
+        "#4A4A4A", // 애쉬 브라운
+        "#8B7D7B", // 애쉬 그레이
+        "#B8A99A"  // 쿨 베이지
+      ],
+      'neutral': [
+        "#8B4513", // 내추럴 브라운
+        "#A0522D", // 시에나 브라운
+        "#C49A6C"  // 밀크 캐러멜
+      ]
+    };
+
+    return colorRecommendations[skinToneType as keyof typeof colorRecommendations] 
+      || colorRecommendations['neutral'];
+  }
+
+  // 🆕 Gemini Vision으로 사용자 사진 분석 (헤어 + 피부톤)
       const { hairAnalysis, skinToneAnalysis } = await this.analyzeUserPhotoForHairAndSkinTone(request.userPhotoUrl);
       apiCallsUsed++;
+
+      // 🆕 포트폴리오 색상 분석이 실패했다면, 사용자 피부톤에 맞는 추천 색상 사용
+      if (colorAnalysis.dominantColors.includes("#8B4513") && colorAnalysis.technique === "full-color") {
+        // 폴백 기본값인 경우 (분석 실패), 피부톤에 맞는 색상으로 교체
+        const recommendedColors = this.getRecommendedColorsBySkinTone(skinToneAnalysis.type);
+        colorAnalysis.dominantColors = recommendedColors;
+        console.log(`🎨 피부톤 ${skinToneAnalysis.type}에 맞는 추천 색상 적용:`, recommendedColors);
+      }
       
       await this.waitForAvailableSlot();
       const resultImageUrl = await this.processColorTransformation(
@@ -348,6 +380,8 @@ Strictly output only the JSON object. Do not add any conversational text.
 
     } catch (error) {
       console.error('❌ 사용자 사진 분석 실패, 기본값 사용:', error);
+      // 🆕 폴백: 중성적인 기본값
+      console.log('⚠️ 사용자 분석 실패, 범용 기본값 사용');
       return {
         hairAnalysis: { 
           currentColor: "brown", 
@@ -359,8 +393,8 @@ Strictly output only the JSON object. Do not add any conversational text.
           type: "neutral", 
           undertone: "neutral", 
           rgbValue: "rgb(200, 170, 145)", 
-          suitableColors: ["browns", "natural tones"], 
-          avoidColors: ["extreme colors"] 
+          suitableColors: ["natural browns", "warm beige", "soft caramel"], 
+          avoidColors: ["extreme bright colors", "very dark colors"] 
         }
       };
     }
@@ -465,9 +499,10 @@ Strictly output only the JSON object. Do not add any conversational text.
 
     } catch (error) {
       console.error('❌ Gemini 이미지 색상 분석 실패:', error);
-      // 폴백 기본값
+      // 🆕 폴백: 사용자 피부톤 기반 추천 색상 사용
+      console.log('⚠️ 포트폴리오 색상 분석 실패, 범용 추천 색상으로 폴백');
       return {
-        dominantColors: ["#8B4513", "#D2691E", "#A0522D"],
+        dominantColors: ["#8B4513", "#C49A6C", "#A0522D"], // 자연스러운 브라운 계열 (대부분 피부톤에 무난)
         technique: "full-color",
         gradientPattern: "uniform",
         difficulty: "easy",
