@@ -372,7 +372,7 @@ Strictly output only the JSON object. Do not add any conversational text.
             temperature: 0.1,
             topK: 1,
             topP: 1,
-            maxOutputTokens: 500,
+            maxOutputTokens: 1024,  // 🔥 500 → 1024 증가
           }
         })
       });
