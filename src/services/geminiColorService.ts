@@ -90,17 +90,21 @@ class GeminiColorTryOnService {
       try {
         let cleanText = text.trim();
         
+        // 1단계: ```json ... ``` 블록 제거
         const jsonBlockMatch = cleanText.match(/```json\s*([\s\S]*?)\s*```/);
         if (jsonBlockMatch && jsonBlockMatch[1]) {
           cleanText = jsonBlockMatch[1].trim();
         } else {
+          // 2단계: ``` ... ``` 블록 제거
           const codeBlockMatch = cleanText.match(/```\s*([\s\S]*?)\s*```/);
           if (codeBlockMatch && codeBlockMatch[1]) {
             cleanText = codeBlockMatch[1].trim();
-            cleanText = cleanText.replace(/^json\s*\n?/, '');
+            // "json" 키워드 제거
+            cleanText = cleanText.replace(/^json\s*\n?/i, '');
           }
         }
 
+        // 3단계: { ... } 추출
         const jsonStart = cleanText.indexOf('{');
         const jsonEnd = cleanText.lastIndexOf('}');
         
@@ -108,10 +112,16 @@ class GeminiColorTryOnService {
           cleanText = cleanText.substring(jsonStart, jsonEnd + 1);
         }
 
+        // 4단계: 줄바꿈 및 공백 정리
+        cleanText = cleanText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+
+        console.log('🔧 정리된 JSON:', cleanText.substring(0, 200) + '...');
+        
         return JSON.parse(cleanText);
         
       } catch (parseError) {
         console.error('JSON 파싱 실패:', parseError);
+        console.error('원본 텍스트:', text);
         throw new Error('응답 파싱 실패: JSON 형식이 아닙니다');
       }
     }
@@ -308,12 +318,24 @@ Strictly output only the JSON object. Do not add any conversational text.
       console.log('📊 Gemini 사용자 분석 응답:', result);
       
       let jsonString = '';
-      if (result.candidates && result.candidates[0] && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts[0].text) {
-        jsonString = result.candidates[0].content.parts[0].text;
-      } else {
+      if (result.candidates && result.candidates[0]) {
+        const candidate = result.candidates[0];
+        
+        // 텍스트 응답 추출
+        if (candidate.content && candidate.content.parts) {
+          for (const part of candidate.content.parts) {
+            if (part.text) {
+              jsonString += part.text;
+            }
+          }
+        }
+      }
+      
+      if (!jsonString) {
         throw new Error('Gemini 사용자 분석 결과가 올바르지 않습니다.');
       }
 
+      console.log('📝 원본 응답:', jsonString);
       const parsedResult = this.extractJsonFromResponse(jsonString);
       
       console.log('✅ 현재 헤어 색상:', parsedResult.hairAnalysis.currentColor);
@@ -415,12 +437,24 @@ Strictly output only the JSON object. Do not add any conversational text.
       console.log('📊 Gemini 색상 분석 응답:', result);
       
       let jsonString = '';
-      if (result.candidates && result.candidates[0] && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts[0].text) {
-        jsonString = result.candidates[0].content.parts[0].text;
-      } else {
+      if (result.candidates && result.candidates[0]) {
+        const candidate = result.candidates[0];
+        
+        // 텍스트 응답 추출
+        if (candidate.content && candidate.content.parts) {
+          for (const part of candidate.content.parts) {
+            if (part.text) {
+              jsonString += part.text;
+            }
+          }
+        }
+      }
+      
+      if (!jsonString) {
         throw new Error('Gemini 색상 분석 결과가 올바르지 않습니다.');
       }
 
+      console.log('📝 원본 응답:', jsonString);
       const colorAnalysisResult = this.extractJsonFromResponse(jsonString) as ColorAnalysis;
       
       console.log('✅ 추출된 헤어 색상:', colorAnalysisResult.dominantColors);
