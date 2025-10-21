@@ -90,17 +90,21 @@ class GeminiColorTryOnService {
       try {
         let cleanText = text.trim();
         
+        // 1단계: ```json ... ``` 블록 제거
         const jsonBlockMatch = cleanText.match(/```json\s*([\s\S]*?)\s*```/);
         if (jsonBlockMatch && jsonBlockMatch[1]) {
           cleanText = jsonBlockMatch[1].trim();
         } else {
+          // 2단계: ``` ... ``` 블록 제거
           const codeBlockMatch = cleanText.match(/```\s*([\s\S]*?)\s*```/);
           if (codeBlockMatch && codeBlockMatch[1]) {
             cleanText = codeBlockMatch[1].trim();
+            // "json" 키워드 제거
             cleanText = cleanText.replace(/^json\s*\n?/i, '');
           }
         }
 
+        // 3단계: { ... } 추출
         const jsonStart = cleanText.indexOf('{');
         const jsonEnd = cleanText.lastIndexOf('}');
         
@@ -108,8 +112,10 @@ class GeminiColorTryOnService {
           cleanText = cleanText.substring(jsonStart, jsonEnd + 1);
         }
 
-        cleanText = cleanText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-        console.log('🔧 정리된 JSON:', cleanText.substring(0, 200) + '...');
+        // 4단계: 줄바꿈을 공백으로 변경 (제거하지 않음!)
+        cleanText = cleanText.replace(/\r?\n/g, ' ').replace(/\s{2,}/g, ' ').trim();
+
+        console.log('🔧 정리된 JSON (전체):', cleanText);
         
         return JSON.parse(cleanText);
         
