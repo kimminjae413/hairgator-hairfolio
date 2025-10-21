@@ -166,6 +166,7 @@ class GeminiColorTryOnService {
   }
 
   // 🆕 Gemini Vision으로 사용자 사진 분석 (헤어 + 피부톤)
+  private async analyzeUserPhotoForHairAndSkinTone(userPhotoUrl: string): Promise<{ hairAnalysis: HairAnalysis, skinToneAnalysis: SkinToneAnalysis }> {
       const { hairAnalysis, skinToneAnalysis } = await this.analyzeUserPhotoForHairAndSkinTone(request.userPhotoUrl);
       apiCallsUsed++;
 
@@ -218,6 +219,30 @@ class GeminiColorTryOnService {
       
       throw new Error('염색 가상체험 처리 중 오류가 발생했습니다: ' + (error as Error).message);
     }
+  }
+
+  // 🆕 피부톤에 따른 추천 헤어 색상
+  private getRecommendedColorsBySkinTone(skinToneType: string): string[] {
+    const colorRecommendations = {
+      'warm': [
+        "#8B4513", // 웜 브라운
+        "#C49A6C", // 캐러멜
+        "#D2691E"  // 초콜릿
+      ],
+      'cool': [
+        "#4A4A4A", // 애쉬 브라운
+        "#8B7D7B", // 애쉬 그레이
+        "#B8A99A"  // 쿨 베이지
+      ],
+      'neutral': [
+        "#8B4513", // 내추럴 브라운
+        "#A0522D", // 시에나 브라운
+        "#C49A6C"  // 밀크 캐러멜
+      ]
+    };
+
+    return colorRecommendations[skinToneType as keyof typeof colorRecommendations] 
+      || colorRecommendations['neutral'];
   }
 
   private createDemoResult(request: ColorTryOnRequest, startTime: number): ColorTryOnResult {
