@@ -46,13 +46,13 @@ interface SkinToneAnalysis {
   avoidColors: string[];
 }
 
-// Gemini Color Try-On Service (최적화 버전)
+// Gemini Color Try-On Service - Gemini Vision 사용
 class GeminiColorTryOnService {
   private apiKey: string;
   private analysisEndpoint: string = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
   private imageGenerationEndpoint: string = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent';
   
-  private colorCache = new Map<string, string[]>();
+  private colorCache = new Map<string, string>();
   private callTimestamps: number[] = [];
   private maxCallsPerMinute = 10;
 
@@ -127,7 +127,9 @@ class GeminiColorTryOnService {
         return this.createDemoResult(request, startTime);
       }
 
-      const colorAnalysis = await this.analyzeColorStyle(request.colorStyleUrl);
+      // 🆕 Gemini Vision으로 포트폴리오 이미지의 헤어 색상 분석
+      const colorAnalysis = await this.analyzeColorStyleWithGemini(request.colorStyleUrl);
+      apiCallsUsed++;
       
       const hairAnalysis: HairAnalysis = {
         currentColor: "자연스러운 갈색",
@@ -151,7 +153,7 @@ class GeminiColorTryOnService {
         colorAnalysis,
         request
       );
-      apiCallsUsed = 1;
+      apiCallsUsed++;
 
       const recommendations = this.generateRecommendations(
         skinToneAnalysis,
@@ -248,149 +250,103 @@ class GeminiColorTryOnService {
     };
   }
 
-  private async analyzeColorStyle(styleImageUrl: string): Promise<ColorAnalysis> {
-    const cacheKey = this.hashImage(styleImageUrl);
+  // 🆕 Gemini Vision을 사용한 헤어 색상 분석
+  private async analyzeColorStyleWithGemini(imageUrl: string): Promise<ColorAnalysis> {
+    const cacheKey = this.hashImage(imageUrl);
     if (this.colorCache.has(cacheKey)) {
-      console.log('💾 캐시된 색상 사용');
-      const cachedColors = this.colorCache.get(cacheKey)!;
-      return {
-        dominantColors: cachedColors,
-        technique: "염색",
-        gradientPattern: "자연스러운 색상",
-        difficulty: "중급",
-        suitableSkinTones: ["웜톤", "뉴트럴톤"],
-        compatibility: 0.8
-      };
+      console.log('💾 캐시된 색상 분석 사용');
+      const cachedData = this.colorCache.get(cacheKey)!;
+      return JSON.parse(cachedData);
     }
 
     try {
-      const colors = await this.analyzeImageColors(styleImageUrl);
-      this.colorCache.set(cacheKey, colors.dominantColors);
-      return colors;
-    } catch (error) {
-      console.error('색상 분석 실패, 기본값 사용:', error);
-      return {
-        dominantColors: ["#8B4513", "#D2691E"],
-        technique: "전체염색",
-        gradientPattern: "균일한 색상",
-        difficulty: "초급",
-        suitableSkinTones: ["모든 톤"],
-        compatibility: 0.7
-      };
-    }
-  }
+      console.log('🔍 Gemini Vision으로 헤어 색상 분석 시작...');
+      const imageData = await this.fetchImageAsBase64(imageUrl);
 
-  private async analyzeImageColors(imageUrl: string): Promise<ColorAnalysis> {
-    try {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      
-      return new Promise((resolve) => {
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx.drawImage(img, 0, 0);
-          
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const colors = this.extractDominantColors(imageData.data);
-          
-          console.log('📊 이미지에서 추출한 색상:', colors);
-          
-          resolve({
-            dominantColors: colors,
-            technique: "염색",
-            gradientPattern: "자연스러운 색상",
-            difficulty: "중급",
-            suitableSkinTones: ["웜톤", "뉴트럴톤"],
-            compatibility: 0.8
-          });
-        };
-        
-        img.onerror = () => {
-          console.error('이미지 로드 실패, 기본값 사용');
-          resolve({
-            dominantColors: ["#8B4513", "#D2691E"],
-            technique: "전체염색",
-            gradientPattern: "균일한 색상",
-            difficulty: "초급",
-            suitableSkinTones: ["모든 톤"],
-            compatibility: 0.7
-          });
-        };
-        
-        img.src = imageUrl;
+      const prompt = `
+Analyze the hair color style in this image. Focus ONLY on the hair, not the background or skin.
+
+Provide a JSON object with the following details:
+{
+  "dominantColors": ["#HEX1", "#HEX2", "#HEX3"],
+  "technique": "full-color" | "highlight" | "ombre" | "balayage" | "unknown",
+  "gradientPattern": "uniform" | "root-to-tip" | "natural-swept" | "defined-sections" | "subtle-blend" | "unknown",
+  "difficulty": "easy" | "medium" | "hard",
+  "suitableSkinTones": ["warm", "cool", "neutral", "all"],
+  "compatibility": 0.0-1.0
+}
+
+IMPORTANT:
+- Extract up to 3 dominant HAIR colors only (exclude background, skin, clothing)
+- Identify the coloring technique used
+- Provide HEX color codes (e.g., #8B4513 for brown)
+
+Strictly output only the JSON object. Do not add any conversational text.
+      `;
+
+      await this.waitForAvailableSlot();
+      const response = await fetch(`${this.analysisEndpoint}?key=${this.apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              {
+                inline_data: {
+                  mime_type: "image/jpeg",
+                  data: imageData
+                }
+              }
+            ]
+          }],
+          generationConfig: {
+            temperature: 0.1,
+            topK: 1,
+            topP: 1,
+            maxOutputTokens: 500,
+          }
+        })
       });
       
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Gemini 색상 분석 API 오류:', errorText);
+        throw new Error(`Gemini 색상 분석 실패: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('📊 Gemini 색상 분석 응답:', result);
+      
+      let jsonString = '';
+      if (result.candidates && result.candidates[0] && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts[0].text) {
+        jsonString = result.candidates[0].content.parts[0].text;
+      } else {
+        throw new Error('Gemini 색상 분석 결과가 올바르지 않습니다.');
+      }
+
+      const colorAnalysisResult = this.extractJsonFromResponse(jsonString) as ColorAnalysis;
+      
+      console.log('✅ 추출된 헤어 색상:', colorAnalysisResult.dominantColors);
+      console.log('✅ 염색 기법:', colorAnalysisResult.technique);
+      
+      this.colorCache.set(cacheKey, JSON.stringify(colorAnalysisResult));
+      return colorAnalysisResult;
+
     } catch (error) {
-      console.error('이미지 색상 분석 실패:', error);
+      console.error('❌ Gemini 이미지 색상 분석 실패:', error);
+      // 폴백 기본값
       return {
-        dominantColors: ["#8B4513", "#D2691E"],
-        technique: "전체염색",
-        gradientPattern: "균일한 색상",
-        difficulty: "초급",
-        suitableSkinTones: ["모든 톤"],
+        dominantColors: ["#8B4513", "#D2691E", "#A0522D"],
+        technique: "full-color",
+        gradientPattern: "uniform",
+        difficulty: "easy",
+        suitableSkinTones: ["all"],
         compatibility: 0.7
       };
     }
-  }
-
-  private extractDominantColors(imageData: Uint8ClampedArray): string[] {
-    const colorMap = new Map<string, number>();
-    
-    for (let i = 0; i < imageData.length; i += 64) {
-      const r = imageData[i];
-      const g = imageData[i + 1];
-      const b = imageData[i + 2];
-      const a = imageData[i + 3];
-      
-      if (a > 200) {
-        const brightness = (r + g + b) / 3;
-        if (brightness < 30 || brightness > 240) continue;
-        
-        const max = Math.max(r, g, b);
-        const min = Math.min(r, g, b);
-        const saturation = max === 0 ? 0 : (max - min) / max;
-        if (saturation < 0.1) continue;
-        
-        const roundedR = Math.round(r / 16) * 16;
-        const roundedG = Math.round(g / 16) * 16;
-        const roundedB = Math.round(b / 16) * 16;
-        
-        const colorKey = `${roundedR},${roundedG},${roundedB}`;
-        colorMap.set(colorKey, (colorMap.get(colorKey) || 0) + 1);
-      }
-    }
-    
-    if (colorMap.size < 2) {
-      console.log('충분한 색상 감지 안됨, 기본값 사용');
-      return ['#E6B3FF', '#D147A3', '#8A2BE2'];
-    }
-    
-    const sortedColors = Array.from(colorMap.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3);
-    
-    const extractedColors = sortedColors.map(([colorKey]) => {
-      const [r, g, b] = colorKey.split(',').map(Number);
-      return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-    });
-    
-    const allDark = extractedColors.every(color => {
-      const r = parseInt(color.slice(1, 3), 16);
-      const g = parseInt(color.slice(3, 5), 16);
-      const b = parseInt(color.slice(5, 7), 16);
-      return (r + g + b) / 3 < 100;
-    });
-    
-    if (allDark) {
-      console.log('어두운 색상만 감지됨, 밝은 색상 추가');
-      extractedColors.push('#E6B3FF', '#D147A3');
-    }
-    
-    return extractedColors.slice(0, 3);
   }
 
   private async fetchImageAsBase64(imageUrl: string): Promise<string> {
@@ -421,7 +377,7 @@ class GeminiColorTryOnService {
     }
   }
 
-  // 🔥 강력한 색상 전용 프롬프트
+  // 🔥 강화된 색상 전용 프롬프트
   private async processColorTransformation(
     originalImageUrl: string,
     hairAnalysis: HairAnalysis,
@@ -430,38 +386,40 @@ class GeminiColorTryOnService {
   ): Promise<string> {
     try {
       const transformationPrompt = `
-HAIR COLOR TRANSFORMATION TASK - EXTREMELY IMPORTANT RULES
+HAIR COLOR TRANSFORMATION - STRICT ADHERENCE REQUIRED
+
+GOAL: ONLY change hair color. Preserve ALL other aspects of the original image.
 
 TARGET COLORS: ${colorAnalysis.dominantColors.join(', ')}
-Technique: ${request.colorType}
+Technique: ${request.colorType} (also consider: ${colorAnalysis.technique})
 Intensity: ${request.intensity}
+Exact Hex Colors: ${colorAnalysis.dominantColors.join(', ')}
 
-🚨 ABSOLUTE REQUIREMENTS - DO NOT DEVIATE:
+🚨 CRITICAL INSTRUCTIONS - ABSOLUTE PRIORITY:
 
-1. ONLY CHANGE HAIR COLOR - Nothing else
-2. DO NOT modify hairstyle, haircut, hair length, or hair shape
-3. DO NOT change face, facial features, skin, or background
-4. DO NOT copy hairstyle from any reference image
-5. PRESERVE the exact same hair structure, layers, and flow
-6. KEEP all waves, curls, straight parts exactly as they are
-7. MAINTAIN the original hair volume and texture
-8. APPLY colors ONLY to the existing hair strands
+1. **HAIR SHAPE & STRUCTURE:** Maintain the original hair's EXACT SHAPE, CUT, LENGTH, LAYERS, and SILHOUETTE.
+2. **HAIR TEXTURE:** Preserve the original hair's EXACT TEXTURE (straight, wavy, curly, coily, frizz), VOLUME, and NATURAL FLOW.
+3. **FEATURES:** DO NOT alter the face, facial features, skin tone, body shape, clothing, background, or any non-hair elements.
+4. **REALISM:** The result must be photorealistic. Seamlessly blend the new color into the existing hair strands, respecting natural highlights, shadows, and hair growth patterns.
 
 WHAT TO DO:
-✅ Apply the specified colors (${colorAnalysis.dominantColors.join(', ')}) to the person's EXISTING hair
-✅ Match the color intensity level: ${request.intensity}
-✅ Use ${request.colorType} coloring technique
-✅ Keep natural hair highlights and shadows for realism
+- Apply the TARGET COLORS (${colorAnalysis.dominantColors.join(', ')}) to the EXISTING hair area ONLY
+- Implement the specified coloring TECHNIQUE (${request.colorType})
+- Match the requested INTENSITY (${request.intensity})
+- Ensure the new color follows the original hair's natural light and shadow contours
 
 WHAT NOT TO DO:
-❌ Do NOT change hair length
-❌ Do NOT change haircut or hairstyle
-❌ Do NOT add or remove hair layers
-❌ Do NOT modify hair texture (straight/wavy/curly)
-❌ Do NOT change the person's face or body
-❌ Do NOT alter background or clothing
+❌ DO NOT change the haircut or hair length in any way
+❌ DO NOT add, remove, or modify hair strands, layers, or volume
+❌ DO NOT introduce new styles or textures
+❌ DO NOT deform or alter any part of the face or body
+❌ DO NOT modify the background
+❌ DO NOT copy hairstyle from any reference image
 
-This is a HAIR COLOR ONLY transformation. The result should look exactly like the original photo but with different hair color.
+The transformed image should be indistinguishable from the original, except for the hair color.
+Focus on meticulous color application within the existing hair boundaries.
+
+This is a close-up portrait. Maintain all details.
       `;
 
       const imageData = await this.fetchImageAsBase64(originalImageUrl);
@@ -484,9 +442,9 @@ This is a HAIR COLOR ONLY transformation. The result should look exactly like th
             ]
           }],
           generationConfig: {
-            temperature: 0.2,  // 🔥 더 낮은 temperature로 일관성 증가
-            topK: 20,          // 🔥 더 낮은 topK로 예측 가능성 증가
-            topP: 0.8,         // 🔥 더 낮은 topP로 정확도 증가
+            temperature: 0.15,  // 🔥 더 낮은 temperature로 일관성 극대화
+            topK: 10,           // 🔥 더 낮은 topK로 예측 가능성 증가
+            topP: 0.7,          // 🔥 더 낮은 topP로 정확도 증가
             maxOutputTokens: 4096,
             response_modalities: ["TEXT", "IMAGE"]
           }
@@ -495,19 +453,19 @@ This is a HAIR COLOR ONLY transformation. The result should look exactly like th
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('이미지 생성 API 오류:', errorText);
+        console.error('❌ 이미지 생성 API 오류:', errorText);
         throw new Error(`이미지 변환 실패: ${response.status}`);
       }
 
       const result = await response.json();
-      console.log('Gemini 이미지 생성 응답:', result);
+      console.log('📸 Gemini 이미지 생성 응답:', result);
       
       if (result.candidates && result.candidates[0]) {
         const candidate = result.candidates[0];
         
         if (candidate.finishReason === 'SAFETY') {
-          console.warn('안전성 필터에 의해 차단됨');
-          return originalImageUrl;
+          console.warn('⚠️ 안전성 필터에 의해 차단됨');
+          throw new Error('이미지 내용이 안전성 정책에 위배되어 처리할 수 없습니다.');
         }
         
         if (candidate.content && candidate.content.parts) {
@@ -523,18 +481,18 @@ This is a HAIR COLOR ONLY transformation. The result should look exactly like th
               const blob = new Blob([byteArray], { type: 'image/jpeg' });
               const blobUrl = URL.createObjectURL(blob);
               
-              console.log('✅ 이미지 생성 성공');
+              console.log('✅ 염색 이미지 생성 성공');
               return blobUrl;
             }
           }
         }
       }
 
-      console.warn('이미지 생성 실패, 원본 반환');
+      console.warn('⚠️ 이미지 생성 실패, 원본 반환');
       return originalImageUrl;
 
     } catch (error) {
-      console.error('이미지 변환 중 오류:', error);
+      console.error('❌ 이미지 변환 중 오류:', error);
       await new Promise(resolve => setTimeout(resolve, 2000));
       return originalImageUrl;
     }
@@ -574,7 +532,7 @@ This is a HAIR COLOR ONLY transformation. The result should look exactly like th
     
     if (recommendedSkinTones.includes(userSkinType)) {
       return 'excellent';
-    } else if (recommendedSkinTones.includes('모든 톤') || recommendedSkinTones.includes('뉴트럴톤')) {
+    } else if (recommendedSkinTones.includes('all') || recommendedSkinTones.includes('neutral')) {
       return 'good';
     } else if (colorAnalysis.compatibility > 0.6) {
       return 'fair';
